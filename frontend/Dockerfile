@@ -8,10 +8,12 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json tsconfig.json next.config.ts next-env.d.ts ./
+COPY components ./components
 COPY pages ./pages
 COPY public ./public
 COPY store ./store
 COPY styles ./styles
+COPY theme ./theme
 RUN yarn build
 
 FROM --platform=linux/amd64 node:22-alpine AS production
