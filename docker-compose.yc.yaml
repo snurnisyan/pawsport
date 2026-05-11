@@ -1,0 +1,72 @@
+version: "3.7"
+
+services:
+  nginx:
+    container_name: pawsport-nginx
+    image: "nginx:1.27-alpine"
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/conf.d/default.conf <<'EOF'
+        server {
+          listen 80;
+          server_name _;
+
+          location = /api {
+            proxy_pass http://backend:4000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $$host;
+            proxy_set_header X-Real-IP $$remote_addr;
+            proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $$scheme;
+          }
+
+          location /api/ {
+            proxy_pass http://backend:4000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $$host;
+            proxy_set_header X-Real-IP $$remote_addr;
+            proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $$scheme;
+          }
+
+          location / {
+            proxy_pass http://frontend:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $$host;
+            proxy_set_header X-Real-IP $$remote_addr;
+            proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $$scheme;
+          }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  backend:
+    container_name: pawsport-backend
+    image: "cr.yandex/crpohuj0hvk9maacnvvo/pawsport-backend:latest"
+    restart: always
+    expose:
+      - "4000"
+    env_file:
+      - /etc/pawsport/backend.env
+
+  frontend:
+    container_name: pawsport-frontend
+    image: "cr.yandex/crpohuj0hvk9maacnvvo/pawsport-frontend:latest"
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    expose:
+      - "3000"
+    depends_on:
+      - backend
