@@ -52,12 +52,12 @@ function EventRow({ event }: TEventRowProps) {
   return (
     <HStack
       align="flex-start"
-      gap={4}
+      gap="16px"
       bg="bg.surface"
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="card"
-      p={4}
+      p="16px"
     >
       <Stack
         align="center"
@@ -65,39 +65,39 @@ function EventRow({ event }: TEventRowProps) {
         minW="56px"
         bg="secondary.700"
         rounded="lg"
-        px={3}
-        py={2}
+        px="12px"
+        py="8px"
       >
-        <Text fontSize="xs" textTransform="uppercase" color="fg.muted" letterSpacing="0.08em">
+        <Text fontSize="12px" textTransform="uppercase" color="fg.muted" letterSpacing="0.08em">
           {RU_MONTH[d.getMonth()].slice(0, 3)}
         </Text>
-        <Text fontSize="2xl" fontWeight="bold" lineHeight={1}>
+        <Text fontSize="24px" fontWeight={700} lineHeight={1}>
           {d.getDate()}
         </Text>
       </Stack>
-      <Stack flex={1} gap={1}>
-        <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap={2}>
-          <Text fontWeight="semibold">{event.title}</Text>
+      <Stack flex={1} gap="4px">
+        <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap="8px">
+          <Text fontWeight={600}>{event.title}</Text>
           <StatusBadge tone={TYPE_TONE[event.type]}>
             {TYPE_LABEL[event.type]}
           </StatusBadge>
         </HStack>
-        <HStack gap={4} fontSize="sm" color="fg.muted" flexWrap="wrap">
+        <HStack gap="16px" fontSize="14px" color="fg.muted" flexWrap="wrap">
           {event.time && (
-            <HStack gap={1}>
+            <HStack gap="4px">
               <LuClock />
               <Text>{event.time}</Text>
             </HStack>
           )}
           {event.place && (
-            <HStack gap={1}>
+            <HStack gap="4px">
               <LuMapPin />
               <Text>{event.place}</Text>
             </HStack>
           )}
         </HStack>
         {event.comment && (
-          <Text fontSize="sm" color="fg.subtle">
+          <Text fontSize="14px" color="fg.subtle">
             {event.comment}
           </Text>
         )}
@@ -121,23 +121,23 @@ type TEventsTabProps = {
 export function EventsTab({ events }: TEventsTabProps) {
   const groups = groupByMonth(events);
   return (
-    <Stack gap={6}>
-      <HStack justify="space-between" flexWrap="wrap" gap={3}>
-        <Stack gap={1}>
+    <Stack gap="24px">
+      <HStack justify="space-between" flexWrap="wrap" gap="12px">
+        <Stack gap="4px">
           <Heading size="lg">Лента событий</Heading>
-          <Text color="fg.muted" fontSize="sm">
+          <Text color="fg.muted" fontSize="14px">
             Будущие и прошедшие события по питомцу
           </Text>
         </Stack>
-        <PrimaryButton h="44px" px={5}>
-          <HStack gap={2}>
+        <PrimaryButton h="44px" px="20px">
+          <HStack gap="8px">
             <LuPlus />
             <Text>Добавить событие</Text>
           </HStack>
         </PrimaryButton>
       </HStack>
 
-      <HStack gap={3} flexWrap={{ base: "wrap", md: "nowrap" }}>
+      <HStack gap="12px" flexWrap={{ base: "wrap", md: "nowrap" }}>
         <Box flex={1} minW="220px">
           <TextField
             placeholder="Поиск по названию, заметкам..."
@@ -157,19 +157,19 @@ export function EventsTab({ events }: TEventsTabProps) {
         </Box>
       </HStack>
 
-      <Stack gap={6}>
+      <Stack gap="24px">
         {groups.map(([month, items]) => (
-          <Stack key={month} gap={3}>
+          <Stack key={month} gap="12px">
             <Text
-              fontSize="xs"
-              fontWeight="bold"
+              fontSize="12px"
+              fontWeight={700}
               letterSpacing="0.12em"
               textTransform="uppercase"
               color="fg.muted"
             >
               {month}
             </Text>
-            <Stack gap={2}>
+            <Stack gap="8px">
               {items.map((e) => (
                 <EventRow key={e.id} event={e} />
               ))}

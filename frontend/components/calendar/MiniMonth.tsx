@@ -37,12 +37,12 @@ export function MiniMonth({ year, month, marks = {}, onDayClick }: TMiniMonthPro
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="card"
-      p={4}
+      p="16px"
     >
-      <Stack gap={3}>
+      <Stack gap="12px">
         <Text
-          fontSize="xs"
-          fontWeight="bold"
+          fontSize="12px"
+          fontWeight={700}
           letterSpacing="0.12em"
           textTransform="uppercase"
           color="fg.muted"
@@ -50,14 +50,14 @@ export function MiniMonth({ year, month, marks = {}, onDayClick }: TMiniMonthPro
         >
           {RU_MONTH_FULL[month]}
         </Text>
-        <Grid templateColumns="repeat(7, 1fr)" gap={1}>
+        <Grid templateColumns="repeat(7, 1fr)" gap="4px">
           {WEEKDAYS.map((d) => (
             <Text
               key={d}
-              fontSize="2xs"
+              fontSize="10px"
               color="fg.muted"
               textAlign="center"
-              py={1}
+              py="4px"
             >
               {d}
             </Text>
@@ -77,10 +77,10 @@ export function MiniMonth({ year, month, marks = {}, onDayClick }: TMiniMonthPro
                 position="relative"
                 aspectRatio={1}
                 rounded="md"
-                fontSize="xs"
+                fontSize="12px"
                 color={isToday ? "white" : "fg.subtle"}
                 bg={isToday ? "primary.500" : "transparent"}
-                fontWeight={isToday ? "bold" : "medium"}
+                fontWeight={isToday ? 700 : 500}
                 cursor="pointer"
                 _hover={!isToday ? { bg: "secondary.700" } : undefined}
                 display="flex"

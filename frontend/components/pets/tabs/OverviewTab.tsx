@@ -38,8 +38,8 @@ function CardHeader({ icon,
                       iconBg = "secondary.700",
                       iconColor = "primary.400" }: TCardHeaderProps) {
   return (
-    <HStack justify="space-between" mb={5}>
-      <HStack gap={3}>
+    <HStack justify="space-between" mb="20px">
+      <HStack gap="12px">
         <Box
           w="32px"
           h="32px"
@@ -50,9 +50,9 @@ function CardHeader({ icon,
           alignItems="center"
           justifyContent="center"
         >
-          <Icon boxSize={4}>{icon}</Icon>
+          <Icon boxSize="16px">{icon}</Icon>
         </Box>
-        <Text fontWeight="bold">{title}</Text>
+        <Text fontWeight={700}>{title}</Text>
       </HStack>
       <IconButton
         aria-label="Редактировать"
@@ -70,13 +70,13 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
   return (
     <Grid
       templateColumns={{ base: "1fr", lg: "2fr 1fr" }}
-      gap={5}
+      gap="20px"
     >
       <GridItem>
-        <Stack gap={5}>
+        <Stack gap="20px">
           <Card>
             <CardHeader icon={<LuUser />} title="Обзор" />
-            <Grid templateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap={4}>
+            <Grid templateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap="16px">
               <TextField
                 label="Номер чипа"
                 defaultValue={pet.chipNumber}
@@ -106,7 +106,7 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
               iconBg="rgba(168, 85, 247, 0.15)"
               iconColor="#D8B4FE"
             />
-            <Stack gap={3}>
+            <Stack gap="12px">
               {[
                 { name: "Бешенство (Nobivac)", date: "Июнь 2026", until: "Действует до: июнь 2026" },
                 { name: "Внешние паразиты", date: "Апрель 2026", until: "Действует до: май 2026" },
@@ -116,9 +116,9 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
                   justify="space-between"
                   bg="secondary.700"
                   rounded="lg"
-                  p={4}
+                  p="16px"
                 >
-                  <HStack gap={3}>
+                  <HStack gap="12px">
                     <Box
                       w="28px"
                       h="28px"
@@ -129,20 +129,20 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
                       alignItems="center"
                       justifyContent="center"
                     >
-                      <Icon boxSize={3.5}>
+                      <Icon boxSize="14px">
                         <LuFileText />
                       </Icon>
                     </Box>
-                    <Stack gap={0}>
-                      <Text fontWeight="medium" fontSize="sm">
+                    <Stack gap="0">
+                      <Text fontWeight={500} fontSize="14px">
                         {v.name}
                       </Text>
-                      <Text fontSize="xs" color="fg.muted">
+                      <Text fontSize="12px" color="fg.muted">
                         {v.date}
                       </Text>
                     </Stack>
                   </HStack>
-                  <Text fontSize="xs" color="fg.muted">
+                  <Text fontSize="12px" color="fg.muted">
                     {v.until}
                   </Text>
                 </HStack>
@@ -153,7 +153,7 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
       </GridItem>
 
       <GridItem>
-        <Stack gap={5}>
+        <Stack gap="20px">
           <Card>
             <CardHeader
               icon={<LuFileText />}
@@ -161,9 +161,9 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
               iconBg="rgba(20, 184, 166, 0.15)"
               iconColor="#5EEAD4"
             />
-            <Stack gap={2}>
+            <Stack gap="8px">
               {pet.notes.length === 0 && (
-                <Text fontSize="sm" color="fg.muted">
+                <Text fontSize="14px" color="fg.muted">
                   Нет заметок
                 </Text>
               )}
@@ -172,9 +172,9 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
                   key={n}
                   bg="secondary.700"
                   rounded="md"
-                  px={3}
-                  py={2}
-                  fontSize="sm"
+                  px="12px"
+                  py="8px"
+                  fontSize="14px"
                 >
                   {n}
                 </Box>
@@ -190,13 +190,13 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
                 iconBg="rgba(59, 130, 246, 0.15)"
                 iconColor="#93C5FD"
               />
-              <Stack gap={3}>
-                <Text fontWeight="semibold">{pet.vet.name}</Text>
-                <HStack color="fg.muted" fontSize="sm" gap={2}>
+              <Stack gap="12px">
+                <Text fontWeight={600}>{pet.vet.name}</Text>
+                <HStack color="fg.muted" fontSize="14px" gap="8px">
                   <LuPhone />
                   <Text>{pet.vet.phone}</Text>
                 </HStack>
-                <HStack color="fg.muted" fontSize="sm" gap={2}>
+                <HStack color="fg.muted" fontSize="14px" gap="8px">
                   <LuMail />
                   <Text>{pet.vet.email}</Text>
                 </HStack>

@@ -57,23 +57,23 @@ const TYPE_META: Record<TFileRow["type"], { icon: ReactNode; bg: string; color: 
 
 export function FilesTab() {
   return (
-    <Stack gap={6}>
-      <HStack justify="space-between" flexWrap="wrap" gap={3}>
-        <Stack gap={1}>
+    <Stack gap="24px">
+      <HStack justify="space-between" flexWrap="wrap" gap="12px">
+        <Stack gap="4px">
           <Heading size="lg">Файлы</Heading>
-          <Text color="fg.muted" fontSize="sm">
+          <Text color="fg.muted" fontSize="14px">
             Управление и доступ ко всем файлам питомца
           </Text>
         </Stack>
-        <SecondaryButton h="44px" px={5}>
-          <HStack gap={2}>
+        <SecondaryButton h="44px" px="20px">
+          <HStack gap="8px">
             <LuUpload />
             <Text>Загрузить файл</Text>
           </HStack>
         </SecondaryButton>
       </HStack>
 
-      <HStack gap={3} flexWrap={{ base: "wrap", md: "nowrap" }}>
+      <HStack gap="12px" flexWrap={{ base: "wrap", md: "nowrap" }}>
         <Box flex={1} minW="220px">
           <TextField
             placeholder="Поиск по названию..."
@@ -90,7 +90,7 @@ export function FilesTab() {
         </Box>
       </HStack>
 
-      <Stack gap={2}>
+      <Stack gap="8px">
         {MOCK_FILES.map((f) => {
           const meta = TYPE_META[f.type];
           return (
@@ -101,10 +101,10 @@ export function FilesTab() {
               borderWidth="1px"
               borderColor="border.subtle"
               rounded="card"
-              p={4}
-              gap={3}
+              p="16px"
+              gap="12px"
             >
-              <HStack gap={3} flex={1} minW={0}>
+              <HStack gap="12px" flex={1} minW={0}>
                 <Box
                   w="40px"
                   h="40px"
@@ -118,16 +118,16 @@ export function FilesTab() {
                 >
                   {meta.icon}
                 </Box>
-                <Stack gap={0} minW={0}>
-                  <Text fontWeight="medium" truncate>
+                <Stack gap="0" minW={0}>
+                  <Text fontWeight={500} truncate>
                     {f.name}
                   </Text>
-                  <Text fontSize="xs" color="fg.muted">
+                  <Text fontSize="12px" color="fg.muted">
                     {meta.ext} · {f.size} · {f.date}
                   </Text>
                 </Stack>
               </HStack>
-              <HStack gap={1}>
+              <HStack gap="4px">
                 <IconButton aria-label="Скачать" size="sm" variant="ghost" color="fg.muted">
                   <LuDownload />
                 </IconButton>

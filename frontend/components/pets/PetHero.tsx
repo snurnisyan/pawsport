@@ -43,8 +43,8 @@ export function PetHero({ pet }: TPetHeroProps) {
       <IconButton
         aria-label="Редактировать"
         position="absolute"
-        top={4}
-        right={4}
+        top="16px"
+        right="16px"
         size="sm"
         rounded="full"
         bg="bg.canvas/80"
@@ -56,28 +56,28 @@ export function PetHero({ pet }: TPetHeroProps) {
       </IconButton>
       <Stack
         position="absolute"
-        bottom={{ base: 4, md: 6 }}
-        left={{ base: 4, md: 6 }}
-        gap={2}
+        bottom={{ base: "16px", md: "24px" }}
+        left={{ base: "16px", md: "24px" }}
+        gap="8px"
       >
-        <HStack gap={3} flexWrap="wrap">
+        <HStack gap="12px" flexWrap="wrap">
           <Text
-            fontSize={{ base: "3xl", md: "5xl" }}
-            fontWeight="bold"
+            fontSize={{ base: "30px", md: "48px" }}
+            fontWeight={700}
             lineHeight={1}
           >
             {pet.name}
           </Text>
           <StatusBadge tone="info">{pet.breed}</StatusBadge>
         </HStack>
-        <HStack gap={4} color="fg.subtle" fontSize="sm">
-          <HStack gap={1}>
+        <HStack gap="16px" color="fg.subtle" fontSize="14px">
+          <HStack gap="4px">
             <Icon>
               <LuCake />
             </Icon>
             <Text>{pet.ageLabel}</Text>
           </HStack>
-          <HStack gap={1}>
+          <HStack gap="4px">
             <Icon>{pet.sex === "male" ? <FaMars /> : <FaVenus />}</Icon>
             <Text>{pet.sex === "male" ? "Мальчик" : "Девочка"}</Text>
           </HStack>

@@ -38,12 +38,12 @@ export default function CalendarPage() {
       <AppWrapper maxW="1440px">
         <Grid
           templateColumns={{ base: "1fr", lg: "1fr 240px" }}
-          gap={{ base: 4, lg: 8 }}
+          gap={{ base: "16px", lg: "32px" }}
           alignItems="start"
         >
-          <Stack gap={5}>
+          <Stack gap="20px">
             <HStack justify="space-between">
-              <HStack gap={2}>
+              <HStack gap="8px">
                 <IconButton
                   aria-label="Предыдущий год"
                   variant="ghost"
@@ -53,7 +53,7 @@ export default function CalendarPage() {
                 >
                   <LuChevronLeft />
                 </IconButton>
-                <Text fontSize="2xl" fontWeight="bold" minW="80px" textAlign="center">
+                <Text fontSize="24px" fontWeight={700} minW="80px" textAlign="center">
                   {year}
                 </Text>
                 <IconButton
@@ -70,9 +70,9 @@ export default function CalendarPage() {
                 display={{ base: "inline-flex", lg: "none" }}
                 onClick={drawer.onOpen}
                 h="40px"
-                px={4}
+                px="16px"
               >
-                <HStack gap={2}>
+                <HStack gap="8px">
                   <LuFilter />
                   <Text>Фильтры</Text>
                 </HStack>
@@ -81,7 +81,7 @@ export default function CalendarPage() {
 
             <Grid
               templateColumns={{ base: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" }}
-              gap={4}
+              gap="16px"
             >
               {Array.from({ length: 12 }).map((_, m) => (
                 <MiniMonth

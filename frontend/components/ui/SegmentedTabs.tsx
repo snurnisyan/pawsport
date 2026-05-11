@@ -19,10 +19,10 @@ export function SegmentedTabs({ tabs, value, onChange }: TSegmentedTabsProps) {
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="full"
-      p={1}
+      p="4px"
       overflowX="auto"
     >
-      <HStack gap={1} minW="max-content">
+      <HStack gap="4px" minW="max-content">
         {tabs.map((tab) => {
           const active = tab.value === value;
           return (
@@ -30,8 +30,8 @@ export function SegmentedTabs({ tabs, value, onChange }: TSegmentedTabsProps) {
               key={tab.value}
               type="button"
               onClick={() => onChange(tab.value)}
-              px={{ base: 5, md: 8 }}
-              py={2.5}
+              px={{ base: "20px", md: "32px" }}
+              py="10px"
               rounded="full"
               bg={active ? "primary.500" : "transparent"}
               boxShadow={active ? "glowSoft" : "none"}
@@ -41,8 +41,8 @@ export function SegmentedTabs({ tabs, value, onChange }: TSegmentedTabsProps) {
               flex={1}
             >
               <Text
-                fontSize="sm"
-                fontWeight={active ? "semibold" : "medium"}
+                fontSize="14px"
+                fontWeight={active ? 600 : 500}
                 color={active ? "white" : "fg.muted"}
                 whiteSpace="nowrap"
               >

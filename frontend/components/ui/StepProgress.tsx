@@ -7,17 +7,17 @@ type TStepProgressProps = {
 
 export function StepProgress({ current, total }: TStepProgressProps) {
   return (
-    <VStack gap={3} align="center" w="full">
+    <VStack gap="12px" align="center" w="full">
       <Text
-        fontSize="xs"
-        fontWeight="bold"
+        fontSize="12px"
+        fontWeight={700}
         letterSpacing="0.12em"
         color="fg.muted"
         textTransform="uppercase"
       >
         Шаг {current} из {total}
       </Text>
-      <HStack gap={2} w="full" maxW="320px">
+      <HStack gap="8px" w="full" maxW="320px">
         {Array.from({ length: total }).map((_, i) => (
           <Box
             key={i}

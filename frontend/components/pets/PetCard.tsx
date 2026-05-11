@@ -39,35 +39,35 @@ export function PetCard({ pet }: TPetCardProps) {
           />
         </AspectRatio>
         {pet.status && (
-          <Box position="absolute" top={3} right={3}>
+          <Box position="absolute" top="12px" right="12px">
             <StatusBadge tone={pet.status.tone}>{pet.status.label}</StatusBadge>
           </Box>
         )}
       </Box>
 
-      <Stack gap={3} p={5}>
+      <Stack gap="12px" p="20px">
         <HStack justify="space-between" align="flex-start">
-          <Stack gap={1}>
-            <Text fontSize="xl" fontWeight="bold">
+          <Stack gap="4px">
+            <Text fontSize="20px" fontWeight={700}>
               {pet.name}
             </Text>
-            <Text fontSize="sm" color="fg.muted">
+            <Text fontSize="14px" color="fg.muted">
               {pet.ageLabel} · {SEX_LABEL[pet.sex]} · {pet.weightKg} кг
             </Text>
           </Stack>
-          <Box color="primary.400" mt={1}>
+          <Box color="primary.400" mt="4px">
             <LuArrowRight />
           </Box>
         </HStack>
 
         {pet.nextEvent && (
           <HStack
-            gap={2}
-            pt={3}
+            gap="8px"
+            pt="12px"
             borderTopWidth="1px"
             borderColor="border.subtle"
             color={pet.status?.tone === "danger" ? "#FCA5A5" : "fg.muted"}
-            fontSize="sm"
+            fontSize="14px"
           >
             <LuCalendar />
             <Text>{pet.nextEvent}</Text>

@@ -1,6 +1,6 @@
 import { Icon, Text } from "@chakra-ui/react";
-import { LuPawPrint } from "react-icons/lu";
 import { ChakraLink } from "@/components/ui/NextLink";
+import PawIcon from "@/icons/paw.svg";
 
 type TLogoProps = {
   href?: string;
@@ -8,20 +8,20 @@ type TLogoProps = {
 };
 
 export function Logo({ href = "/pets", size = "md" }: TLogoProps) {
-  const fontSize = size === "sm" ? "md" : "lg";
-  const iconSize = size === "sm" ? 4 : 5;
+  const fontSize = size === "sm" ? "16px" : "18px";
+  const iconSize = size === "sm" ? "16px" : "20px";
   return (
     <ChakraLink
       href={href}
       display="inline-flex"
       alignItems="center"
-      gap={2}
+      gap="8px"
       color="primary.400"
     >
       <Icon boxSize={iconSize}>
-        <LuPawPrint />
+        <PawIcon />
       </Icon>
-      <Text fontSize={fontSize} fontWeight="bold" letterSpacing="-0.01em">
+      <Text fontSize={fontSize} fontWeight={700}>
         PawsPort
       </Text>
     </ChakraLink>

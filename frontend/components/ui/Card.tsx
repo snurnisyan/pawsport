@@ -7,7 +7,7 @@ export function Card(props: BoxProps) {
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="card"
-      p={6}
+      p="24px"
       shadow="card"
       {...props}
     />

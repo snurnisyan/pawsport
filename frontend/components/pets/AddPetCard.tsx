@@ -10,7 +10,7 @@ export function AddPetCard() {
       borderStyle="dashed"
       borderColor="border.default"
       rounded="card"
-      p={8}
+      p="32px"
       minH="320px"
       display="flex"
       alignItems="center"
@@ -19,7 +19,7 @@ export function AddPetCard() {
       transition="all 0.15s"
       _hover={{ borderColor: "primary.500", color: "primary.400" }}
     >
-      <Stack gap={3} align="center" textAlign="center">
+      <Stack gap="12px" align="center" textAlign="center">
         <Box
           w="48px"
           h="48px"
@@ -29,12 +29,12 @@ export function AddPetCard() {
           alignItems="center"
           justifyContent="center"
           color="primary.400"
-          fontSize="xl"
+          fontSize="20px"
         >
           <LuPlus />
         </Box>
-        <Text fontWeight="semibold">Добавить питомца</Text>
-        <Text fontSize="sm" color="fg.muted" maxW="180px">
+        <Text fontWeight={600}>Добавить питомца</Text>
+        <Text fontSize="14px" color="fg.muted" maxW="180px">
           Добавьте нового питомца для отслеживания
         </Text>
       </Stack>

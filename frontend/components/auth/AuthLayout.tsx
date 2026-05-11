@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Box, Container, HStack, IconButton } from "@chakra-ui/react";
+import { Box, Flex, HStack, IconButton } from "@chakra-ui/react";
 import { LuArrowLeft } from "react-icons/lu";
 import { Logo } from "@/components/ui/Logo";
 
@@ -13,24 +13,25 @@ export function AuthLayout({ children,
                              showHeader = false,
                              onBack }: TAuthLayoutProps) {
   return (
-    <Box minH="100vh" bg="bg.canvas">
+    <Flex direction="column" minH="100vh" w="100%" bg="bg.canvas">
       {showHeader && (
         <Box
           as="header"
           borderBottomWidth="1px"
           borderColor="border.subtle"
           position="sticky"
-          top={0}
+          top="0"
           zIndex={10}
           bg="bg.canvas/80"
           backdropFilter="blur(12px)"
+          w="100%"
         >
           <HStack
             maxW="1280px"
             mx="auto"
-            px={{ base: 4, md: 6 }}
-            py={3}
-            gap={3}
+            px={{ base: "16px", md: "24px" }}
+            py="12px"
+            gap="12px"
           >
             {onBack && (
               <IconButton
@@ -47,13 +48,18 @@ export function AuthLayout({ children,
           </HStack>
         </Box>
       )}
-      <Container
-        maxW="container.md"
-        px={{ base: 4, md: 6 }}
-        py={{ base: 8, md: 12 }}
+      <Flex
+        flex="1"
+        w="100%"
+        align="center"
+        justify="center"
+        px={{ base: "16px", md: "24px" }}
+        py={{ base: "32px", md: "48px" }}
       >
-        {children}
-      </Container>
-    </Box>
+        <Box w="100%" maxW="640px">
+          {children}
+        </Box>
+      </Flex>
+    </Flex>
   );
 }

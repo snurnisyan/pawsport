@@ -11,7 +11,7 @@ export function AppWrapper({ children, maxW = "1280px" }: TAppWrapperProps) {
   return (
     <Box minH="100vh" bg="bg.canvas">
       <Header />
-      <Container maxW={maxW} px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }}>
+      <Container maxW={maxW} px={{ base: "16px", md: "24px" }} py={{ base: "24px", md: "40px" }}>
         {children}
       </Container>
     </Box>
