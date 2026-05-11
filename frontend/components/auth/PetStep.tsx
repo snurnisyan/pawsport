@@ -25,16 +25,16 @@ type TPetStepProps = {
 
 export function PetStep({ data, onChange, onNext }: TPetStepProps) {
   return (
-    <VStack gap={8} align="stretch" w="full" maxW="640px" mx="auto">
-      <VStack gap={2} align="center">
+    <VStack gap="32px" align="stretch" w="full" maxW="640px" mx="auto">
+      <VStack gap="8px" align="center">
         <StepProgress current={2} total={3} />
-        <Text fontSize={{ base: "3xl", md: "4xl" }} fontWeight="bold" mt={6}>
+        <Text fontSize={{ base: "30px", md: "36px" }} fontWeight={700} mt="24px">
           Первый питомец
         </Text>
         <Text color="fg.muted">Коротко расскажи о своем питомце</Text>
       </VStack>
 
-      <VStack gap={3}>
+      <VStack gap="12px">
         <Pressable
           type="button"
           w="120px"
@@ -52,12 +52,12 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
           _hover={{ borderColor: "primary.500", color: "primary.400" }}
           transition="all 0.15s"
         >
-          <Icon boxSize={8}>
+          <Icon boxSize="32px">
             <LuCamera />
           </Icon>
         </Pressable>
         <Text
-          fontSize="xs"
+          fontSize="12px"
           letterSpacing="0.12em"
           textTransform="uppercase"
           color="fg.muted"
@@ -66,7 +66,7 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
         </Text>
       </VStack>
 
-      <Stack gap={5}>
+      <Stack gap="20px">
         <TextField
           label="Имя"
           placeholder="Луна"
@@ -76,16 +76,16 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
 
         <Box>
           <Text
-            fontSize="xs"
-            fontWeight="semibold"
+            fontSize="12px"
+            fontWeight={600}
             color="fg.muted"
             textTransform="uppercase"
             letterSpacing="0.08em"
-            mb={2}
+            mb="8px"
           >
             Вид
           </Text>
-          <SimpleGrid columns={3} gap={3}>
+          <SimpleGrid columns={3} gap="12px">
             <ChoiceCard
               fullWidth
               icon={<LuDog />}
@@ -120,16 +120,16 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
 
         <Box>
           <Text
-            fontSize="xs"
-            fontWeight="semibold"
+            fontSize="12px"
+            fontWeight={600}
             color="fg.muted"
             textTransform="uppercase"
             letterSpacing="0.08em"
-            mb={2}
+            mb="8px"
           >
             Пол
           </Text>
-          <SimpleGrid columns={2} gap={3}>
+          <SimpleGrid columns={2} gap="12px">
             <ChoiceCard
               fullWidth
               icon={<FaMars />}
@@ -149,7 +149,7 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
       </Stack>
 
       <PrimaryButton onClick={onNext}>
-        <HStack gap={2}>
+        <HStack gap="8px">
           <Text>Далее</Text>
           <LuArrowRight />
         </HStack>

@@ -25,22 +25,22 @@ export function ChoiceCard({ selected,
       borderWidth="1px"
       borderColor={selected ? "primary.500" : "border.subtle"}
       rounded="card"
-      px={5}
-      py={5}
+      px="20px"
+      py="20px"
       cursor="pointer"
       transition="all 0.15s"
       boxShadow={selected ? "glowSoft" : "none"}
       _hover={{ borderColor: selected ? "primary.500" : "border.default" }}
     >
-      <VStack gap={2}>
+      <VStack gap="8px">
         {icon && (
-          <Box fontSize="2xl" color={selected ? "primary.400" : "fg.muted"}>
+          <Box fontSize="24px" color={selected ? "primary.400" : "fg.muted"}>
             {icon}
           </Box>
         )}
         <Text
-          fontSize="xs"
-          fontWeight="bold"
+          fontSize="12px"
+          fontWeight={700}
           letterSpacing="0.08em"
           textTransform="uppercase"
           color={selected ? "fg.default" : "fg.muted"}

@@ -7,7 +7,7 @@ export function PrimaryButton(props: ButtonProps) {
       color="white"
       rounded="field"
       h="48px"
-      fontWeight="semibold"
+      fontWeight={600}
       boxShadow="glow"
       _hover={{ bg: "primary.600", boxShadow: "glow" }}
       _active={{ bg: "primary.700" }}
@@ -26,7 +26,7 @@ export function SecondaryButton(props: ButtonProps) {
       borderColor="border.default"
       rounded="field"
       h="48px"
-      fontWeight="medium"
+      fontWeight={500}
       _hover={{ bg: "secondary.600", borderColor: "border.accent" }}
       {...props}
     />

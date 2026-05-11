@@ -1,7 +1,8 @@
 import { Box, HStack, Icon, IconButton, Stack, Text, VStack } from "@chakra-ui/react";
 import { ChakraLink } from "@/components/ui/NextLink";
 import { useState } from "react";
-import { LuArrowRight, LuEye, LuEyeOff, LuLock, LuMail, LuPawPrint } from "react-icons/lu";
+import { LuArrowRight, LuEye, LuEyeOff, LuLock, LuMail } from "react-icons/lu";
+import PawIcon from "@/icons/paw.svg";
 import { Card } from "@/components/ui/Card";
 import { PrimaryButton } from "@/components/ui/Buttons";
 import { StepProgress } from "@/components/ui/StepProgress";
@@ -18,37 +19,38 @@ export function RegisterStep({ email, password, onChange, onNext }: TRegisterSte
   const [showPwd, setShowPwd] = useState(false);
 
   return (
-    <VStack gap={8}>
-      <VStack gap={3}>
+    <VStack gap="32px">
+      <VStack gap="12px">
         <Box
-          w="56px"
-          h="56px"
           rounded="card"
-          bg="secondary.700"
+          bg="secondary.600"
           display="flex"
           alignItems="center"
           justifyContent="center"
           color="primary.400"
+          borderWidth="1px"
+          borderColor="primary.200"
+          px="16px"
+          py="12px"
+          boxShadow="0 4px 15px 0 rgba(59, 130, 246, 0.3)"
         >
-          <Icon boxSize={6}>
-            <LuPawPrint />
-          </Icon>
+          <PawIcon width={30} height={29} />
         </Box>
-        <Text fontSize="2xl" fontWeight="bold">
+        <Text fontSize="24px" fontWeight={700}>
           PawsPort
         </Text>
-        <Text fontSize="sm" color="fg.muted" textAlign="center">
+        <Text fontSize="14px" color="fg.muted" textAlign="center">
           Путь к здоровью вашего питомца начинается здесь
         </Text>
       </VStack>
 
-      <Card w="full" maxW="420px" p={{ base: 5, md: 6 }}>
-        <VStack gap={5} align="stretch">
+      <Card w="full" maxW="420px" p={{ base: "20px", md: "24px" }}>
+        <VStack gap="20px" align="stretch">
           <StepProgress current={1} total={3} />
-          <Text fontSize="2xl" fontWeight="bold">
+          <Text fontSize="24px" fontWeight={700}>
             Регистрация
           </Text>
-          <Stack gap={4}>
+          <Stack gap="16px">
             <TextField
               label="Email"
               type="email"
@@ -78,14 +80,14 @@ export function RegisterStep({ email, password, onChange, onNext }: TRegisterSte
             />
           </Stack>
           <PrimaryButton onClick={onNext}>
-            <HStack gap={2}>
+            <HStack gap="8px">
               <Text>Далее к созданию питомца</Text>
               <LuArrowRight />
             </HStack>
           </PrimaryButton>
-          <Text fontSize="sm" color="fg.muted" textAlign="center">
+          <Text fontSize="14px" color="fg.muted" textAlign="center">
             Уже есть аккаунт?{" "}
-            <ChakraLink href="/auth/login" color="primary.400" fontWeight="semibold">
+            <ChakraLink href="/auth/login" color="primary.400" fontWeight={600}>
               Войдите
             </ChakraLink>
           </Text>

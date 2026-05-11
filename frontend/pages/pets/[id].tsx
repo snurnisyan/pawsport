@@ -48,7 +48,7 @@ export default function PetPage() {
         <title>{pet.name} — PawsPort</title>
       </Head>
       <AppWrapper>
-        <Stack gap={6}>
+        <Stack gap="24px">
           <PetHero pet={pet} />
           <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
           {tab === "overview" && <OverviewTab pet={pet} />}

@@ -32,9 +32,9 @@ function FilterRow({ f, checked }: TFilterRowProps) {
       <Checkbox.HiddenInput />
       <Checkbox.Control />
       <Checkbox.Label>
-        <HStack gap={2}>
+        <HStack gap="8px">
           <Box w="8px" h="8px" rounded="full" bg={f.color} />
-          <Text fontSize="sm">{f.label}</Text>
+          <Text fontSize="14px">{f.label}</Text>
         </HStack>
       </Checkbox.Label>
     </Checkbox.Root>
@@ -43,34 +43,34 @@ function FilterRow({ f, checked }: TFilterRowProps) {
 
 export function CalendarFilters() {
   return (
-    <Stack gap={6}>
-      <Stack gap={3}>
+    <Stack gap="24px">
+      <Stack gap="12px">
         <Text
-          fontSize="xs"
-          fontWeight="bold"
+          fontSize="12px"
+          fontWeight={700}
           letterSpacing="0.12em"
           textTransform="uppercase"
           color="fg.muted"
         >
           Типы событий
         </Text>
-        <Stack gap={2}>
+        <Stack gap="8px">
           {EVENT_TYPES.map((f) => (
             <FilterRow key={f.id} f={f} checked />
           ))}
         </Stack>
       </Stack>
-      <Stack gap={3}>
+      <Stack gap="12px">
         <Text
-          fontSize="xs"
-          fontWeight="bold"
+          fontSize="12px"
+          fontWeight={700}
           letterSpacing="0.12em"
           textTransform="uppercase"
           color="fg.muted"
         >
           Питомцы
         </Text>
-        <Stack gap={2}>
+        <Stack gap="8px">
           {PETS.map((f) => (
             <FilterRow key={f.id} f={f} checked />
           ))}

@@ -71,10 +71,10 @@ type TReminderStepProps = {
 
 export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
   return (
-    <VStack gap={6} align="stretch" w="full" maxW="640px" mx="auto">
-      <VStack gap={2} align="center">
+    <VStack gap="24px" align="stretch" w="full" maxW="640px" mx="auto">
+      <VStack gap="8px" align="center">
         <StepProgress current={3} total={3} />
-        <Text fontSize={{ base: "3xl", md: "4xl" }} fontWeight="bold" mt={6}>
+        <Text fontSize={{ base: "30px", md: "36px" }} fontWeight={700} mt="24px">
           Первое напоминание
         </Text>
         <Text color="fg.muted" textAlign="center">
@@ -82,12 +82,12 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
         </Text>
       </VStack>
 
-      <Stack gap={4}>
+      <Stack gap="16px">
         {DEFAULT_REMINDERS.map((r) => (
-          <Card key={r.id} p={5}>
-            <Stack gap={4}>
+          <Card key={r.id} p="20px">
+            <Stack gap="16px">
               <HStack justify="space-between">
-                <HStack gap={3}>
+                <HStack gap="12px">
                   <Box
                     w="36px"
                     h="36px"
@@ -98,9 +98,9 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
                     justifyContent="center"
                     color={r.iconColor}
                   >
-                    <Icon boxSize={4}>{r.icon}</Icon>
+                    <Icon boxSize="16px">{r.icon}</Icon>
                   </Box>
-                  <Text fontWeight="semibold">{r.label}</Text>
+                  <Text fontWeight={600}>{r.label}</Text>
                 </HStack>
                 <Switch.Root defaultChecked={r.enabled} colorPalette="blue">
                   <Switch.HiddenInput />
@@ -109,7 +109,7 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
                   </Switch.Control>
                 </Switch.Root>
               </HStack>
-              <SimpleGrid columns={2} gap={3}>
+              <SimpleGrid columns={2} gap="12px">
                 <TextField
                   label="Последняя обработка"
                   placeholder={r.lastDate}
@@ -126,7 +126,7 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
         ))}
       </Stack>
 
-      <Stack gap={2}>
+      <Stack gap="8px">
         <PrimaryButton onClick={onSave}>Сохранить</PrimaryButton>
         <GhostButton onClick={onSkip}>Пропустить</GhostButton>
       </Stack>

@@ -51,37 +51,37 @@ export function ExportTab() {
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="card"
-      p={{ base: 5, md: 7 }}
+      p={{ base: "20px", md: "28px" }}
     >
-      <Stack gap={6}>
-        <Stack gap={1}>
+      <Stack gap="24px">
+        <Stack gap="4px">
           <Heading size="lg">Экспорт данных о питомце</Heading>
-          <Text color="fg.muted" fontSize="sm">
+          <Text color="fg.muted" fontSize="14px">
             Выберите период и тип данных для выгрузки
           </Text>
         </Stack>
 
-        <Stack gap={3}>
+        <Stack gap="12px">
           <Text
-            fontSize="xs"
-            fontWeight="bold"
+            fontSize="12px"
+            fontWeight={700}
             letterSpacing="0.12em"
             textTransform="uppercase"
             color="fg.muted"
           >
             Период
           </Text>
-          <HStack gap={2} flexWrap="wrap">
+          <HStack gap="8px" flexWrap="wrap">
             {PERIODS.map((p) => (
               <Pressable
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                px={4}
-                py={2}
+                px="16px"
+                py="8px"
                 rounded="full"
-                fontSize="sm"
-                fontWeight="medium"
+                fontSize="14px"
+                fontWeight={500}
                 borderWidth="1px"
                 cursor="pointer"
                 transition="all 0.15s"
@@ -96,17 +96,17 @@ export function ExportTab() {
           </HStack>
         </Stack>
 
-        <Stack gap={3}>
+        <Stack gap="12px">
           <Text
-            fontSize="xs"
-            fontWeight="bold"
+            fontSize="12px"
+            fontWeight={700}
             letterSpacing="0.12em"
             textTransform="uppercase"
             color="fg.muted"
           >
             Тип данных
           </Text>
-          <Stack gap={2}>
+          <Stack gap="8px">
             {DATA_TYPES.map((t) => {
               const checked = Boolean(selected[t.id]);
               return (
@@ -116,19 +116,19 @@ export function ExportTab() {
                   borderWidth="1px"
                   borderColor="border.subtle"
                   rounded="card"
-                  px={4}
-                  py={3}
+                  px="16px"
+                  py="12px"
                   justify="space-between"
                   cursor="pointer"
                   onClick={() =>
                     setSelected((s) => ({ ...s, [t.id]: !checked }))
                   }
                 >
-                  <HStack gap={3}>
+                  <HStack gap="12px">
                     <Box color={t.color}>
-                      <Icon boxSize={4}>{t.icon}</Icon>
+                      <Icon boxSize="16px">{t.icon}</Icon>
                     </Box>
-                    <Text fontSize="sm" fontWeight="medium">
+                    <Text fontSize="14px" fontWeight={500}>
                       {t.label}
                     </Text>
                   </HStack>
@@ -148,15 +148,15 @@ export function ExportTab() {
           </Stack>
         </Stack>
 
-        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={3} pt={2}>
+        <SimpleGrid columns={{ base: 1, sm: 2 }} gap="12px" pt="8px">
           <PrimaryButton>
-            <HStack gap={2}>
+            <HStack gap="8px">
               <LuDownload />
               <Text>Сохранить PDF</Text>
             </HStack>
           </PrimaryButton>
           <SecondaryButton>
-            <HStack gap={2}>
+            <HStack gap="8px">
               <LuMail />
               <Text>Отправить по почте</Text>
             </HStack>

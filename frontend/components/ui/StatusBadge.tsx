@@ -23,11 +23,11 @@ export function StatusBadge({ tone = "info", children }: TStatusBadgeProps) {
     <Badge
       bg={s.bg}
       color={s.color}
-      px={3}
-      py={1}
+      px="12px"
+      py="4px"
       rounded="full"
-      fontSize="2xs"
-      fontWeight="bold"
+      fontSize="10px"
+      fontWeight={700}
       letterSpacing="0.06em"
       textTransform="uppercase"
       borderWidth="0"

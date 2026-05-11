@@ -13,8 +13,8 @@ const config = defineConfig({
   theme: {
     tokens: {
       fonts: {
-        heading: { value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-        body: { value: "Inter, ui-sans-serif, system-ui, sans-serif" },
+        heading: { value: "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif" },
+        body: { value: "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif" },
       },
       colors: {
         primary: {
@@ -86,4 +86,4 @@ const config = defineConfig({
   },
 });
 
-export const system = createSystem(defaultConfig, config);
+export const theme = createSystem(defaultConfig, config);
