@@ -33,6 +33,7 @@ yarn-error.log*
 .env.*
 !.env.example
 !.env*.example
+.cert/
 
 # OS
 .DS_Store
