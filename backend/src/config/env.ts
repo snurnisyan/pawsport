@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { z } from "zod";
 
 dotenv.config({ path: ".env" });
-dotenv.config({ path: ".env.local", override: true });
+dotenv.config({ path: ".env.local" });
 
 const booleanFromString = z.preprocess((value) => {
   if (typeof value === "string") {
@@ -17,6 +17,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   API_PREFIX: z.string().default("/api"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  FRONTEND_URL: z.string().url().default("http://localhost:3000"),
+  BACKEND_PUBLIC_URL: z.string().url().default("http://localhost:4000"),
 
   MONGODB_URI: z.string().min(1),
 
