@@ -1,9 +1,22 @@
-import { Router } from "express";
-
 import { deleteMe, getMe } from "../controllers/userController";
-import { authMiddleware } from "../middleware/authMiddleware";
+import { createDocumentedRouter } from "../docs/route";
+import { jsonResponse } from "../docs/routeContent";
+import { UserResponseSchema } from "../docs/schemas";
 
-export const userRoutes = Router();
+const users = createDocumentedRouter({ basePath: "/users", tags: ["Users"], auth: true });
 
-userRoutes.get("/me", authMiddleware, getMe);
-userRoutes.delete("/me/delete", authMiddleware, deleteMe);
+users.route("get", "/me", {
+  operationId: "getMe",
+  summary: "Get the authenticated user profile",
+  responses: { 200: jsonResponse("Current user", UserResponseSchema) },
+  handlers: [getMe]
+});
+
+users.route("delete", "/me/delete", {
+  operationId: "deleteMe",
+  summary: "Delete the authenticated user account",
+  responses: { 204: { description: "User deleted" } },
+  handlers: [deleteMe]
+});
+
+export const userRoutes = users.router;

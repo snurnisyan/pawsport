@@ -33,7 +33,9 @@ yarn-error.log*
 .env.*
 !.env.example
 !.env*.example
+!.env.test
 .cert/
+.smtp/
 
 # OS
 .DS_Store

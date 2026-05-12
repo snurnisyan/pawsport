@@ -1,8 +1,16 @@
-import { Router } from "express";
-
 import { getCalendar } from "../controllers/calendarController";
-import { authMiddleware } from "../middleware/authMiddleware";
+import { createDocumentedRouter } from "../docs/route";
+import { jsonResponse } from "../docs/routeContent";
+import { CalendarQuerySchema, CalendarResponseSchema } from "../docs/schemas";
 
-export const calendarRoutes = Router();
+const calendar = createDocumentedRouter({ basePath: "/calendar", tags: ["Calendar"], auth: true });
 
-calendarRoutes.get("/", authMiddleware, getCalendar);
+calendar.route("get", "/", {
+  operationId: "getCalendar",
+  summary: "Get events and reminders for a date range",
+  request: { query: CalendarQuerySchema },
+  responses: { 200: jsonResponse("Calendar data", CalendarResponseSchema) },
+  handlers: [getCalendar]
+});
+
+export const calendarRoutes = calendar.router;

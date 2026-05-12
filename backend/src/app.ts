@@ -5,6 +5,7 @@ import helmet from "helmet";
 
 import { env } from "./config/env";
 import { healthCheck } from "./controllers/healthController";
+import { registerSwaggerRoutes } from "./docs/swaggerRoutes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiRouter } from "./routes";
 
@@ -20,6 +21,11 @@ export const createApp = (): express.Express => {
   const app = express();
 
   app.disable("x-powered-by");
+
+  const apiPrefix = env.API_PREFIX === "/" ? "" : env.API_PREFIX;
+  if (env.SWAGGER_ENABLED) {
+    registerSwaggerRoutes(app, apiPrefix);
+  }
 
   app.use(helmet());
   app.use(
