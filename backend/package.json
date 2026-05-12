@@ -7,12 +7,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "NODE_ENV=test API_PREFIX=/api CORS_ORIGIN=http://localhost:3000 FRONTEND_URL=http://localhost:3000 BACKEND_PUBLIC_URL=http://localhost:4000 MONGODB_URI=mongodb://localhost:27017/pawsport-test JWT_SECRET=test-secret JWT_EXPIRES_IN=1h SMTP_HOST=localhost SMTP_PORT=1025 SMTP_SECURE=false SMTP_USER=test SMTP_PASSWORD=test SMTP_FROM=no-reply@localhost S3_ENDPOINT=http://localhost:9000 S3_REGION=ru-central1 S3_BUCKET=test S3_ACCESS_KEY_ID=test S3_SECRET_ACCESS_KEY=test node --import tsx --test test/*.test.ts",
+    "test": "NODE_ENV=test node --import tsx --test test/*.test.ts",
+    "openapi": "NODE_ENV=test tsx scripts/dump-openapi.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "7.3.4",
     "@aws-sdk/client-s3": "^3.758.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

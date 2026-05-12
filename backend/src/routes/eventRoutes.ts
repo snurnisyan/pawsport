@@ -1,14 +1,62 @@
-import { Router } from "express";
-
 import { createPetEvent, deleteEvent, getEvent, listPetEvents, updateEvent } from "../controllers/eventController";
-import { authMiddleware } from "../middleware/authMiddleware";
+import { createDocumentedRouter } from "../docs/route";
+import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
+import {
+  CreateEventRequestSchema,
+  EventListResponseSchema,
+  EventResponseSchema,
+  IdPathParamsSchema,
+  UpdateEventRequestSchema
+} from "../docs/schemas";
 
-export const petEventRoutes = Router({ mergeParams: true });
-export const eventRoutes = Router();
+const petEvents = createDocumentedRouter({
+  basePath: "/pets/:id/events",
+  tags: ["Events"],
+  auth: true,
+  mergeParams: true
+});
 
-petEventRoutes.get("/", authMiddleware, listPetEvents);
-petEventRoutes.post("/", authMiddleware, createPetEvent);
+petEvents.route("get", "/", {
+  operationId: "listPetEvents",
+  summary: "List events for a pet",
+  request: { params: IdPathParamsSchema },
+  responses: { 200: jsonResponse("Event list", EventListResponseSchema) },
+  handlers: [listPetEvents]
+});
 
-eventRoutes.get("/:id", authMiddleware, getEvent);
-eventRoutes.patch("/:id", authMiddleware, updateEvent);
-eventRoutes.delete("/:id", authMiddleware, deleteEvent);
+petEvents.route("post", "/", {
+  operationId: "createPetEvent",
+  summary: "Create an event for a pet",
+  request: { params: IdPathParamsSchema, body: jsonRequestBody(CreateEventRequestSchema) },
+  responses: { 201: jsonResponse("Event created", EventResponseSchema) },
+  handlers: [createPetEvent]
+});
+
+const events = createDocumentedRouter({ basePath: "/events", tags: ["Events"], auth: true });
+
+events.route("get", "/:id", {
+  operationId: "getEvent",
+  summary: "Get an event",
+  request: { params: IdPathParamsSchema },
+  responses: { 200: jsonResponse("Event", EventResponseSchema) },
+  handlers: [getEvent]
+});
+
+events.route("patch", "/:id", {
+  operationId: "updateEvent",
+  summary: "Update an event",
+  request: { params: IdPathParamsSchema, body: jsonRequestBody(UpdateEventRequestSchema) },
+  responses: { 200: jsonResponse("Event updated", EventResponseSchema) },
+  handlers: [updateEvent]
+});
+
+events.route("delete", "/:id", {
+  operationId: "deleteEvent",
+  summary: "Delete an event",
+  request: { params: IdPathParamsSchema },
+  responses: { 204: { description: "Event deleted" } },
+  handlers: [deleteEvent]
+});
+
+export const petEventRoutes = petEvents.router;
+export const eventRoutes = events.router;

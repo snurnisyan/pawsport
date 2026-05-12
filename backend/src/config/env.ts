@@ -1,8 +1,10 @@
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config({ path: ".env" });
+const nodeEnv = process.env.NODE_ENV ?? "development";
+dotenv.config({ path: `.env.${nodeEnv}` });
 dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
 
 const booleanFromString = z.preprocess((value) => {
   if (typeof value === "string") {
@@ -39,7 +41,9 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().min(1),
 
   REMINDER_SCHEDULER_ENABLED: booleanFromString.default(false),
-  REMINDER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60000)
+  REMINDER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+
+  SWAGGER_ENABLED: booleanFromString.default(false)
 });
 
 export const env = envSchema.parse(process.env);
