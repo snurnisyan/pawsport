@@ -9,9 +9,10 @@ export interface IUser {
   email: string;
   passwordHash: string;
   status: UserStatus;
-  emailConfirmToken?: string;
-  emailConfirmExpiresAt?: Date;
-  resetToken?: string;
+  emailVerified: boolean;
+  verificationTokenHash?: string;
+  verificationTokenExpiresAt?: Date;
+  resetTokenHash?: string;
   resetTokenExpiresAt?: Date;
   consentAcceptedAt: Date;
   createdAt: Date;
@@ -37,16 +38,21 @@ const userSchema = new Schema<IUser>(
     status: {
       type: String,
       enum: USER_STATUSES,
-      default: "pending",
+      default: "active",
       required: true
     },
-    emailConfirmToken: {
+    emailVerified: {
+      type: Boolean,
+      default: false,
+      required: true
+    },
+    verificationTokenHash: {
       type: String
     },
-    emailConfirmExpiresAt: {
+    verificationTokenExpiresAt: {
       type: Date
     },
-    resetToken: {
+    resetTokenHash: {
       type: String
     },
     resetTokenExpiresAt: {

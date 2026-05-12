@@ -1,3 +1,291 @@
-import { createServiceStub } from "../utils/serviceStub";
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
+import jwt, { type SignOptions } from "jsonwebtoken";
+import nodemailer from "nodemailer";
 
-export const authService = createServiceStub("auth");
+import { env } from "../config/env";
+import { AppError } from "../middleware/errorHandler";
+import { UserModel, type IUser, type UserDocument } from "../models/User";
+
+const BCRYPT_ROUNDS = 12;
+const EMAIL_CONFIRMATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export interface RegisterInput {
+  email?: unknown;
+  password?: unknown;
+  personalDataConsent?: unknown;
+}
+
+export interface SafeAuthUser {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+}
+
+export interface RegisterResult {
+  accessToken: string;
+  user: SafeAuthUser;
+  nextStep: "onboarding";
+}
+
+export type ConfirmationStatus = "success" | "invalid_or_expired";
+
+export interface ConfirmationEmailPayload {
+  to: string;
+  confirmationUrl: string;
+}
+
+interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  status: "active";
+  emailVerified: boolean;
+  verificationTokenHash: string;
+  verificationTokenExpiresAt: Date;
+  consentAcceptedAt: Date;
+}
+
+type ConfirmationUser = Pick<
+  UserDocument,
+  "emailVerified" | "verificationTokenExpiresAt" | "verificationTokenHash" | "save"
+>;
+
+export interface AuthServiceDependencies {
+  findUserByEmail?: (email: string) => Promise<unknown>;
+  createUser?: (input: CreateUserInput) => Promise<Pick<IUser, "_id" | "email" | "emailVerified">>;
+  findUserByVerificationTokenHash?: (tokenHash: string) => Promise<ConfirmationUser | null>;
+  generateToken?: () => string;
+  hashPassword?: (password: string) => Promise<string>;
+  signJwt?: (payload: JwtPayload) => string;
+  sendConfirmationEmail?: (payload: ConfirmationEmailPayload) => Promise<void>;
+  now?: () => Date;
+  awaitConfirmationEmail?: boolean;
+}
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+}
+
+export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
+export const hashToken = (token: string): string => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
+
+const defaultGenerateToken = (): string => crypto.randomBytes(32).toString("base64url");
+
+const defaultHashPassword = (password: string): Promise<string> => bcrypt.hash(password, BCRYPT_ROUNDS);
+
+const defaultSignJwt = (payload: JwtPayload): string => {
+  const options: SignOptions = {
+    expiresIn: env.JWT_EXPIRES_IN as SignOptions["expiresIn"]
+  };
+
+  return jwt.sign(payload, env.JWT_SECRET, options);
+};
+
+const getBackendAuthPath = (path: string): string => {
+  const prefix = env.API_PREFIX === "/" ? "" : env.API_PREFIX.replace(/\/$/, "");
+  return `${prefix}/auth/${path.replace(/^\//, "")}`;
+};
+
+const buildConfirmationUrl = (token: string): string => {
+  const url = new URL(getBackendAuthPath("confirm"), env.BACKEND_PUBLIC_URL);
+  url.searchParams.set("token", token);
+  return url.toString();
+};
+
+const defaultSendConfirmationEmail = async ({
+  to,
+  confirmationUrl
+}: ConfirmationEmailPayload): Promise<void> => {
+  const transporter = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASSWORD
+    }
+  });
+
+  await transporter.sendMail({
+    from: `Команда Pawsport <${env.SMTP_FROM}>`,
+    to,
+    subject: "Подтвердите email в Pawsport",
+    text: [
+      "Здравствуйте!",
+      "",
+      "Подтвердите email, чтобы включить автоматические email-уведомления Pawsport.",
+      confirmationUrl,
+      "",
+      "Если вы не регистрировались в Pawsport, просто проигнорируйте это письмо."
+    ].join("\n"),
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #202124; line-height: 1.55;">
+        <h1 style="font-size: 22px; margin: 0 0 16px;">Подтвердите email в Pawsport</h1>
+        <p>Здравствуйте!</p>
+        <p>Подтвердите email, чтобы включить автоматические email-уведомления Pawsport.</p>
+        <p><a href="${confirmationUrl}">Подтвердить email</a></p>
+        <p style="color: #5f6368;">Если вы не регистрировались в Pawsport, просто проигнорируйте это письмо.</p>
+      </div>
+    `
+  });
+};
+
+const validateRegistrationInput = (input: RegisterInput): { email: string; password: string } => {
+  if (typeof input.email !== "string") {
+    throw new AppError(400, "INVALID_EMAIL", "Email is required");
+  }
+
+  const email = normalizeEmail(input.email);
+
+  if (!emailPattern.test(email)) {
+    throw new AppError(400, "INVALID_EMAIL", "Email must be a valid email address");
+  }
+
+  if (typeof input.password !== "string") {
+    throw new AppError(400, "INVALID_PASSWORD", "Password is required");
+  }
+
+  if (input.password.length < 8 || !/[A-Za-zА-Яа-я]/.test(input.password) || !/\d/.test(input.password)) {
+    throw new AppError(
+      400,
+      "INVALID_PASSWORD",
+      "Password must be at least 8 characters long and contain at least one letter and one digit"
+    );
+  }
+
+  if (input.personalDataConsent !== true) {
+    throw new AppError(400, "PERSONAL_DATA_CONSENT_REQUIRED", "Personal data consent is required");
+  }
+
+  return { email, password: input.password };
+};
+
+const toSafeUser = (user: Pick<IUser, "_id" | "email" | "emailVerified">): SafeAuthUser => ({
+  id: user._id.toString(),
+  email: user.email,
+  emailVerified: user.emailVerified
+});
+
+const sendEmailSafely = async (
+  sender: (payload: ConfirmationEmailPayload) => Promise<void>,
+  payload: ConfirmationEmailPayload
+): Promise<void> => {
+  try {
+    await sender(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown SMTP error";
+    process.stderr.write(`Failed to send confirmation email: ${message}\n`);
+  }
+};
+
+export const registerUser = async (
+  input: RegisterInput,
+  dependencies: AuthServiceDependencies = {}
+): Promise<RegisterResult> => {
+  const {
+    findUserByEmail = async (email) => UserModel.findOne({ email }).exec(),
+    createUser = async (userInput) => UserModel.create(userInput),
+    generateToken = defaultGenerateToken,
+    hashPassword = defaultHashPassword,
+    signJwt = defaultSignJwt,
+    sendConfirmationEmail = defaultSendConfirmationEmail,
+    now = () => new Date(),
+    awaitConfirmationEmail = false
+  } = dependencies;
+
+  const { email, password } = validateRegistrationInput(input);
+  const existingUser = await findUserByEmail(email);
+
+  if (existingUser) {
+    throw new AppError(409, "EMAIL_ALREADY_EXISTS", "User with this email already exists");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const confirmationToken = generateToken();
+  const verificationTokenHash = hashToken(confirmationToken);
+  const createdAt = now();
+  const verificationTokenExpiresAt = new Date(createdAt.getTime() + EMAIL_CONFIRMATION_TOKEN_TTL_MS);
+
+  let user: Pick<IUser, "_id" | "email" | "emailVerified">;
+
+  try {
+    user = await createUser({
+      email,
+      passwordHash,
+      status: "active",
+      emailVerified: false,
+      verificationTokenHash,
+      verificationTokenExpiresAt,
+      consentAcceptedAt: createdAt
+    });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      throw new AppError(409, "EMAIL_ALREADY_EXISTS", "User with this email already exists");
+    }
+
+    throw error;
+  }
+
+  const emailPayload = {
+    to: email,
+    confirmationUrl: buildConfirmationUrl(confirmationToken)
+  };
+
+  const emailTask = sendEmailSafely(sendConfirmationEmail, emailPayload);
+
+  if (awaitConfirmationEmail) {
+    await emailTask;
+  } else {
+    void emailTask;
+  }
+
+  const safeUser = toSafeUser(user);
+
+  return {
+    accessToken: signJwt({
+      sub: safeUser.id,
+      email: safeUser.email
+    }),
+    user: safeUser,
+    nextStep: "onboarding"
+  };
+};
+
+export const confirmEmail = async (
+  token: unknown,
+  dependencies: AuthServiceDependencies = {}
+): Promise<ConfirmationStatus> => {
+  const {
+    findUserByVerificationTokenHash = async (tokenHash) =>
+      UserModel.findOne({ verificationTokenHash: tokenHash }).exec(),
+    now = () => new Date()
+  } = dependencies;
+
+  if (typeof token !== "string" || token.trim().length === 0) {
+    return "invalid_or_expired";
+  }
+
+  const tokenHash = hashToken(token);
+  const user = await findUserByVerificationTokenHash(tokenHash);
+
+  if (!user || user.emailVerified || !user.verificationTokenExpiresAt) {
+    return "invalid_or_expired";
+  }
+
+  if (user.verificationTokenExpiresAt.getTime() <= now().getTime()) {
+    return "invalid_or_expired";
+  }
+
+  user.emailVerified = true;
+  user.verificationTokenHash = undefined;
+  user.verificationTokenExpiresAt = undefined;
+  await user.save();
+
+  return "success";
+};
