@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import multer from "multer";
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -16,9 +17,15 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  const statusCode = error instanceof AppError ? error.statusCode : 500;
-  const code = error instanceof AppError ? error.code : "INTERNAL_SERVER_ERROR";
-  const message = error instanceof Error ? error.message : "Unexpected error";
+  let statusCode = error instanceof AppError ? error.statusCode : 500;
+  let code = error instanceof AppError ? error.code : "INTERNAL_SERVER_ERROR";
+  let message = error instanceof Error ? error.message : "Unexpected error";
+
+  if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+    statusCode = 400;
+    code = "FILE_TOO_LARGE";
+    message = "file exceeds the maximum allowed size";
+  }
 
   res.status(statusCode).json({
     error: {
