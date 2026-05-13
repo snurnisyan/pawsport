@@ -5,3 +5,4 @@ export * from "./eventService";
 export * from "./fileService";
 export * from "./reminderService";
 export * from "./exportService";
+export * from "./calendarService";
