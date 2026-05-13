@@ -21,6 +21,13 @@ export interface CreateReminderInput {
   offset?: unknown;
 }
 
+export interface UpdateReminderInput {
+  dueAt?: unknown;
+  sendAt?: unknown;
+  offset?: unknown;
+  status?: unknown;
+}
+
 export interface SerializedReminder {
   id: string;
   ownerId: string;
@@ -66,6 +73,10 @@ interface CreateReminderPersistInput extends NormalizedCreateReminderInput {
   status: ReminderStatus;
 }
 
+export interface ReminderUpdates {
+  set: Record<string, unknown>;
+}
+
 export interface ReminderServiceDependencies {
   createReminderRecord?: (input: CreateReminderPersistInput) => Promise<ReminderRecord>;
   listRemindersForOwner?: (ownerId: Types.ObjectId) => Promise<ReminderRecord[]>;
@@ -73,6 +84,19 @@ export interface ReminderServiceDependencies {
     petId: Types.ObjectId,
     ownerId: Types.ObjectId
   ) => Promise<Pick<IPet, "_id"> | null>;
+  findReminderByIdForOwner?: (
+    reminderId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<ReminderRecord | null>;
+  updateReminderRecord?: (
+    reminderId: Types.ObjectId,
+    ownerId: Types.ObjectId,
+    updates: ReminderUpdates
+  ) => Promise<ReminderRecord | null>;
+  deleteReminderRecord?: (
+    reminderId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<ReminderRecord | null>;
 }
 
 const parseObjectId = (value: unknown, code: string, message: string): Types.ObjectId => {
@@ -116,6 +140,43 @@ const parseOffset = (value: unknown): ReminderOffset => {
     );
   }
   return value as ReminderOffset;
+};
+
+const parseStatus = (value: unknown): ReminderStatus => {
+  if (typeof value !== "string" || !(REMINDER_STATUSES as readonly string[]).includes(value)) {
+    throw new AppError(
+      400,
+      "INVALID_STATUS",
+      `status must be one of: ${REMINDER_STATUSES.join(", ")}`
+    );
+  }
+  return value as ReminderStatus;
+};
+
+const hasField = (input: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(input, key);
+
+const normalizeUpdateInput = (input: UpdateReminderInput): ReminderUpdates => {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return { set: {} };
+  }
+
+  const set: Record<string, unknown> = {};
+
+  if (hasField(input, "dueAt")) {
+    set.dueAt = parseDate(input.dueAt, "INVALID_DUE_AT", "dueAt must be a valid ISO date-time string");
+  }
+  if (hasField(input, "sendAt")) {
+    set.sendAt = parseDate(input.sendAt, "INVALID_SEND_AT", "sendAt must be a valid ISO date-time string");
+  }
+  if (hasField(input, "offset")) {
+    set.offset = parseOffset(input.offset);
+  }
+  if (hasField(input, "status")) {
+    set.status = parseStatus(input.status);
+  }
+
+  return { set };
 };
 
 const normalizeCreateInput = (input: CreateReminderInput): NormalizedCreateReminderInput => {
@@ -203,4 +264,76 @@ export const listReminders = async (
   const ownerObjectId = requireOwnerId(ownerId);
   const reminders = await listRemindersForOwner(ownerObjectId);
   return reminders.map(serializeReminder);
+};
+
+const requireReminderId = (reminderId: string): Types.ObjectId => {
+  if (!isValidObjectId(reminderId)) {
+    throw new AppError(400, "INVALID_REMINDER_ID", "reminderId must be a valid id");
+  }
+  return new Types.ObjectId(reminderId);
+};
+
+const defaultFindReminder: NonNullable<
+  ReminderServiceDependencies["findReminderByIdForOwner"]
+> = async (id, owner) =>
+  ReminderModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as ReminderRecord | null;
+
+export const updateReminder = async (
+  ownerId: string,
+  reminderId: string,
+  input: UpdateReminderInput,
+  dependencies: ReminderServiceDependencies = {}
+): Promise<SerializedReminder> => {
+  const {
+    findReminderByIdForOwner = defaultFindReminder,
+    updateReminderRecord = async (id, owner, updates) => {
+      const op: Record<string, unknown> = {};
+      if (Object.keys(updates.set).length > 0) op.$set = updates.set;
+      return ReminderModel.findOneAndUpdate({ _id: id, ownerId: owner }, op, {
+        new: true
+      }).exec() as unknown as ReminderRecord | null;
+    }
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const reminderObjectId = requireReminderId(reminderId);
+  const updates = normalizeUpdateInput(input);
+
+  const existing = await findReminderByIdForOwner(reminderObjectId, ownerObjectId);
+  if (!existing) {
+    throw new AppError(404, "REMINDER_NOT_FOUND", "Reminder was not found");
+  }
+
+  if (Object.keys(updates.set).length === 0) {
+    return serializeReminder(existing);
+  }
+
+  if (existing.status === "sent") {
+    throw new AppError(409, "REMINDER_SENT_IMMUTABLE", "A sent reminder cannot be modified");
+  }
+
+  const updated = await updateReminderRecord(reminderObjectId, ownerObjectId, updates);
+  if (!updated) {
+    throw new AppError(404, "REMINDER_NOT_FOUND", "Reminder was not found");
+  }
+  return serializeReminder(updated);
+};
+
+export const deleteReminder = async (
+  ownerId: string,
+  reminderId: string,
+  dependencies: ReminderServiceDependencies = {}
+): Promise<void> => {
+  const {
+    deleteReminderRecord = async (id, owner) =>
+      ReminderModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as ReminderRecord | null
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const reminderObjectId = requireReminderId(reminderId);
+
+  const deleted = await deleteReminderRecord(reminderObjectId, ownerObjectId);
+  if (!deleted) {
+    throw new AppError(404, "REMINDER_NOT_FOUND", "Reminder was not found");
+  }
 };

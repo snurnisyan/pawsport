@@ -13,6 +13,7 @@ import {
   type ReminderOffset
 } from "../models/Event";
 import { PetModel, type IPet } from "../models/Pet";
+import { ReminderModel } from "../models/Reminder";
 
 export interface CreateEventInput {
   type?: unknown;
@@ -83,6 +84,11 @@ interface CreateEventPersistInput extends NormalizedCreateEventInput {
   petId: Types.ObjectId;
 }
 
+export interface EventUpdates {
+  set: Record<string, unknown>;
+  unset: string[];
+}
+
 export interface EventServiceDependencies {
   createEventRecord?: (input: CreateEventPersistInput) => Promise<EventRecord>;
   listEventsForOwnerPet?: (
@@ -93,6 +99,23 @@ export interface EventServiceDependencies {
     petId: Types.ObjectId,
     ownerId: Types.ObjectId
   ) => Promise<Pick<IPet, "_id"> | null>;
+  findEventByIdForOwner?: (
+    eventId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<EventRecord | null>;
+  updateEventRecord?: (
+    eventId: Types.ObjectId,
+    ownerId: Types.ObjectId,
+    updates: EventUpdates
+  ) => Promise<EventRecord | null>;
+  deleteEventRecord?: (
+    eventId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<EventRecord | null>;
+  deleteRemindersForEvent?: (
+    eventId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<void>;
 }
 
 const requireString = (value: unknown, code: string, message: string): string => {
@@ -218,6 +241,81 @@ const normalizeCreateInput = (input: CreateEventInput): NormalizedCreateEventInp
   };
 };
 
+const hasField = (input: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(input, key);
+
+const normalizeUpdateInput = (input: CreateEventInput): EventUpdates => {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return { set: {}, unset: [] };
+  }
+
+  const set: Record<string, unknown> = {};
+  const unset: string[] = [];
+
+  if (hasField(input, "type")) {
+    set.type = parseType(input.type);
+  }
+  if (hasField(input, "title")) {
+    set.title = requireString(input.title, "INVALID_TITLE", "title is required");
+  }
+  if (hasField(input, "eventDate")) {
+    set.eventDate = parseDate(
+      input.eventDate,
+      "INVALID_EVENT_DATE",
+      "eventDate must be a valid ISO date-time string"
+    );
+  }
+  if (hasField(input, "nextDate")) {
+    const value = optionalDate(
+      input.nextDate,
+      "INVALID_NEXT_DATE",
+      "nextDate must be a valid ISO date-time string"
+    );
+    if (value) {
+      set.nextDate = value;
+    } else {
+      unset.push("nextDate");
+    }
+  }
+  if (hasField(input, "clinicName")) {
+    const value = optionalString(input.clinicName, "INVALID_CLINIC_NAME", "clinicName must be a string");
+    if (value) {
+      set.clinicName = value;
+    } else {
+      unset.push("clinicName");
+    }
+  }
+  if (hasField(input, "comment")) {
+    const value = optionalString(input.comment, "INVALID_COMMENT", "comment must be a string");
+    if (value) {
+      set.comment = value;
+    } else {
+      unset.push("comment");
+    }
+  }
+  if (hasField(input, "recurrence")) {
+    const value = parseRecurrence(input.recurrence);
+    if (value) {
+      set.recurrence = value;
+    } else {
+      unset.push("recurrence");
+    }
+  }
+  if (hasField(input, "reminderOffset")) {
+    const value = parseReminderOffset(input.reminderOffset);
+    if (value) {
+      set.reminderOffset = value;
+    } else {
+      unset.push("reminderOffset");
+    }
+  }
+  if (hasField(input, "fileIds")) {
+    set.fileIds = parseFileIds(input.fileIds);
+  }
+
+  return { set, unset };
+};
+
 export const serializeEvent = (event: EventRecord): SerializedEvent => {
   const result: SerializedEvent = {
     id: event._id.toString(),
@@ -259,6 +357,19 @@ const requirePetId = (petId: string): Types.ObjectId => {
   }
   return new Types.ObjectId(petId);
 };
+
+const requireEventId = (eventId: string): Types.ObjectId => {
+  if (!isValidObjectId(eventId)) {
+    throw new AppError(400, "INVALID_EVENT_ID", "eventId must be a valid id");
+  }
+  return new Types.ObjectId(eventId);
+};
+
+const defaultFindEvent: NonNullable<EventServiceDependencies["findEventByIdForOwner"]> = async (
+  eventId,
+  ownerId
+) =>
+  EventModel.findOne({ _id: eventId, ownerId }).exec() as unknown as EventRecord | null;
 
 const defaultFindPet: NonNullable<EventServiceDependencies["findPetByIdForOwner"]> = async (
   petId,
@@ -320,4 +431,84 @@ export const listPetEvents = async (
 
   const events = await listEventsForOwnerPet(ownerObjectId, petObjectId);
   return events.map(serializeEvent);
+};
+
+export const getEvent = async (
+  ownerId: string,
+  eventId: string,
+  dependencies: EventServiceDependencies = {}
+): Promise<SerializedEvent> => {
+  const { findEventByIdForOwner = defaultFindEvent } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const eventObjectId = requireEventId(eventId);
+
+  const event = await findEventByIdForOwner(eventObjectId, ownerObjectId);
+  if (!event) {
+    throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  }
+  return serializeEvent(event);
+};
+
+export const updateEvent = async (
+  ownerId: string,
+  eventId: string,
+  input: CreateEventInput,
+  dependencies: EventServiceDependencies = {}
+): Promise<SerializedEvent> => {
+  const {
+    findEventByIdForOwner = defaultFindEvent,
+    updateEventRecord = async (id, owner, updates) => {
+      const op: Record<string, unknown> = {};
+      if (Object.keys(updates.set).length > 0) op.$set = updates.set;
+      if (updates.unset.length > 0) {
+        op.$unset = Object.fromEntries(updates.unset.map((key) => [key, ""]));
+      }
+      return EventModel.findOneAndUpdate({ _id: id, ownerId: owner }, op, {
+        new: true
+      }).exec() as unknown as EventRecord | null;
+    }
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const eventObjectId = requireEventId(eventId);
+  const updates = normalizeUpdateInput(input);
+
+  if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
+    const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
+    if (!existing) {
+      throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+    }
+    return serializeEvent(existing);
+  }
+
+  const updated = await updateEventRecord(eventObjectId, ownerObjectId, updates);
+  if (!updated) {
+    throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  }
+  return serializeEvent(updated);
+};
+
+export const deleteEvent = async (
+  ownerId: string,
+  eventId: string,
+  dependencies: EventServiceDependencies = {}
+): Promise<void> => {
+  const {
+    deleteEventRecord = async (id, owner) =>
+      EventModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as EventRecord | null,
+    deleteRemindersForEvent = async (id, owner) => {
+      await ReminderModel.deleteMany({ eventId: id, ownerId: owner }).exec();
+    }
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const eventObjectId = requireEventId(eventId);
+
+  const deleted = await deleteEventRecord(eventObjectId, ownerObjectId);
+  if (!deleted) {
+    throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  }
+
+  await deleteRemindersForEvent(eventObjectId, ownerObjectId);
 };

@@ -1,7 +1,6 @@
 import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
-import { notImplemented } from "../utils/notImplemented";
 import * as eventService from "../services/eventService";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
@@ -25,6 +24,21 @@ export const createPetEvent = asyncHandler(async (req: AuthenticatedRequest, res
   res.status(201).json({ event });
 });
 
-export const getEvent = notImplemented("events", "getEvent");
-export const updateEvent = notImplemented("events", "updateEvent");
-export const deleteEvent = notImplemented("events", "deleteEvent");
+export const getEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const event = await eventService.getEvent(requireUserId(req), req.params.id);
+  res.status(200).json({ event });
+});
+
+export const updateEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const event = await eventService.updateEvent(
+    requireUserId(req),
+    req.params.id,
+    req.body ?? {}
+  );
+  res.status(200).json({ event });
+});
+
+export const deleteEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  await eventService.deleteEvent(requireUserId(req), req.params.id);
+  res.status(204).send();
+});

@@ -1,7 +1,6 @@
 import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
-import { notImplemented } from "../utils/notImplemented";
 import * as petService from "../services/petService";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
@@ -26,5 +25,12 @@ export const getPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
   res.status(200).json({ pet });
 });
 
-export const updatePet = notImplemented("pets", "updatePet");
-export const deletePet = notImplemented("pets", "deletePet");
+export const updatePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const pet = await petService.updatePet(requireUserId(req), req.params.id, req.body ?? {});
+  res.status(200).json({ pet });
+});
+
+export const deletePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  await petService.deletePet(requireUserId(req), req.params.id);
+  res.status(204).send();
+});
