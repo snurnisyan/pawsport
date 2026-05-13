@@ -1,5 +1,7 @@
 import multer from "multer";
 
+import { AppError } from "./errorHandler";
+
 export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 export const ALLOWED_FILE_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
@@ -15,6 +17,6 @@ export const upload = multer({
       return;
     }
 
-    callback(new Error("Unsupported file type"));
+    callback(new AppError(400, "UNSUPPORTED_FILE_TYPE", "file type is not supported"));
   }
 });
