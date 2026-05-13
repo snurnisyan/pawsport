@@ -1,7 +1,6 @@
 import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
-import { notImplemented } from "../utils/notImplemented";
 import * as reminderService from "../services/reminderService";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
@@ -21,5 +20,16 @@ export const createReminder = asyncHandler(async (req: AuthenticatedRequest, res
   res.status(201).json({ reminder });
 });
 
-export const updateReminder = notImplemented("reminders", "updateReminder");
-export const deleteReminder = notImplemented("reminders", "deleteReminder");
+export const updateReminder = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const reminder = await reminderService.updateReminder(
+    requireUserId(req),
+    req.params.id,
+    req.body ?? {}
+  );
+  res.status(200).json({ reminder });
+});
+
+export const deleteReminder = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  await reminderService.deleteReminder(requireUserId(req), req.params.id);
+  res.status(204).send();
+});
