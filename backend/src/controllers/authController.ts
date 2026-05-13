@@ -17,5 +17,10 @@ export const confirmEmail = asyncHandler(async (req, res) => {
   res.redirect(302, redirectUrl.toString());
 });
 
-export const login = notImplemented("auth", "login");
+export const login = asyncHandler(async (req, res) => {
+  const result = await authService.loginUser(req.body);
+
+  res.status(200).json(result);
+});
+
 export const requestPasswordReset = notImplemented("auth", "requestPasswordReset");

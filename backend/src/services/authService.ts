@@ -18,17 +18,25 @@ export interface RegisterInput {
   personalDataConsent?: unknown;
 }
 
+export interface LoginInput {
+  email?: unknown;
+  password?: unknown;
+}
+
 export interface SafeAuthUser {
   id: string;
   email: string;
   emailVerified: boolean;
 }
 
-export interface RegisterResult {
+export interface AuthResult {
   accessToken: string;
   user: SafeAuthUser;
   nextStep: "onboarding";
 }
+
+export type RegisterResult = AuthResult;
+export type LoginResult = AuthResult;
 
 export type ConfirmationStatus = "success" | "invalid_or_expired";
 
@@ -52,12 +60,16 @@ type ConfirmationUser = Pick<
   "emailVerified" | "verificationTokenExpiresAt" | "verificationTokenHash" | "save"
 >;
 
+type LoginUser = Pick<IUser, "_id" | "email" | "emailVerified" | "passwordHash">;
+
 export interface AuthServiceDependencies {
   findUserByEmail?: (email: string) => Promise<unknown>;
   createUser?: (input: CreateUserInput) => Promise<Pick<IUser, "_id" | "email" | "emailVerified">>;
   findUserByVerificationTokenHash?: (tokenHash: string) => Promise<ConfirmationUser | null>;
+  findLoginUserByEmail?: (email: string) => Promise<LoginUser | null>;
   generateToken?: () => string;
   hashPassword?: (password: string) => Promise<string>;
+  comparePassword?: (password: string, hash: string) => Promise<boolean>;
   signJwt?: (payload: JwtPayload) => string;
   sendConfirmationEmail?: (payload: ConfirmationEmailPayload) => Promise<void>;
   now?: () => Date;
@@ -78,6 +90,9 @@ export const hashToken = (token: string): string => {
 const defaultGenerateToken = (): string => crypto.randomBytes(32).toString("base64url");
 
 const defaultHashPassword = (password: string): Promise<string> => bcrypt.hash(password, BCRYPT_ROUNDS);
+
+const defaultComparePassword = (password: string, hash: string): Promise<boolean> =>
+  bcrypt.compare(password, hash);
 
 const defaultSignJwt = (payload: JwtPayload): string => {
   const options: SignOptions = {
@@ -288,4 +303,54 @@ export const confirmEmail = async (
   await user.save();
 
   return "success";
+};
+
+const validateLoginInput = (input: LoginInput): { email: string; password: string } => {
+  if (typeof input.email !== "string" || typeof input.password !== "string") {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+  }
+
+  const email = normalizeEmail(input.email);
+
+  if (!emailPattern.test(email) || input.password.length === 0) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+  }
+
+  return { email, password: input.password };
+};
+
+export const loginUser = async (
+  input: LoginInput,
+  dependencies: AuthServiceDependencies = {}
+): Promise<LoginResult> => {
+  const {
+    findLoginUserByEmail = async (email) =>
+      UserModel.findOne({ email }).select("+passwordHash").exec() as Promise<LoginUser | null>,
+    comparePassword = defaultComparePassword,
+    signJwt = defaultSignJwt
+  } = dependencies;
+
+  const { email, password } = validateLoginInput(input);
+  const user = await findLoginUserByEmail(email);
+
+  if (!user) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+  }
+
+  const passwordMatches = await comparePassword(password, user.passwordHash);
+
+  if (!passwordMatches) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+  }
+
+  const safeUser = toSafeUser(user);
+
+  return {
+    accessToken: signJwt({
+      sub: safeUser.id,
+      email: safeUser.email
+    }),
+    user: safeUser,
+    nextStep: "onboarding"
+  };
 };

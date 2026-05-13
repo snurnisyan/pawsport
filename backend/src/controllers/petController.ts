@@ -1,7 +1,26 @@
+import { AppError } from "../middleware/errorHandler";
+import type { AuthenticatedRequest } from "../middleware/authMiddleware";
+import { asyncHandler } from "../utils/asyncHandler";
 import { notImplemented } from "../utils/notImplemented";
+import * as petService from "../services/petService";
 
-export const listPets = notImplemented("pets", "listPets");
-export const createPet = notImplemented("pets", "createPet");
+const requireUserId = (req: AuthenticatedRequest): string => {
+  if (!req.user) {
+    throw new AppError(401, "UNAUTHORIZED", "Authentication is required");
+  }
+  return req.user.id;
+};
+
+export const listPets = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const items = await petService.listPets(requireUserId(req));
+  res.status(200).json({ items });
+});
+
+export const createPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const pet = await petService.createPet(requireUserId(req), req.body ?? {});
+  res.status(201).json({ pet });
+});
+
 export const getPet = notImplemented("pets", "getPet");
 export const updatePet = notImplemented("pets", "updatePet");
 export const deletePet = notImplemented("pets", "deletePet");
