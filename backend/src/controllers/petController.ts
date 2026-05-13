@@ -21,6 +21,10 @@ export const createPet = asyncHandler(async (req: AuthenticatedRequest, res) => 
   res.status(201).json({ pet });
 });
 
-export const getPet = notImplemented("pets", "getPet");
+export const getPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const pet = await petService.getPet(requireUserId(req), req.params.id);
+  res.status(200).json({ pet });
+});
+
 export const updatePet = notImplemented("pets", "updatePet");
 export const deletePet = notImplemented("pets", "deletePet");

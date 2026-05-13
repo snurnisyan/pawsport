@@ -81,6 +81,7 @@ interface CreatePetPersistInput extends NormalizedCreatePetInput {
 export interface PetServiceDependencies {
   createPetRecord?: (input: CreatePetPersistInput) => Promise<PetRecord>;
   listPetsForOwner?: (ownerId: Types.ObjectId) => Promise<PetRecord[]>;
+  findPetByIdForOwner?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
 }
 
 const MICROCHIP_PATTERN = /^\d{15}$/;
@@ -275,4 +276,29 @@ export const listPets = async (
   const ownerObjectId = requireOwnerId(ownerId);
   const pets = await listPetsForOwner(ownerObjectId);
   return pets.map(serializePet);
+};
+
+export const getPet = async (
+  ownerId: string,
+  petId: string,
+  dependencies: PetServiceDependencies = {}
+): Promise<SerializedPet> => {
+  const {
+    findPetByIdForOwner = async (id, owner) =>
+      PetModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as PetRecord | null
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+
+  if (!isValidObjectId(petId)) {
+    throw new AppError(400, "INVALID_PET_ID", "petId must be a valid id");
+  }
+
+  const pet = await findPetByIdForOwner(new Types.ObjectId(petId), ownerObjectId);
+
+  if (!pet) {
+    throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+  }
+
+  return serializePet(pet);
 };
