@@ -1,17 +1,21 @@
 import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
-import { notImplemented } from "../utils/notImplemented";
 import * as userService from "../services/userService";
 
-export const getMe = asyncHandler(async (req: AuthenticatedRequest, res) => {
+const requireUserId = (req: AuthenticatedRequest): string => {
   if (!req.user) {
     throw new AppError(401, "UNAUTHORIZED", "Authentication is required");
   }
+  return req.user.id;
+};
 
-  const user = await userService.getCurrentUser(req.user.id);
-
+export const getMe = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const user = await userService.getCurrentUser(requireUserId(req));
   res.status(200).json({ user });
 });
 
-export const deleteMe = notImplemented("users", "deleteMe");
+export const deleteMe = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  await userService.deleteCurrentUser(requireUserId(req));
+  res.status(204).send();
+});
