@@ -47,6 +47,24 @@ const s3Client = new S3Client({
   }
 });
 
+export const isMissingObjectError = (error: unknown): boolean => {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const candidate = error as {
+    name?: unknown;
+    Code?: unknown;
+    code?: unknown;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    candidate.name === "NoSuchKey" ||
+    candidate.Code === "NoSuchKey" ||
+    candidate.code === "NoSuchKey" ||
+    candidate.$metadata?.httpStatusCode === 404
+  );
+};
+
 const toReadable = async (body: unknown): Promise<Readable> => {
   if (body instanceof Readable) {
     return body;

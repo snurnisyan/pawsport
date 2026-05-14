@@ -5,6 +5,7 @@ import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
 import {
+  deleteAllFilesForOwner,
   deleteFile,
   downloadFile,
   listPetFiles,
@@ -386,4 +387,98 @@ test("deleteFile keeps metadata when storage delete has a network error", async 
 test("serializeFile hides storage key", () => {
   const result = serializeFile(makeFileRecord());
   assert.equal("storageKey" in result, false);
+});
+
+test("deleteAllFilesForOwner removes every owned object and metadata", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const fileA = { _id: new Types.ObjectId(), storageKey: "users/o/pets/p/files/a/a.pdf" };
+  const fileB = { _id: new Types.ObjectId(), storageKey: "users/o/pets/p/files/b/b.pdf" };
+  const deletedKeys: string[] = [];
+  let metadataDeletedFor: Types.ObjectId | undefined;
+
+  await deleteAllFilesForOwner(ownerObjectId, {
+    storage: makeStorage({
+      deleteObject: async ({ key }) => {
+        deletedKeys.push(key);
+      }
+    }),
+    listOwnerFiles: async (owner) => {
+      assert.equal(owner.toString(), ownerId);
+      return [fileA, fileB];
+    },
+    deleteOwnerFiles: async (owner) => {
+      metadataDeletedFor = owner;
+    }
+  });
+
+  assert.deepEqual(deletedKeys, [fileA.storageKey, fileB.storageKey]);
+  assert.equal(metadataDeletedFor?.toString(), ownerId);
+});
+
+test("deleteAllFilesForOwner tolerates already-missing storage objects", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const missing = Object.assign(new Error("missing"), { name: "NoSuchKey" });
+  let metadataDeleted = false;
+
+  await deleteAllFilesForOwner(ownerObjectId, {
+    storage: makeStorage({
+      deleteObject: async () => {
+        throw missing;
+      }
+    }),
+    listOwnerFiles: async () => [
+      { _id: new Types.ObjectId(), storageKey: "users/o/p/f/a.pdf" }
+    ],
+    deleteOwnerFiles: async () => {
+      metadataDeleted = true;
+    }
+  });
+
+  assert.equal(metadataDeleted, true);
+});
+
+test("deleteAllFilesForOwner throws on hard storage failure and keeps metadata", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  let metadataDeleted = false;
+
+  await assert.rejects(
+    () =>
+      deleteAllFilesForOwner(ownerObjectId, {
+        storage: makeStorage({
+          deleteObject: async () => {
+            throw new Error("network down");
+          }
+        }),
+        listOwnerFiles: async () => [
+          { _id: new Types.ObjectId(), storageKey: "users/o/p/f/a.pdf" }
+        ],
+        deleteOwnerFiles: async () => {
+          metadataDeleted = true;
+        }
+      }),
+    assertAppError(502, "FILE_STORAGE_DELETE_FAILED")
+  );
+
+  assert.equal(metadataDeleted, false);
+});
+
+test("deleteAllFilesForOwner skips storage when owner has no files", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  let storageCalled = false;
+  let metadataDeleted = false;
+
+  await deleteAllFilesForOwner(ownerObjectId, {
+    storage: makeStorage({
+      deleteObject: async () => {
+        storageCalled = true;
+      }
+    }),
+    listOwnerFiles: async () => [],
+    deleteOwnerFiles: async () => {
+      metadataDeleted = true;
+    }
+  });
+
+  assert.equal(storageCalled, false);
+  assert.equal(metadataDeleted, true);
 });

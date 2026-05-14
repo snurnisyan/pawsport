@@ -7,7 +7,7 @@ import { ALLOWED_FILE_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../middleware/uplo
 import { EventModel, type IEvent } from "../models/Event";
 import { FileModel, type AllowedFileMimeType, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
-import { s3Storage, type FileStorage } from "../storage/s3Storage";
+import { isMissingObjectError, s3Storage, type FileStorage } from "../storage/s3Storage";
 
 export interface UploadedFileInput {
   originalname: string;
@@ -137,19 +137,6 @@ const buildStorageKey = (
   originalName: string
 ): string =>
   `users/${ownerId.toString()}/pets/${petId.toString()}/files/${fileId.toString()}/${sanitizeOriginalName(originalName)}`;
-
-const isMissingObjectError = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const candidate = error as { name?: unknown; Code?: unknown; code?: unknown; $metadata?: { httpStatusCode?: number } };
-  return (
-    candidate.name === "NoSuchKey" ||
-    candidate.Code === "NoSuchKey" ||
-    candidate.code === "NoSuchKey" ||
-    candidate.$metadata?.httpStatusCode === 404
-  );
-};
 
 const toStorageError = (error: unknown, code: string, message: string): AppError => {
   if (isMissingObjectError(error) && code === "FILE_STORAGE_GET_FAILED") {
@@ -344,4 +331,42 @@ export const deleteFile = async (
   if (!deleted) {
     throw new AppError(404, "FILE_NOT_FOUND", "File was not found");
   }
+};
+
+type OwnerFileRecord = Pick<IStoredFile, "_id" | "storageKey">;
+
+export interface DeleteOwnerFilesDependencies {
+  storage?: FileStorage;
+  listOwnerFiles?: (ownerId: Types.ObjectId) => Promise<OwnerFileRecord[]>;
+  deleteOwnerFiles?: (ownerId: Types.ObjectId) => Promise<void>;
+}
+
+export const deleteAllFilesForOwner = async (
+  ownerId: Types.ObjectId,
+  dependencies: DeleteOwnerFilesDependencies = {}
+): Promise<void> => {
+  const {
+    storage = s3Storage,
+    listOwnerFiles = async (owner) =>
+      FileModel.find({ ownerId: owner })
+        .select({ _id: 1, storageKey: 1 })
+        .exec() as unknown as OwnerFileRecord[],
+    deleteOwnerFiles = async (owner) => {
+      await FileModel.deleteMany({ ownerId: owner }).exec();
+    }
+  } = dependencies;
+
+  const files = await listOwnerFiles(ownerId);
+
+  for (const file of files) {
+    try {
+      await storage.deleteObject({ key: file.storageKey });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+      }
+    }
+  }
+
+  await deleteOwnerFiles(ownerId);
 };
