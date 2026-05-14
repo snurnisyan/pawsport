@@ -1,4 +1,11 @@
-import { confirmEmail, login, register, requestPasswordReset } from "../controllers/authController";
+import {
+  confirmEmail,
+  confirmPasswordReset,
+  login,
+  register,
+  requestPasswordReset,
+  validatePasswordResetToken
+} from "../controllers/authController";
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
@@ -7,7 +14,9 @@ import {
   ErrorResponseSchema,
   LoginRequestSchema,
   MessageResponseSchema,
+  PasswordResetConfirmRequestSchema,
   PasswordResetRequestSchema,
+  PasswordResetValidateRequestSchema,
   RegisterRequestSchema
 } from "../docs/schemas";
 
@@ -56,6 +65,28 @@ auth.route("post", "/password-reset", {
   request: { body: jsonRequestBody(PasswordResetRequestSchema) },
   responses: { 202: jsonResponse("Password reset request accepted", MessageResponseSchema) },
   handlers: [requestPasswordReset]
+});
+
+auth.route("post", "/password-reset/validate", {
+  operationId: "validatePasswordResetToken",
+  summary: "Check a password reset token and extend its expiry while the user fills the form",
+  request: { body: jsonRequestBody(PasswordResetValidateRequestSchema) },
+  responses: {
+    204: { description: "Reset token is valid" },
+    400: jsonResponse("Invalid or expired reset token", ErrorResponseSchema)
+  },
+  handlers: [validatePasswordResetToken]
+});
+
+auth.route("post", "/password-reset/confirm", {
+  operationId: "confirmPasswordReset",
+  summary: "Confirm password reset with a token and a new password",
+  request: { body: jsonRequestBody(PasswordResetConfirmRequestSchema) },
+  responses: {
+    204: { description: "Password updated" },
+    400: jsonResponse("Invalid or expired reset token, or invalid password", ErrorResponseSchema)
+  },
+  handlers: [confirmPasswordReset]
 });
 
 export const authRoutes = auth.router;

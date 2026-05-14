@@ -64,6 +64,19 @@ export const PasswordResetRequestSchema = z
   })
   .openapi("PasswordResetRequest");
 
+export const PasswordResetValidateRequestSchema = z
+  .object({
+    token: z.string().min(1)
+  })
+  .openapi("PasswordResetValidateRequest");
+
+export const PasswordResetConfirmRequestSchema = z
+  .object({
+    token: z.string().min(1),
+    password: z.string().min(8).openapi({ format: "password" })
+  })
+  .openapi("PasswordResetConfirmRequest");
+
 export const ConfirmEmailQuerySchema = z
   .object({
     token: z.string()

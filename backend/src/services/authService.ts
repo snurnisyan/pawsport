@@ -9,6 +9,8 @@ import { UserModel, type IUser, type UserDocument } from "../models/User";
 
 const BCRYPT_ROUNDS = 12;
 const EMAIL_CONFIRMATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_VALIDATION_EXTENSION_MS = 15 * 60 * 1000;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +23,19 @@ export interface RegisterInput {
 export interface LoginInput {
   email?: unknown;
   password?: unknown;
+}
+
+export interface PasswordResetRequestInput {
+  email?: unknown;
+}
+
+export interface PasswordResetConfirmInput {
+  token?: unknown;
+  password?: unknown;
+}
+
+export interface PasswordResetValidateInput {
+  token?: unknown;
 }
 
 export interface SafeAuthUser {
@@ -62,18 +77,37 @@ type ConfirmationUser = Pick<
 
 type LoginUser = Pick<IUser, "_id" | "email" | "emailVerified" | "passwordHash">;
 
+type PasswordResetRequestUser = Pick<
+  UserDocument,
+  "email" | "resetTokenHash" | "resetTokenExpiresAt" | "save"
+>;
+
+type PasswordResetConfirmUser = Pick<
+  UserDocument,
+  "passwordHash" | "resetTokenHash" | "resetTokenExpiresAt" | "save"
+>;
+
+export interface PasswordResetEmailPayload {
+  to: string;
+  resetUrl: string;
+}
+
 export interface AuthServiceDependencies {
   findUserByEmail?: (email: string) => Promise<unknown>;
   createUser?: (input: CreateUserInput) => Promise<Pick<IUser, "_id" | "email" | "emailVerified">>;
   findUserByVerificationTokenHash?: (tokenHash: string) => Promise<ConfirmationUser | null>;
   findLoginUserByEmail?: (email: string) => Promise<LoginUser | null>;
+  findPasswordResetUserByEmail?: (email: string) => Promise<PasswordResetRequestUser | null>;
+  findUserByResetTokenHash?: (tokenHash: string) => Promise<PasswordResetConfirmUser | null>;
   generateToken?: () => string;
   hashPassword?: (password: string) => Promise<string>;
   comparePassword?: (password: string, hash: string) => Promise<boolean>;
   signJwt?: (payload: JwtPayload) => string;
   sendConfirmationEmail?: (payload: ConfirmationEmailPayload) => Promise<void>;
+  sendPasswordResetEmail?: (payload: PasswordResetEmailPayload) => Promise<void>;
   now?: () => Date;
   awaitConfirmationEmail?: boolean;
+  awaitPasswordResetEmail?: boolean;
 }
 
 interface JwtPayload {
@@ -109,6 +143,12 @@ const getBackendAuthPath = (path: string): string => {
 
 const buildConfirmationUrl = (token: string): string => {
   const url = new URL(getBackendAuthPath("confirm"), env.BACKEND_PUBLIC_URL);
+  url.searchParams.set("token", token);
+  return url.toString();
+};
+
+const buildPasswordResetUrl = (token: string): string => {
+  const url = new URL("/auth/password-reset", env.FRONTEND_URL);
   url.searchParams.set("token", token);
   return url.toString();
 };
@@ -151,6 +191,22 @@ const defaultSendConfirmationEmail = async ({
   });
 };
 
+const validatePasswordStrength = (password: unknown): string => {
+  if (typeof password !== "string") {
+    throw new AppError(400, "INVALID_PASSWORD", "Password is required");
+  }
+
+  if (password.length < 8 || !/[A-Za-zА-Яа-я]/.test(password) || !/\d/.test(password)) {
+    throw new AppError(
+      400,
+      "INVALID_PASSWORD",
+      "Password must be at least 8 characters long and contain at least one letter and one digit"
+    );
+  }
+
+  return password;
+};
+
 const validateRegistrationInput = (input: RegisterInput): { email: string; password: string } => {
   if (typeof input.email !== "string") {
     throw new AppError(400, "INVALID_EMAIL", "Email is required");
@@ -162,23 +218,13 @@ const validateRegistrationInput = (input: RegisterInput): { email: string; passw
     throw new AppError(400, "INVALID_EMAIL", "Email must be a valid email address");
   }
 
-  if (typeof input.password !== "string") {
-    throw new AppError(400, "INVALID_PASSWORD", "Password is required");
-  }
-
-  if (input.password.length < 8 || !/[A-Za-zА-Яа-я]/.test(input.password) || !/\d/.test(input.password)) {
-    throw new AppError(
-      400,
-      "INVALID_PASSWORD",
-      "Password must be at least 8 characters long and contain at least one letter and one digit"
-    );
-  }
+  const password = validatePasswordStrength(input.password);
 
   if (input.personalDataConsent !== true) {
     throw new AppError(400, "PERSONAL_DATA_CONSENT_REQUIRED", "Personal data consent is required");
   }
 
-  return { email, password: input.password };
+  return { email, password };
 };
 
 const toSafeUser = (user: Pick<IUser, "_id" | "email" | "emailVerified">): SafeAuthUser => ({
@@ -196,6 +242,58 @@ const sendEmailSafely = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown SMTP error";
     process.stderr.write(`Failed to send confirmation email: ${message}\n`);
+  }
+};
+
+const defaultSendPasswordResetEmail = async ({
+  to,
+  resetUrl
+}: PasswordResetEmailPayload): Promise<void> => {
+  const transporter = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASSWORD
+    }
+  });
+
+  await transporter.sendMail({
+    from: `Команда Pawsport <${env.SMTP_FROM}>`,
+    to,
+    subject: "Сброс пароля в Pawsport",
+    text: [
+      "Здравствуйте!",
+      "",
+      "Мы получили запрос на сброс пароля для вашего аккаунта Pawsport.",
+      "Чтобы задать новый пароль, перейдите по ссылке (она действительна один час):",
+      resetUrl,
+      "",
+      "Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо."
+    ].join("\n"),
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #202124; line-height: 1.55;">
+        <h1 style="font-size: 22px; margin: 0 0 16px;">Сброс пароля в Pawsport</h1>
+        <p>Здравствуйте!</p>
+        <p>Мы получили запрос на сброс пароля для вашего аккаунта Pawsport.</p>
+        <p>Чтобы задать новый пароль, перейдите по ссылке (она действительна один час):</p>
+        <p><a href="${resetUrl}">Сбросить пароль</a></p>
+        <p style="color: #5f6368;">Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
+      </div>
+    `
+  });
+};
+
+const sendPasswordResetEmailSafely = async (
+  sender: (payload: PasswordResetEmailPayload) => Promise<void>,
+  payload: PasswordResetEmailPayload
+): Promise<void> => {
+  try {
+    await sender(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown SMTP error";
+    process.stderr.write(`Failed to send password reset email: ${message}\n`);
   }
 };
 
@@ -353,4 +451,130 @@ export const loginUser = async (
     user: safeUser,
     nextStep: "onboarding"
   };
+};
+
+const parsePasswordResetEmail = (input: PasswordResetRequestInput): string => {
+  if (typeof input.email !== "string") {
+    throw new AppError(400, "INVALID_EMAIL", "Email is required");
+  }
+
+  const email = normalizeEmail(input.email);
+
+  if (!emailPattern.test(email)) {
+    throw new AppError(400, "INVALID_EMAIL", "Email must be a valid email address");
+  }
+
+  return email;
+};
+
+export const requestPasswordReset = async (
+  input: PasswordResetRequestInput,
+  dependencies: AuthServiceDependencies = {}
+): Promise<void> => {
+  const {
+    findPasswordResetUserByEmail = async (email) =>
+      UserModel.findOne({ email }).exec() as Promise<PasswordResetRequestUser | null>,
+    generateToken = defaultGenerateToken,
+    sendPasswordResetEmail = defaultSendPasswordResetEmail,
+    now = () => new Date(),
+    awaitPasswordResetEmail = false
+  } = dependencies;
+
+  const email = parsePasswordResetEmail(input);
+  const resetToken = generateToken();
+  const resetTokenHash = hashToken(resetToken);
+  const resetTokenExpiresAt = new Date(now().getTime() + PASSWORD_RESET_TOKEN_TTL_MS);
+  const user = await findPasswordResetUserByEmail(email);
+
+  if (!user) {
+    return;
+  }
+
+  user.resetTokenHash = resetTokenHash;
+  user.resetTokenExpiresAt = resetTokenExpiresAt;
+  await user.save();
+
+  const emailPayload: PasswordResetEmailPayload = {
+    to: user.email,
+    resetUrl: buildPasswordResetUrl(resetToken)
+  };
+
+  const emailTask = sendPasswordResetEmailSafely(sendPasswordResetEmail, emailPayload);
+
+  if (awaitPasswordResetEmail) {
+    await emailTask;
+  } else {
+    void emailTask;
+  }
+};
+
+const validatePasswordResetConfirmInput = (
+  input: PasswordResetConfirmInput
+): { token: string; password: string } => {
+  if (typeof input.token !== "string" || input.token.trim().length === 0) {
+    throw new AppError(400, "INVALID_RESET_TOKEN", "Reset token is invalid or has expired");
+  }
+
+  const password = validatePasswordStrength(input.password);
+
+  return { token: input.token, password };
+};
+
+const parseResetToken = (input: PasswordResetValidateInput): string => {
+  if (typeof input.token !== "string" || input.token.trim().length === 0) {
+    throw new AppError(400, "INVALID_RESET_TOKEN", "Reset token is invalid or has expired");
+  }
+
+  return input.token;
+};
+
+export const validatePasswordResetToken = async (
+  input: PasswordResetValidateInput,
+  dependencies: AuthServiceDependencies = {}
+): Promise<void> => {
+  const {
+    findUserByResetTokenHash = async (tokenHash) =>
+      UserModel.findOne({ resetTokenHash: tokenHash }).exec() as Promise<PasswordResetConfirmUser | null>,
+    now = () => new Date()
+  } = dependencies;
+
+  const token = parseResetToken(input);
+  const tokenHash = hashToken(token);
+  const user = await findUserByResetTokenHash(tokenHash);
+  const currentTime = now().getTime();
+
+  if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt.getTime() <= currentTime) {
+    throw new AppError(400, "INVALID_RESET_TOKEN", "Reset token is invalid or has expired");
+  }
+
+  const minimumExpiry = currentTime + PASSWORD_RESET_VALIDATION_EXTENSION_MS;
+  if (user.resetTokenExpiresAt.getTime() < minimumExpiry) {
+    user.resetTokenExpiresAt = new Date(minimumExpiry);
+    await user.save();
+  }
+};
+
+export const confirmPasswordReset = async (
+  input: PasswordResetConfirmInput,
+  dependencies: AuthServiceDependencies = {}
+): Promise<void> => {
+  const {
+    findUserByResetTokenHash = async (tokenHash) =>
+      UserModel.findOne({ resetTokenHash: tokenHash }).exec() as Promise<PasswordResetConfirmUser | null>,
+    hashPassword = defaultHashPassword,
+    now = () => new Date()
+  } = dependencies;
+
+  const { token, password } = validatePasswordResetConfirmInput(input);
+  const tokenHash = hashToken(token);
+  const user = await findUserByResetTokenHash(tokenHash);
+
+  if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt.getTime() <= now().getTime()) {
+    throw new AppError(400, "INVALID_RESET_TOKEN", "Reset token is invalid or has expired");
+  }
+
+  user.passwordHash = await hashPassword(password);
+  user.resetTokenHash = undefined;
+  user.resetTokenExpiresAt = undefined;
+  await user.save();
 };
