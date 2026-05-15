@@ -19,6 +19,9 @@ export interface IReminder {
   offset: ReminderOffset;
   status: ReminderStatus;
   lastError?: string;
+  processingToken?: string;
+  processingStartedAt?: Date;
+  processingExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +78,16 @@ const reminderSchema = new Schema<IReminder>(
     },
     lastError: {
       type: String
+    },
+    processingToken: {
+      type: String
+    },
+    processingStartedAt: {
+      type: Date
+    },
+    processingExpiresAt: {
+      type: Date,
+      index: true
     }
   },
   {
@@ -84,6 +97,7 @@ const reminderSchema = new Schema<IReminder>(
 );
 
 reminderSchema.index({ status: 1, sendAt: 1 });
+reminderSchema.index({ status: 1, sendAt: 1, processingExpiresAt: 1 });
 reminderSchema.index({ ownerId: 1, petId: 1, dueAt: 1 });
 
 export const ReminderModel = model<IReminder>("Reminder", reminderSchema);
