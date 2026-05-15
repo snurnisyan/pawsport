@@ -137,10 +137,10 @@ test("uploadPetFile rejects missing file with FILE_REQUIRED", async () => {
   );
 });
 
-test("uploadPetFile rejects invalid pet id with INVALID_ID", async () => {
+test("uploadPetFile rejects invalid pet id with INVALID_PET_ID", async () => {
   await assert.rejects(
     () => uploadPetFile(ownerId, "not-an-id", { file: makeUpload() }),
-    assertAppError(400, "INVALID_ID")
+    assertAppError(400, "INVALID_PET_ID")
   );
 });
 
@@ -246,10 +246,10 @@ test("listPetFiles returns 404 for a pet outside the owner scope", async () => {
   );
 });
 
-test("listPetFiles rejects invalid pet id with INVALID_ID", async () => {
+test("listPetFiles rejects invalid pet id with INVALID_PET_ID", async () => {
   await assert.rejects(
     () => listPetFiles(ownerId, "not-an-id", { findPetByIdForOwner: petFound }),
-    assertAppError(400, "INVALID_ID")
+    assertAppError(400, "INVALID_PET_ID")
   );
 });
 
@@ -279,10 +279,10 @@ test("downloadFile returns 404 for another owner's file", async () => {
   );
 });
 
-test("downloadFile rejects invalid file id with INVALID_ID", async () => {
+test("downloadFile rejects invalid file id with INVALID_FILE_ID", async () => {
   await assert.rejects(
     () => downloadFile(ownerId, "not-an-id"),
-    assertAppError(400, "INVALID_ID")
+    assertAppError(400, "INVALID_FILE_ID")
   );
 });
 

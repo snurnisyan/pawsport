@@ -90,9 +90,9 @@ const requireOwnerId = (ownerId: string): Types.ObjectId => {
   return new Types.ObjectId(ownerId);
 };
 
-const requireObjectId = (value: string, message: string): Types.ObjectId => {
+const requireObjectId = (value: string, code: string, message: string): Types.ObjectId => {
   if (!isValidObjectId(value)) {
-    throw new AppError(400, "INVALID_ID", message);
+    throw new AppError(400, code, message);
   }
   return new Types.ObjectId(value);
 };
@@ -181,7 +181,7 @@ export const uploadPetFile = async (
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
-  const petObjectId = requireObjectId(petId, "pet id must be a valid id");
+  const petObjectId = requireObjectId(petId, "INVALID_PET_ID", "petId must be a valid id");
   const file = input.file;
 
   if (!file) {
@@ -256,7 +256,7 @@ export const listPetFiles = async (
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
-  const petObjectId = requireObjectId(petId, "pet id must be a valid id");
+  const petObjectId = requireObjectId(petId, "INVALID_PET_ID", "petId must be a valid id");
 
   const pet = await findPetByIdForOwner(petObjectId, ownerObjectId);
   if (!pet) {
@@ -279,7 +279,7 @@ export const downloadFile = async (
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
-  const fileObjectId = requireObjectId(fileId, "file id must be a valid id");
+  const fileObjectId = requireObjectId(fileId, "INVALID_FILE_ID", "fileId must be a valid id");
 
   const file = await findFileByIdForOwner(fileObjectId, ownerObjectId);
   if (!file) {
@@ -319,7 +319,7 @@ export const deleteFile = async (
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
-  const fileObjectId = requireObjectId(fileId, "file id must be a valid id");
+  const fileObjectId = requireObjectId(fileId, "INVALID_FILE_ID", "fileId must be a valid id");
 
   const file = await findFileByIdForOwner(fileObjectId, ownerObjectId);
   if (!file) {
