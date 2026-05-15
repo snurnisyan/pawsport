@@ -1,4 +1,4 @@
-import { createPetExport } from "../controllers/exportController";
+import { createPetExport, getPetExport } from "../controllers/exportController";
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import { CreateExportRequestSchema, ExportResponseSchema, IdPathParamsSchema } from "../docs/schemas";
@@ -18,4 +18,19 @@ petExports.route("post", "/", {
   handlers: [createPetExport]
 });
 
-export const exportRoutes = petExports.router;
+const exportStatus = createDocumentedRouter({
+  basePath: "/exports",
+  tags: ["Exports"],
+  auth: true
+});
+
+exportStatus.route("get", "/:id", {
+  operationId: "getPetExport",
+  summary: "Get export status",
+  request: { params: IdPathParamsSchema },
+  responses: { 200: jsonResponse("Export status", ExportResponseSchema) },
+  handlers: [getPetExport]
+});
+
+export const petExportRoutes = petExports.router;
+export const exportRoutes = exportStatus.router;

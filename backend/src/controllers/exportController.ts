@@ -18,3 +18,8 @@ export const createPetExport = asyncHandler(async (req: AuthenticatedRequest, re
   });
   res.status(202).json({ export: petExport });
 });
+
+export const getPetExport = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const petExport = await exportService.getPetExport(requireUserId(req), req.params.id);
+  res.status(200).json({ export: petExport });
+});
