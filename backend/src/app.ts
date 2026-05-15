@@ -20,6 +20,7 @@ const parseCorsOrigin = (origin: string): boolean | string[] => {
 export const createApp = (): express.Express => {
   const app = express();
 
+  app.set("trust proxy", 1);
   app.disable("x-powered-by");
 
   const apiPrefix = env.API_PREFIX === "/" ? "" : env.API_PREFIX;

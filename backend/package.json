@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "test": "NODE_ENV=test node --import tsx --test test/*.test.ts",
     "openapi": "NODE_ENV=test tsx scripts/dump-openapi.ts",
+    "gen:jwt-secret": "tsx scripts/generate-jwt-secret.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rimraf dist"
