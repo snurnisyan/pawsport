@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
@@ -63,6 +64,79 @@ export const isMissingObjectError = (error: unknown): boolean => {
     candidate.code === "NoSuchKey" ||
     candidate.$metadata?.httpStatusCode === 404
   );
+};
+
+export const getPublicObjectUrl = (key: string): string => {
+  const endpoint = new URL(env.S3_ENDPOINT);
+  const encodedPath = [env.S3_BUCKET, ...key.split("/")].map(encodeURIComponent).join("/");
+  endpoint.pathname = `${endpoint.pathname.replace(/\/+$/, "")}/${encodedPath}`;
+  endpoint.search = "";
+  endpoint.hash = "";
+  return endpoint.toString();
+};
+
+const hmac = (key: Buffer | string, value: string): Buffer =>
+  crypto.createHmac("sha256", key).update(value, "utf8").digest();
+
+const sha256Hex = (value: string): string => crypto.createHash("sha256").update(value, "utf8").digest("hex");
+
+const toAmzDate = (date: Date): { dateStamp: string; timestamp: string } => {
+  const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  return {
+    dateStamp: iso.slice(0, 8),
+    timestamp: iso
+  };
+};
+
+const encodeQueryValue = (value: string): string =>
+  encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+
+export const getObjectDownloadUrl = (
+  key: string,
+  expiresInSeconds = 7 * 24 * 60 * 60,
+  now = new Date()
+): string => {
+  const url = new URL(getPublicObjectUrl(key));
+  const { dateStamp, timestamp } = toAmzDate(now);
+  const credentialScope = `${dateStamp}/${env.S3_REGION}/s3/aws4_request`;
+  const credential = `${env.S3_ACCESS_KEY_ID}/${credentialScope}`;
+  const host = url.host;
+
+  const query = new Map<string, string>([
+    ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
+    ["X-Amz-Credential", credential],
+    ["X-Amz-Date", timestamp],
+    ["X-Amz-Expires", Math.min(expiresInSeconds, 7 * 24 * 60 * 60).toString()],
+    ["X-Amz-SignedHeaders", "host"]
+  ]);
+
+  const canonicalQuery = [...query.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => `${encodeQueryValue(name)}=${encodeQueryValue(value)}`)
+    .join("&");
+  const canonicalRequest = [
+    "GET",
+    url.pathname,
+    canonicalQuery,
+    `host:${host}\n`,
+    "host",
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    timestamp,
+    credentialScope,
+    sha256Hex(canonicalRequest)
+  ].join("\n");
+
+  const dateKey = hmac(`AWS4${env.S3_SECRET_ACCESS_KEY}`, dateStamp);
+  const regionKey = hmac(dateKey, env.S3_REGION);
+  const serviceKey = hmac(regionKey, "s3");
+  const signingKey = hmac(serviceKey, "aws4_request");
+  const signature = crypto.createHmac("sha256", signingKey).update(stringToSign, "utf8").digest("hex");
+
+  url.search = `${canonicalQuery}&X-Amz-Signature=${signature}`;
+  return url.toString();
 };
 
 const toReadable = async (body: unknown): Promise<Readable> => {

@@ -347,7 +347,12 @@ export const ExportSchema = z
     petId: ObjectIdSchema,
     period: ExportPeriodSchema.optional(),
     sections: z.array(z.enum(EXPORT_SECTIONS)),
-    fileKey: z.string().optional(),
+    fileKey: z.string().optional().openapi({
+      description: "Non-guessable S3 key for the generated PDF report."
+    }),
+    downloadUrl: z.string().url().optional().openapi({
+      description: "Temporary download URL for the generated PDF report."
+    }),
     status: z.enum(EXPORT_STATUSES),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
@@ -357,7 +362,8 @@ export const ExportSchema = z
 export const CreateExportRequestSchema = z
   .object({
     period: ExportPeriodSchema.optional(),
-    sections: z.array(z.enum(EXPORT_SECTIONS)).default(["profile", "events"])
+    sections: z.array(z.enum(EXPORT_SECTIONS)).default(["profile", "events"]),
+    notificationEmail: z.string().email().optional()
   })
   .partial()
   .openapi("CreateExportRequest");

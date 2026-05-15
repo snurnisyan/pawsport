@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pawsport export report</title>
+    <style>
+      @page {
+        margin: 0;
+        size: A4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #f4f7fb;
+        color: #1f2937;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0;
+      }
+
+      .page {
+        background: white;
+        min-height: 297mm;
+        padding: 28px;
+      }
+
+      .hero {
+        align-items: stretch;
+        background: linear-gradient(135deg, #17324d, #2b6f77);
+        border-radius: 18px;
+        color: white;
+        display: grid;
+        gap: 22px;
+        grid-template-columns: 1fr 188px;
+        margin-bottom: 22px;
+        overflow: hidden;
+        padding: 26px;
+      }
+
+      .eyebrow {
+        color: #b7f7e3;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin: 0 0 10px;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.05;
+        margin: 0 0 16px;
+      }
+
+      .hero-meta {
+        color: #d7e8ee;
+        display: grid;
+        gap: 5px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .photo-frame {
+        align-self: center;
+        aspect-ratio: 1;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 16px;
+        display: grid;
+        overflow: hidden;
+        place-items: center;
+      }
+
+      .photo-frame img {
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .photo-placeholder {
+        color: #d7e8ee;
+        font-size: 12px;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .section-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      section {
+        background: #ffffff;
+        border: 1px solid #d7dde7;
+        border-radius: 14px;
+        box-shadow: 0 10px 28px rgba(31, 41, 55, 0.08);
+        margin-bottom: 16px;
+        overflow: hidden;
+      }
+
+      .section-full {
+        grid-column: 1 / -1;
+      }
+
+      h2 {
+        background: #f7fafc;
+        border-bottom: 1px solid #d7dde7;
+        font-size: 16px;
+        margin: 0;
+        padding: 12px 14px;
+      }
+
+      .kv {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 112px 1fr;
+        padding: 14px;
+      }
+
+      .k {
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .v {
+        overflow-wrap: anywhere;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+
+      tbody tr:nth-child(even) {
+        background: #fbfdff;
+      }
+
+      .badge-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .badge {
+        background: #e8f7f0;
+        border: 1px solid #bfe8d6;
+        border-radius: 999px;
+        color: #176448;
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Pawsport export report</p>
+          <h1>{{#if profile}}{{profile.name}}{{else}}Pet report{{/if}}</h1>
+          <div class="hero-meta">
+            <span>Export ID: {{report.exportId}}</span>
+            <span>Generated: {{report.generatedAt}}</span>
+            {{#if report.period}}
+              <span>From: {{report.period.from}}</span>
+              <span>To: {{report.period.to}}</span>
+            {{else}}
+              <span>Period: all time</span>
+            {{/if}}
+          </div>
+        </div>
+        <div class="photo-frame">
+          {{#if profile.photo}}
+            <img src="{{{profile.photo.src}}}" alt="{{profile.name}}" />
+          {{else}}
+            <div class="photo-placeholder">No profile photo</div>
+          {{/if}}
+        </div>
+      </header>
+
+      <div class="section-grid">
+        {{#if profile}}
+          <section>
+            <h2>Profile</h2>
+            <div class="kv">
+              <span class="k">Name</span><span class="v">{{profile.name}}</span>
+              <span class="k">Species</span><span class="v">{{profile.species}}</span>
+              <span class="k">Breed</span><span class="v">{{profile.breed}}</span>
+              <span class="k">Sex</span><span class="v">{{profile.sex}}</span>
+              <span class="k">Microchip</span><span class="v">{{profile.microchipNumber}}</span>
+              {{#if profile.photo}}
+                <span class="k">Photo</span><span class="v">{{profile.photo.originalName}} ({{profile.photo.mimeType}})</span>
+              {{/if}}
+              <span class="k">Tags</span>
+              <span class="v badge-list">
+                {{#each profile.tags}}<span class="badge">{{this}}</span>{{/each}}
+              </span>
+              <span class="k">Notes</span><span class="v">{{#each profile.notes}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</span>
+            </div>
+          </section>
+        {{/if}}
+
+        {{#if events}}
+          <section class="section-full">
+            <h2>Events</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Title</th>
+                  <th>Clinic</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each events}}
+                  <tr>
+                    <td>{{eventDate}}</td>
+                    <td>{{type}}</td>
+                    <td>{{title}}</td>
+                    <td>{{clinicName}}</td>
+                    <td>{{comment}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+        {{/if}}
+
+        {{#if files}}
+          <section class="section-full">
+            <h2>Files</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Uploaded</th>
+                  <th>Name</th>
+                  <th>MIME</th>
+                  <th>Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each files}}
+                  <tr>
+                    <td>{{uploadedAt}}</td>
+                    <td>{{originalName}}</td>
+                    <td>{{mimeType}}</td>
+                    <td>{{eventTitle}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+        {{/if}}
+
+        {{#if reminders}}
+          <section class="section-full">
+            <h2>Reminders</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Send at</th>
+                  <th>Channel</th>
+                  <th>Status</th>
+                  <th>Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each reminders}}
+                  <tr>
+                    <td>{{sendAt}}</td>
+                    <td>{{channel}}</td>
+                    <td>{{status}}</td>
+                    <td>{{eventTitle}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+        {{/if}}
+      </div>
+    </main>
+  </body>
+</html>

@@ -4,14 +4,21 @@ import test from "node:test";
 import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
-import { deleteAllExportsForOwner } from "../src/services/exportService";
+import { createPetExport, deleteAllExportsForOwner } from "../src/services/exportService";
 import type { FileStorage } from "../src/storage/s3Storage";
 
 const ownerId = "507f1f77bcf86cd799439011";
+const petId = "507f1f77bcf86cd799439022";
+const otherPetId = "507f1f77bcf86cd799439033";
+const now = new Date("2026-05-14T10:00:00.000Z");
 
 const makeStorage = (overrides: Partial<FileStorage> = {}): FileStorage => ({
   putObject: async () => {},
-  getObject: async () => ({ body: Readable.from(""), contentType: "application/zip", contentLength: 0 }),
+  getObject: async () => ({
+    body: Readable.from(""),
+    contentType: "application/pdf",
+    contentLength: 0
+  }),
   deleteObject: async () => {},
   ...overrides
 });
@@ -23,9 +30,145 @@ const assertAppError = (statusCode: number, code: string) => (error: unknown): t
   return true;
 };
 
+const oid = (value: string): Types.ObjectId => new Types.ObjectId(value);
+
+const makePet = () => ({
+  _id: oid(petId),
+  ownerId: oid(ownerId),
+  name: "Miso",
+  species: "cat",
+  breed: "Siberian",
+  birthDate: new Date("2020-01-02T00:00:00.000Z"),
+  sex: "female" as const,
+  weight: 4.2,
+  microchipNumber: "123456789012345",
+  tags: ["indoor"],
+  notes: ["likes travel"],
+  vetContact: { name: "Dr. Smith", email: "vet@example.com" },
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-02T00:00:00.000Z")
+});
+
+const makeExportRecord = (input: {
+  _id: Types.ObjectId;
+  ownerId: Types.ObjectId;
+  petId: Types.ObjectId;
+  period?: { from?: Date; to?: Date };
+  sections: ("profile" | "events" | "files" | "reminders")[];
+  fileToken?: string;
+  status: "pending" | "ready" | "failed";
+  fileKey?: string;
+}) => ({
+  ...input,
+  createdAt: now,
+  updatedAt: now
+});
+
+test("createPetExport persists pending export and enqueues a pet-export job", async () => {
+  let persisted:
+    | {
+        _id: Types.ObjectId;
+        ownerId: Types.ObjectId;
+        petId: Types.ObjectId;
+        period?: { from?: Date; to?: Date };
+        sections: ("profile" | "events" | "files" | "reminders")[];
+        fileToken: string;
+        status: "pending";
+      }
+    | undefined;
+  let enqueued:
+    | {
+        type: string;
+        payload: Record<string, unknown>;
+        idempotencyKey?: string;
+        maxAttempts?: number;
+      }
+    | undefined;
+
+  const petExport = await createPetExport(
+    ownerId,
+    petId,
+    {
+      period: { from: "2026-05-01", to: "2026-05-31" },
+      sections: ["profile", "events", "profile"],
+      notificationEmail: "owner@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      createExportRecord: async (input) => {
+        persisted = input;
+        return makeExportRecord(input);
+      },
+      enqueuePetExportJob: async (input) => {
+        enqueued = input;
+      },
+      randomToken: () => "not-guessable-token"
+    }
+  );
+
+  assert.ok(persisted);
+  assert.equal(persisted.status, "pending");
+  assert.equal(persisted.fileToken, "not-guessable-token");
+  assert.equal(persisted.period?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
+  assert.equal(persisted.period?.to?.toISOString(), "2026-05-31T00:00:00.000Z");
+  assert.deepEqual(persisted.sections, ["profile", "events"]);
+
+  assert.ok(enqueued);
+  assert.equal(enqueued.type, "pet-export");
+  assert.equal(enqueued.idempotencyKey, persisted._id.toString());
+  assert.equal(enqueued.maxAttempts, 5);
+  assert.deepEqual(enqueued.payload, {
+    exportId: persisted._id.toString(),
+    ownerId,
+    petId,
+    period: { from: "2026-05-01", to: "2026-05-31" },
+    sections: ["profile", "events"],
+    notificationEmail: "owner@example.com"
+  });
+
+  assert.equal(petExport.status, "pending");
+  assert.equal(petExport.fileKey, undefined);
+  assert.equal(petExport.downloadUrl, undefined);
+});
+
+test("createPetExport hides pets owned by another user before creating an export", async () => {
+  let exportCreated = false;
+  let jobEnqueued = false;
+
+  await assert.rejects(
+    () =>
+      createPetExport(ownerId, otherPetId, {}, {
+        findPetByIdForOwner: async () => null,
+        createExportRecord: async (input) => {
+          exportCreated = true;
+          return makeExportRecord(input);
+        },
+        enqueuePetExportJob: async () => {
+          jobEnqueued = true;
+        }
+      }),
+    assertAppError(404, "PET_NOT_FOUND")
+  );
+
+  assert.equal(exportCreated, false);
+  assert.equal(jobEnqueued, false);
+});
+
+test("createPetExport rejects invalid period and invalid sections", async () => {
+  await assert.rejects(
+    () => createPetExport(ownerId, petId, { period: { from: "2026-06-01", to: "2026-05-01" } }),
+    assertAppError(400, "INVALID_EXPORT_PERIOD")
+  );
+
+  await assert.rejects(
+    () => createPetExport(ownerId, petId, { sections: ["profile", "payments"] }),
+    assertAppError(400, "INVALID_EXPORT_SECTIONS")
+  );
+});
+
 test("deleteAllExportsForOwner deletes ready exports from storage and clears metadata", async () => {
   const ownerObjectId = new Types.ObjectId(ownerId);
-  const ready = { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.zip" };
+  const ready = { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" };
   const pending = { _id: new Types.ObjectId(), fileKey: undefined };
   const deletedKeys: string[] = [];
   let metadataDeleted = false;
@@ -60,7 +203,7 @@ test("deleteAllExportsForOwner tolerates missing storage objects", async () => {
         throw missing;
       }
     }),
-    listOwnerExports: async () => [{ _id: new Types.ObjectId(), fileKey: "users/o/exports/a.zip" }],
+    listOwnerExports: async () => [{ _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }],
     deleteOwnerExports: async () => {
       metadataDeleted = true;
     }
@@ -82,7 +225,7 @@ test("deleteAllExportsForOwner throws on hard storage failure and keeps metadata
           }
         }),
         listOwnerExports: async () => [
-          { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.zip" }
+          { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }
         ],
         deleteOwnerExports: async () => {
           metadataDeleted = true;

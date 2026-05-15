@@ -18,7 +18,10 @@ export interface IExport {
   period?: IExportPeriod;
   sections: ExportSection[];
   fileKey?: string;
+  fileToken?: string;
   status: ExportStatus;
+  emailSentAt?: Date;
+  lastError?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,12 +60,21 @@ const exportSchema = new Schema<IExport>(
     fileKey: {
       type: String
     },
+    fileToken: {
+      type: String
+    },
     status: {
       type: String,
       enum: EXPORT_STATUSES,
       default: "pending",
       required: true,
       index: true
+    },
+    emailSentAt: {
+      type: Date
+    },
+    lastError: {
+      type: String
     }
   },
   {
