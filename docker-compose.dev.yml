@@ -1,0 +1,15 @@
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    command:
+      - "gotenberg"
+      - "--api-timeout=60s"
+      - "--chromium-deny-list=^(?!file:///).*"
+      - "--chromium-disable-javascript=true"
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G

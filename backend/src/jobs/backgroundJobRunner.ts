@@ -273,6 +273,7 @@ const buildContext = (
   type: job.type,
   payload: job.payload,
   attempts: job.attempts,
+  maxAttempts: job.maxAttempts,
   logger
 });
 

@@ -14,7 +14,8 @@ const booleanFromString = z.preprocess((value) => {
   return value;
 }, z.boolean());
 
-const envSchema = z.object({
+const envSchema = z
+  .object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   API_PREFIX: z.string().default("/api"),
@@ -49,8 +50,24 @@ const envSchema = z.object({
   BACKGROUND_JOB_VISIBILITY_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   BACKGROUND_JOB_DEFAULT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
 
+  GOTENBERG_URL: z.string().url().optional(),
+  GOTENBERG_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+
   SWAGGER_ENABLED: booleanFromString.default(false)
-});
+  })
+  .superRefine((value, context) => {
+    if (
+      value.NODE_ENV === "production" &&
+      value.BACKGROUND_JOB_RUNNER_ENABLED &&
+      !value.GOTENBERG_URL
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["GOTENBERG_URL"],
+        message: "GOTENBERG_URL is required when BACKGROUND_JOB_RUNNER_ENABLED=true in production"
+      });
+    }
+  });
 
 export const env = envSchema.parse(process.env);
 

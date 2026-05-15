@@ -46,8 +46,8 @@ export interface BackgroundJobContext {
   type: string;
   payload: BackgroundJobPayload;
   attempts: number;
+  maxAttempts: number;
   logger: BackgroundJobLogger;
 }
 
 export type BackgroundJobHandler = (job: BackgroundJobContext) => Promise<void>;
-

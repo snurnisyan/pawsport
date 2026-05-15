@@ -80,6 +80,26 @@ services:
       - "4000"
     env_file:
       - /etc/pawsport/backend.env
+    environment:
+      GOTENBERG_URL: "http://gotenberg:3000"
+    depends_on:
+      - gotenberg
+
+  gotenberg:
+    container_name: pawsport-gotenberg
+    image: gotenberg/gotenberg:8
+    restart: always
+    command:
+      - "gotenberg"
+      - "--api-timeout=60s"
+      - "--chromium-deny-list=^(?!file:///).*"
+      - "--chromium-disable-javascript=true"
+    expose:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   frontend:
     container_name: pawsport-frontend

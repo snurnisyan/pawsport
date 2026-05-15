@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import { createApp } from "./app";
 import { startReminderScheduler, stopReminderScheduler } from "./scheduler/reminderScheduler";
 import { startBackgroundJobRunner, stopBackgroundJobRunner } from "./jobs/backgroundJobRunner";
+import { registerPetExportJobHandler } from "./jobs/handlers/petExportHandler";
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   stopReminderScheduler();
@@ -14,6 +15,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 
 const bootstrap = async (): Promise<void> => {
   await connectDatabase();
+  registerPetExportJobHandler();
 
   const app = createApp();
 
