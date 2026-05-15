@@ -1,7 +1,7 @@
 import { Types, isValidObjectId } from "mongoose";
 
 import { AppError } from "../middleware/errorHandler";
-import { REMINDER_OFFSETS, type ReminderOffset } from "../models/Event";
+import { EventModel, REMINDER_OFFSETS, type IEvent, type ReminderOffset } from "../models/Event";
 import { PetModel, type IPet } from "../models/Pet";
 import {
   REMINDER_CHANNELS,
@@ -59,6 +59,8 @@ type ReminderRecord = Pick<
   | "updatedAt"
 >;
 
+type ReminderEventRecord = Pick<IEvent, "_id" | "petId">;
+
 interface NormalizedCreateReminderInput {
   petId: Types.ObjectId;
   eventId: Types.ObjectId;
@@ -84,6 +86,10 @@ export interface ReminderServiceDependencies {
     petId: Types.ObjectId,
     ownerId: Types.ObjectId
   ) => Promise<Pick<IPet, "_id"> | null>;
+  findEventByIdForOwner?: (
+    eventId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<ReminderEventRecord | null>;
   findReminderByIdForOwner?: (
     reminderId: Types.ObjectId,
     ownerId: Types.ObjectId
@@ -230,7 +236,11 @@ export const createReminder = async (
     findPetByIdForOwner = async (petId, owner) =>
       PetModel.findOne({ _id: petId, ownerId: owner })
         .select({ _id: 1 })
-        .exec() as Promise<Pick<IPet, "_id"> | null>
+        .exec() as Promise<Pick<IPet, "_id"> | null>,
+    findEventByIdForOwner = async (eventId, owner) =>
+      EventModel.findOne({ _id: eventId, ownerId: owner })
+        .select({ _id: 1, petId: 1 })
+        .exec() as Promise<ReminderEventRecord | null>
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -239,6 +249,11 @@ export const createReminder = async (
   const pet = await findPetByIdForOwner(normalized.petId, ownerObjectId);
   if (!pet) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+  }
+
+  const event = await findEventByIdForOwner(normalized.eventId, ownerObjectId);
+  if (!event || event.petId.toString() !== normalized.petId.toString()) {
+    throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
 
   const reminder = await createReminderRecord({

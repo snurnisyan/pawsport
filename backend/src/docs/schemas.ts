@@ -198,7 +198,10 @@ export const EventSchema = z
     clinicName: z.string().optional(),
     comment: z.string().optional(),
     recurrence: RecurrenceSchema.optional(),
-    reminderOffset: z.enum(REMINDER_OFFSETS).optional(),
+    reminderOffset: z.enum(REMINDER_OFFSETS).optional().openapi({
+      description:
+        "When set, the backend maintains one pending email reminder for this event. Clearing it deletes the pending event reminder; sent reminders are left unchanged."
+    }),
     fileIds: z.array(ObjectIdSchema),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
@@ -274,7 +277,9 @@ export const ReminderSchema = z
     id: ObjectIdSchema,
     ownerId: ObjectIdSchema,
     petId: ObjectIdSchema,
-    eventId: ObjectIdSchema,
+    eventId: ObjectIdSchema.openapi({
+      description: "Must reference an event owned by the authenticated user and belonging to the same petId."
+    }),
     channel: z.enum(REMINDER_CHANNELS),
     dueAt: DateTimeSchema,
     sendAt: DateTimeSchema,

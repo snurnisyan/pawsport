@@ -4,6 +4,7 @@ import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
 import {
+  calculateReminderSendAt,
   createPetEvent,
   listPetEvents,
   serializeEvent
@@ -42,6 +43,7 @@ const failingCreate = async () => {
 
 test("createPetEvent persists normalized input and returns serialized event", async () => {
   let captured: Record<string, unknown> | undefined;
+  let reminderSync: Record<string, unknown> | undefined;
 
   const result = await createPetEvent(
     ownerId,
@@ -74,6 +76,9 @@ test("createPetEvent persists normalized input and returns serialized event", as
           reminderOffset: input.reminderOffset,
           fileIds: input.fileIds
         });
+      },
+      syncPendingReminderForEvent: async (input) => {
+        reminderSync = input as unknown as Record<string, unknown>;
       }
     }
   );
@@ -104,6 +109,13 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.deepEqual(result.recurrence, { frequency: "yearly", interval: 1 });
   assert.equal(result.reminderOffset, "week");
   assert.deepEqual(result.fileIds, [fileId]);
+
+  assert.ok(reminderSync);
+  assert.equal((reminderSync.ownerId as Types.ObjectId).toString(), ownerId);
+  assert.equal((reminderSync.petId as Types.ObjectId).toString(), petId);
+  assert.equal((reminderSync.eventId as Types.ObjectId).toString(), eventId);
+  assert.equal((reminderSync.eventDate as Date).toISOString(), "2026-06-01T10:00:00.000Z");
+  assert.equal(reminderSync.reminderOffset, "week");
 });
 
 test("createPetEvent defaults fileIds to empty array when omitted", async () => {
@@ -118,6 +130,28 @@ test("createPetEvent defaults fileIds to empty array when omitted", async () => 
   });
 
   assert.deepEqual(captured?.fileIds, []);
+});
+
+test("createPetEvent does not sync reminders when reminderOffset is omitted", async () => {
+  let syncCalled = false;
+
+  await createPetEvent(ownerId, petId, validInput, {
+    findPetByIdForOwner: petFound,
+    createEventRecord: async (input) => makeEventRecord({ ...input, reminderOffset: undefined }),
+    syncPendingReminderForEvent: async () => {
+      syncCalled = true;
+    }
+  });
+
+  assert.equal(syncCalled, false);
+});
+
+test("calculateReminderSendAt subtracts the selected reminder offset", () => {
+  const eventDate = new Date("2026-06-01T10:00:00.000Z");
+
+  assert.equal(calculateReminderSendAt(eventDate, "day").toISOString(), "2026-05-31T10:00:00.000Z");
+  assert.equal(calculateReminderSendAt(eventDate, "week").toISOString(), "2026-05-25T10:00:00.000Z");
+  assert.equal(calculateReminderSendAt(eventDate, "month").toISOString(), "2026-05-02T10:00:00.000Z");
 });
 
 test("createPetEvent rejects invalid input", async () => {

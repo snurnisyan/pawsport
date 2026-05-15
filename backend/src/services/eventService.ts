@@ -89,6 +89,14 @@ export interface EventUpdates {
   unset: string[];
 }
 
+export interface SyncEventReminderInput {
+  ownerId: Types.ObjectId;
+  petId: Types.ObjectId;
+  eventId: Types.ObjectId;
+  eventDate: Date;
+  reminderOffset?: ReminderOffset;
+}
+
 export interface EventServiceDependencies {
   createEventRecord?: (input: CreateEventPersistInput) => Promise<EventRecord>;
   listEventsForOwnerPet?: (
@@ -112,6 +120,7 @@ export interface EventServiceDependencies {
     eventId: Types.ObjectId,
     ownerId: Types.ObjectId
   ) => Promise<EventRecord | null>;
+  syncPendingReminderForEvent?: (input: SyncEventReminderInput) => Promise<void>;
   deleteRemindersForEvent?: (
     eventId: Types.ObjectId,
     ownerId: Types.ObjectId
@@ -379,6 +388,47 @@ const defaultFindPet: NonNullable<EventServiceDependencies["findPetByIdForOwner"
     .select({ _id: 1 })
     .exec() as Promise<Pick<IPet, "_id"> | null>;
 
+const REMINDER_OFFSET_DAYS: Record<ReminderOffset, number> = {
+  day: 1,
+  week: 7,
+  month: 30
+};
+
+export const calculateReminderSendAt = (eventDate: Date, offset: ReminderOffset): Date =>
+  new Date(eventDate.getTime() - REMINDER_OFFSET_DAYS[offset] * 24 * 60 * 60 * 1000);
+
+const defaultSyncPendingReminderForEvent: NonNullable<
+  EventServiceDependencies["syncPendingReminderForEvent"]
+> = async ({ ownerId, petId, eventId, eventDate, reminderOffset }) => {
+  if (!reminderOffset) {
+    await ReminderModel.deleteMany({ ownerId, eventId, status: "pending" }).exec();
+    return;
+  }
+
+  await ReminderModel.findOneAndUpdate(
+    { ownerId, eventId, status: "pending" },
+    {
+      $set: {
+        ownerId,
+        petId,
+        eventId,
+        channel: "email",
+        dueAt: eventDate,
+        sendAt: calculateReminderSendAt(eventDate, reminderOffset),
+        offset: reminderOffset,
+        status: "pending"
+      },
+      $unset: {
+        lastError: "",
+        processingToken: "",
+        processingStartedAt: "",
+        processingExpiresAt: ""
+      }
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  ).exec();
+};
+
 export const createPetEvent = async (
   ownerId: string,
   petId: string,
@@ -387,7 +437,8 @@ export const createPetEvent = async (
 ): Promise<SerializedEvent> => {
   const {
     createEventRecord = async (payload) => EventModel.create(payload) as unknown as EventRecord,
-    findPetByIdForOwner = defaultFindPet
+    findPetByIdForOwner = defaultFindPet,
+    syncPendingReminderForEvent = defaultSyncPendingReminderForEvent
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -404,6 +455,16 @@ export const createPetEvent = async (
     petId: petObjectId,
     ...normalized
   });
+
+  if (event.reminderOffset) {
+    await syncPendingReminderForEvent({
+      ownerId: event.ownerId,
+      petId: event.petId,
+      eventId: event._id,
+      eventDate: event.eventDate,
+      reminderOffset: event.reminderOffset
+    });
+  }
 
   return serializeEvent(event);
 };
@@ -458,6 +519,7 @@ export const updateEvent = async (
 ): Promise<SerializedEvent> => {
   const {
     findEventByIdForOwner = defaultFindEvent,
+    syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
     updateEventRecord = async (id, owner, updates) => {
       const op: Record<string, unknown> = {};
       if (Object.keys(updates.set).length > 0) op.$set = updates.set;
@@ -473,6 +535,11 @@ export const updateEvent = async (
   const ownerObjectId = requireOwnerId(ownerId);
   const eventObjectId = requireEventId(eventId);
   const updates = normalizeUpdateInput(input);
+  const shouldSyncReminder =
+    input !== null &&
+    typeof input === "object" &&
+    !Array.isArray(input) &&
+    (hasField(input, "eventDate") || hasField(input, "reminderOffset"));
 
   if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
     const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
@@ -486,6 +553,17 @@ export const updateEvent = async (
   if (!updated) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
+
+  if (shouldSyncReminder) {
+    await syncPendingReminderForEvent({
+      ownerId: updated.ownerId,
+      petId: updated.petId,
+      eventId: updated._id,
+      eventDate: updated.eventDate,
+      reminderOffset: updated.reminderOffset
+    });
+  }
+
   return serializeEvent(updated);
 };
 
@@ -498,7 +576,7 @@ export const deleteEvent = async (
     deleteEventRecord = async (id, owner) =>
       EventModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as EventRecord | null,
     deleteRemindersForEvent = async (id, owner) => {
-      await ReminderModel.deleteMany({ eventId: id, ownerId: owner }).exec();
+      await ReminderModel.deleteMany({ eventId: id, ownerId: owner, status: "pending" }).exec();
     }
   } = dependencies;
 

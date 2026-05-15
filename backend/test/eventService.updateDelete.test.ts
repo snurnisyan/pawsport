@@ -102,7 +102,8 @@ test("updateEvent unsets optional fields when null", async () => {
       updateEventRecord: async (_id, _owner, updates) => {
         captured = updates;
         return makeEventRecord();
-      }
+      },
+      syncPendingReminderForEvent: async () => {}
     }
   );
 
@@ -110,8 +111,9 @@ test("updateEvent unsets optional fields when null", async () => {
   assert.deepEqual(captured?.unset.sort(), ["clinicName", "reminderOffset"]);
 });
 
-test("updateEvent does not touch reminders when eventDate changes", async () => {
+test("updateEvent syncs pending reminder when eventDate changes", async () => {
   let captured: EventUpdates | undefined;
+  let reminderSync: Record<string, unknown> | undefined;
 
   await updateEvent(
     ownerId,
@@ -120,7 +122,13 @@ test("updateEvent does not touch reminders when eventDate changes", async () => 
     {
       updateEventRecord: async (_id, _owner, updates) => {
         captured = updates;
-        return makeEventRecord({ eventDate: new Date("2026-09-01T10:00:00.000Z") });
+        return makeEventRecord({
+          eventDate: new Date("2026-09-01T10:00:00.000Z"),
+          reminderOffset: "week"
+        });
+      },
+      syncPendingReminderForEvent: async (input) => {
+        reminderSync = input as unknown as Record<string, unknown>;
       }
     }
   );
@@ -128,6 +136,32 @@ test("updateEvent does not touch reminders when eventDate changes", async () => 
   const setDate = captured?.set.eventDate as Date | undefined;
   assert.ok(setDate instanceof Date);
   assert.equal(setDate.toISOString(), "2026-09-01T10:00:00.000Z");
+  assert.ok(reminderSync);
+  assert.equal((reminderSync.eventId as Types.ObjectId).toString(), eventId);
+  assert.equal((reminderSync.eventDate as Date).toISOString(), "2026-09-01T10:00:00.000Z");
+  assert.equal(reminderSync.reminderOffset, "week");
+});
+
+test("updateEvent syncs deletion of pending reminder when reminderOffset is cleared", async () => {
+  let reminderSync: Record<string, unknown> | undefined;
+
+  await updateEvent(
+    ownerId,
+    eventId,
+    { reminderOffset: null },
+    {
+      updateEventRecord: async () => makeEventRecord({ reminderOffset: undefined }),
+      syncPendingReminderForEvent: async (input) => {
+        reminderSync = input as unknown as Record<string, unknown>;
+      }
+    }
+  );
+
+  assert.ok(reminderSync);
+  assert.equal((reminderSync.ownerId as Types.ObjectId).toString(), ownerId);
+  assert.equal((reminderSync.petId as Types.ObjectId).toString(), petId);
+  assert.equal((reminderSync.eventId as Types.ObjectId).toString(), eventId);
+  assert.equal(reminderSync.reminderOffset, undefined);
 });
 
 test("updateEvent returns current event when body is empty", async () => {
@@ -203,7 +237,7 @@ test("updateEvent rejects invalid eventId with 400", async () => {
   );
 });
 
-test("deleteEvent removes event and cascades reminders", async () => {
+test("deleteEvent removes event and cascades pending reminders", async () => {
   const seen: string[] = [];
 
   await deleteEvent(ownerId, eventId, {
