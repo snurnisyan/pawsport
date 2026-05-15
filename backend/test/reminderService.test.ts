@@ -39,6 +39,7 @@ const makeReminderRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const petFound = async () => ({ _id: new Types.ObjectId(petId) });
+const eventFound = async () => ({ _id: new Types.ObjectId(eventId), petId: new Types.ObjectId(petId) });
 const failingCreate = async () => {
   throw new Error("should not be called");
 };
@@ -48,6 +49,7 @@ test("createReminder persists normalized input and returns serialized reminder",
 
   const result = await createReminder(ownerId, validInput, {
     findPetByIdForOwner: petFound,
+    findEventByIdForOwner: eventFound,
     createReminderRecord: async (input) => {
       captured = input as unknown as Record<string, unknown>;
       return makeReminderRecord({
@@ -92,6 +94,7 @@ test("createReminder defaults channel to email when omitted", async () => {
     { ...validInput, channel: undefined },
     {
       findPetByIdForOwner: petFound,
+      findEventByIdForOwner: eventFound,
       createReminderRecord: async (input) => {
         captured = input as unknown as Record<string, unknown>;
         return makeReminderRecord({ channel: input.channel });
@@ -110,6 +113,7 @@ test("createReminder accepts channel=null and defaults to email", async () => {
     { ...validInput, channel: null },
     {
       findPetByIdForOwner: petFound,
+      findEventByIdForOwner: eventFound,
       createReminderRecord: async (input) => {
         captured = input as unknown as Record<string, unknown>;
         return makeReminderRecord({ channel: input.channel });
@@ -166,6 +170,7 @@ test("createReminder rejects invalid input", async () => {
       () =>
         createReminder(ownerId, input, {
           findPetByIdForOwner: petFound,
+          findEventByIdForOwner: eventFound,
           createReminderRecord: failingCreate
         }),
       (error: unknown) => {
@@ -183,6 +188,7 @@ test("createReminder returns 404 when pet does not belong to owner", async () =>
     () =>
       createReminder(ownerId, validInput, {
         findPetByIdForOwner: async () => null,
+        findEventByIdForOwner: eventFound,
         createReminderRecord: failingCreate
       }),
     (error: unknown) => {
@@ -199,12 +205,50 @@ test("createReminder rejects invalid owner id with UNAUTHORIZED", async () => {
     () =>
       createReminder("not-an-id", validInput, {
         findPetByIdForOwner: petFound,
+        findEventByIdForOwner: eventFound,
         createReminderRecord: failingCreate
       }),
     (error: unknown) => {
       assert.ok(error instanceof AppError);
       assert.equal(error.statusCode, 401);
       assert.equal(error.code, "UNAUTHORIZED");
+      return true;
+    }
+  );
+});
+
+test("createReminder returns 404 when event is missing or owned by another user", async () => {
+  await assert.rejects(
+    () =>
+      createReminder(ownerId, validInput, {
+        findPetByIdForOwner: petFound,
+        findEventByIdForOwner: async () => null,
+        createReminderRecord: failingCreate
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 404);
+      assert.equal(error.code, "EVENT_NOT_FOUND");
+      return true;
+    }
+  );
+});
+
+test("createReminder returns 404 when event belongs to another pet", async () => {
+  await assert.rejects(
+    () =>
+      createReminder(ownerId, validInput, {
+        findPetByIdForOwner: petFound,
+        findEventByIdForOwner: async () => ({
+          _id: new Types.ObjectId(eventId),
+          petId: new Types.ObjectId("60a7c1aa9e1d4f1234567891")
+        }),
+        createReminderRecord: failingCreate
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 404);
+      assert.equal(error.code, "EVENT_NOT_FOUND");
       return true;
     }
   );
