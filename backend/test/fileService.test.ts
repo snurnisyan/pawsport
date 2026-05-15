@@ -6,11 +6,14 @@ import { Types } from "mongoose";
 import { AppError } from "../src/middleware/errorHandler";
 import {
   deleteAllFilesForOwner,
+  deleteAllFilesForPet,
   deleteFile,
+  detachEventFromFiles,
   downloadFile,
   listPetFiles,
   serializeFile,
   uploadPetFile,
+  validateFileIdsForPet,
   type UploadedFileInput
 } from "../src/services/fileService";
 import type { FileStorage } from "../src/storage/s3Storage";
@@ -315,7 +318,7 @@ test("downloadFile maps storage network errors to 502", async () => {
   );
 });
 
-test("deleteFile deletes storage object before metadata", async () => {
+test("deleteFile deletes storage object, then metadata, then pulls the id from event fileIds", async () => {
   const calls: string[] = [];
 
   await deleteFile(ownerId, fileId, {
@@ -328,10 +331,32 @@ test("deleteFile deletes storage object before metadata", async () => {
     deleteFileRecord: async () => {
       calls.push("metadata");
       return makeFileRecord();
+    },
+    removeFileIdFromEvents: async (id, owner) => {
+      assert.equal(id.toString(), fileId);
+      assert.equal(owner.toString(), ownerId);
+      calls.push("events");
     }
   });
 
-  assert.deepEqual(calls, [`storage:${makeFileRecord().storageKey}`, "metadata"]);
+  assert.deepEqual(calls, [`storage:${makeFileRecord().storageKey}`, "metadata", "events"]);
+});
+
+test("deleteFile does not pull from events when file is not found", async () => {
+  let pullCalled = false;
+
+  await assert.rejects(
+    () =>
+      deleteFile(ownerId, fileId, {
+        findFileByIdForOwner: async () => null,
+        removeFileIdFromEvents: async () => {
+          pullCalled = true;
+        }
+      }),
+    assertAppError(404, "FILE_NOT_FOUND")
+  );
+
+  assert.equal(pullCalled, false);
 });
 
 test("deleteFile returns 404 for repeated delete or another owner's file", async () => {
@@ -344,6 +369,7 @@ test("deleteFile returns 404 for repeated delete or another owner's file", async
 test("deleteFile deletes metadata when storage object is already missing", async () => {
   const missing = Object.assign(new Error("missing"), { name: "NoSuchKey" });
   let metadataDeleted = false;
+  let pullCalled = false;
 
   await deleteFile(ownerId, fileId, {
     storage: makeStorage({
@@ -355,14 +381,19 @@ test("deleteFile deletes metadata when storage object is already missing", async
     deleteFileRecord: async () => {
       metadataDeleted = true;
       return makeFileRecord();
+    },
+    removeFileIdFromEvents: async () => {
+      pullCalled = true;
     }
   });
 
   assert.equal(metadataDeleted, true);
+  assert.equal(pullCalled, true);
 });
 
-test("deleteFile keeps metadata when storage delete has a network error", async () => {
+test("deleteFile keeps metadata and does not pull from events when storage delete has a network error", async () => {
   let metadataDeleted = false;
+  let pullCalled = false;
 
   await assert.rejects(
     () =>
@@ -376,12 +407,16 @@ test("deleteFile keeps metadata when storage delete has a network error", async 
         deleteFileRecord: async () => {
           metadataDeleted = true;
           return makeFileRecord();
+        },
+        removeFileIdFromEvents: async () => {
+          pullCalled = true;
         }
       }),
     assertAppError(502, "FILE_STORAGE_DELETE_FAILED")
   );
 
   assert.equal(metadataDeleted, false);
+  assert.equal(pullCalled, false);
 });
 
 test("serializeFile hides storage key", () => {
@@ -481,4 +516,161 @@ test("deleteAllFilesForOwner skips storage when owner has no files", async () =>
 
   assert.equal(storageCalled, false);
   assert.equal(metadataDeleted, true);
+});
+
+test("validateFileIdsForPet accepts when every file belongs to owner and pet", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const petObjectId = new Types.ObjectId(petId);
+  const ids = [new Types.ObjectId(fileId), new Types.ObjectId()];
+  let observed: { owner: string; pet: string; ids: string[] } | undefined;
+
+  await validateFileIdsForPet(ownerObjectId, petObjectId, ids, {
+    countFilesForPet: async (owner, pet, queried) => {
+      observed = {
+        owner: owner.toString(),
+        pet: pet.toString(),
+        ids: queried.map((id) => id.toString())
+      };
+      return queried.length;
+    }
+  });
+
+  assert.ok(observed);
+  assert.equal(observed.owner, ownerId);
+  assert.equal(observed.pet, petId);
+  assert.deepEqual(observed.ids, ids.map((id) => id.toString()));
+});
+
+test("validateFileIdsForPet skips the count query for an empty list", async () => {
+  let queried = false;
+  await validateFileIdsForPet(new Types.ObjectId(ownerId), new Types.ObjectId(petId), [], {
+    countFilesForPet: async () => {
+      queried = true;
+      return 0;
+    }
+  });
+  assert.equal(queried, false);
+});
+
+test("validateFileIdsForPet deduplicates ids before counting", async () => {
+  let queriedIds: string[] | undefined;
+  const sameId = new Types.ObjectId(fileId);
+  await validateFileIdsForPet(
+    new Types.ObjectId(ownerId),
+    new Types.ObjectId(petId),
+    [sameId, sameId],
+    {
+      countFilesForPet: async (_owner, _pet, ids) => {
+        queriedIds = ids.map((id) => id.toString());
+        return ids.length;
+      }
+    }
+  );
+  assert.deepEqual(queriedIds, [fileId]);
+});
+
+test("validateFileIdsForPet rejects when any file is missing or out of scope", async () => {
+  await assert.rejects(
+    () =>
+      validateFileIdsForPet(
+        new Types.ObjectId(ownerId),
+        new Types.ObjectId(petId),
+        [new Types.ObjectId(fileId), new Types.ObjectId()],
+        {
+          countFilesForPet: async (_owner, _pet, ids) => ids.length - 1
+        }
+      ),
+    assertAppError(400, "INVALID_FILE_IDS")
+  );
+});
+
+test("detachEventFromFiles unsets eventId on matching files for the owner", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const eventObjectId = new Types.ObjectId(eventId);
+  let observed: { owner: string; event: string } | undefined;
+
+  await detachEventFromFiles(ownerObjectId, eventObjectId, {
+    detachEventFromFileRecords: async (owner, event) => {
+      observed = { owner: owner.toString(), event: event.toString() };
+    }
+  });
+
+  assert.deepEqual(observed, { owner: ownerId, event: eventId });
+});
+
+test("deleteAllFilesForPet removes pet files from storage and metadata", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const petObjectId = new Types.ObjectId(petId);
+  const fileA = { _id: new Types.ObjectId(), storageKey: "users/o/pets/p/files/a/a.pdf" };
+  const fileB = { _id: new Types.ObjectId(), storageKey: "users/o/pets/p/files/b/b.pdf" };
+  const deletedKeys: string[] = [];
+  let metadataDeletedFor: { owner: string; pet: string } | undefined;
+
+  await deleteAllFilesForPet(ownerObjectId, petObjectId, {
+    storage: makeStorage({
+      deleteObject: async ({ key }) => {
+        deletedKeys.push(key);
+      }
+    }),
+    listPetFiles: async (owner, pet) => {
+      assert.equal(owner.toString(), ownerId);
+      assert.equal(pet.toString(), petId);
+      return [fileA, fileB];
+    },
+    deletePetFileRecords: async (owner, pet) => {
+      metadataDeletedFor = { owner: owner.toString(), pet: pet.toString() };
+    }
+  });
+
+  assert.deepEqual(deletedKeys, [fileA.storageKey, fileB.storageKey]);
+  assert.deepEqual(metadataDeletedFor, { owner: ownerId, pet: petId });
+});
+
+test("deleteAllFilesForPet tolerates already-missing storage objects", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const petObjectId = new Types.ObjectId(petId);
+  const missing = Object.assign(new Error("missing"), { name: "NoSuchKey" });
+  let metadataDeleted = false;
+
+  await deleteAllFilesForPet(ownerObjectId, petObjectId, {
+    storage: makeStorage({
+      deleteObject: async () => {
+        throw missing;
+      }
+    }),
+    listPetFiles: async () => [
+      { _id: new Types.ObjectId(), storageKey: "users/o/p/f/a.pdf" }
+    ],
+    deletePetFileRecords: async () => {
+      metadataDeleted = true;
+    }
+  });
+
+  assert.equal(metadataDeleted, true);
+});
+
+test("deleteAllFilesForPet throws on hard storage failure and keeps metadata", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const petObjectId = new Types.ObjectId(petId);
+  let metadataDeleted = false;
+
+  await assert.rejects(
+    () =>
+      deleteAllFilesForPet(ownerObjectId, petObjectId, {
+        storage: makeStorage({
+          deleteObject: async () => {
+            throw new Error("network down");
+          }
+        }),
+        listPetFiles: async () => [
+          { _id: new Types.ObjectId(), storageKey: "users/o/p/f/a.pdf" }
+        ],
+        deletePetFileRecords: async () => {
+          metadataDeleted = true;
+        }
+      }),
+    assertAppError(502, "FILE_STORAGE_DELETE_FAILED")
+  );
+
+  assert.equal(metadataDeleted, false);
 });

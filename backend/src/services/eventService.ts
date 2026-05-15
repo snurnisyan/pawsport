@@ -14,6 +14,10 @@ import {
 } from "../models/Event";
 import { PetModel, type IPet } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
+import {
+  detachEventFromFiles as defaultDetachEventFromFiles,
+  validateFileIdsForPet as defaultValidateFileIdsForPet
+} from "./fileService";
 
 export interface CreateEventInput {
   type?: unknown;
@@ -124,6 +128,15 @@ export interface EventServiceDependencies {
   deleteRemindersForEvent?: (
     eventId: Types.ObjectId,
     ownerId: Types.ObjectId
+  ) => Promise<void>;
+  validateFileIdsForPet?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<void>;
+  detachFilesFromEvent?: (
+    ownerId: Types.ObjectId,
+    eventId: Types.ObjectId
   ) => Promise<void>;
 }
 
@@ -438,7 +451,8 @@ export const createPetEvent = async (
   const {
     createEventRecord = async (payload) => EventModel.create(payload) as unknown as EventRecord,
     findPetByIdForOwner = defaultFindPet,
-    syncPendingReminderForEvent = defaultSyncPendingReminderForEvent
+    syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
+    validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids)
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -449,6 +463,8 @@ export const createPetEvent = async (
   if (!pet) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
+
+  await validateFileIdsForPet(ownerObjectId, petObjectId, normalized.fileIds);
 
   const event = await createEventRecord({
     ownerId: ownerObjectId,
@@ -520,6 +536,7 @@ export const updateEvent = async (
   const {
     findEventByIdForOwner = defaultFindEvent,
     syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
+    validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids),
     updateEventRecord = async (id, owner, updates) => {
       const op: Record<string, unknown> = {};
       if (Object.keys(updates.set).length > 0) op.$set = updates.set;
@@ -535,11 +552,11 @@ export const updateEvent = async (
   const ownerObjectId = requireOwnerId(ownerId);
   const eventObjectId = requireEventId(eventId);
   const updates = normalizeUpdateInput(input);
+  const isObjectInput =
+    input !== null && typeof input === "object" && !Array.isArray(input);
   const shouldSyncReminder =
-    input !== null &&
-    typeof input === "object" &&
-    !Array.isArray(input) &&
-    (hasField(input, "eventDate") || hasField(input, "reminderOffset"));
+    isObjectInput && (hasField(input, "eventDate") || hasField(input, "reminderOffset"));
+  const fileIdsInUpdate = isObjectInput && hasField(input, "fileIds");
 
   if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
     const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
@@ -547,6 +564,17 @@ export const updateEvent = async (
       throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
     }
     return serializeEvent(existing);
+  }
+
+  if (fileIdsInUpdate) {
+    const requestedFileIds = (updates.set.fileIds as Types.ObjectId[] | undefined) ?? [];
+    if (requestedFileIds.length > 0) {
+      const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
+      if (!existing) {
+        throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+      }
+      await validateFileIdsForPet(ownerObjectId, existing.petId, requestedFileIds);
+    }
   }
 
   const updated = await updateEventRecord(eventObjectId, ownerObjectId, updates);
@@ -577,16 +605,20 @@ export const deleteEvent = async (
       EventModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as EventRecord | null,
     deleteRemindersForEvent = async (id, owner) => {
       await ReminderModel.deleteMany({ eventId: id, ownerId: owner, status: "pending" }).exec();
-    }
+    },
+    detachFilesFromEvent = (owner, id) => defaultDetachEventFromFiles(owner, id)
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const eventObjectId = requireEventId(eventId);
 
+  // Event-deletion file policy: detach event-linked files (unset eventId) and keep them
+  // under the pet so the user can still find them via GET /api/pets/:id/files.
   const deleted = await deleteEventRecord(eventObjectId, ownerObjectId);
   if (!deleted) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
 
+  await detachFilesFromEvent(ownerObjectId, eventObjectId);
   await deleteRemindersForEvent(eventObjectId, ownerObjectId);
 };

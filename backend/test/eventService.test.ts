@@ -44,6 +44,7 @@ const failingCreate = async () => {
 test("createPetEvent persists normalized input and returns serialized event", async () => {
   let captured: Record<string, unknown> | undefined;
   let reminderSync: Record<string, unknown> | undefined;
+  let validatedFileIds: Types.ObjectId[] | undefined;
 
   const result = await createPetEvent(
     ownerId,
@@ -61,6 +62,11 @@ test("createPetEvent persists normalized input and returns serialized event", as
     },
     {
       findPetByIdForOwner: petFound,
+      validateFileIdsForPet: async (owner, pet, ids) => {
+        assert.equal(owner.toString(), ownerId);
+        assert.equal(pet.toString(), petId);
+        validatedFileIds = ids;
+      },
       createEventRecord: async (input) => {
         captured = input as unknown as Record<string, unknown>;
         return makeEventRecord({
@@ -82,6 +88,10 @@ test("createPetEvent persists normalized input and returns serialized event", as
       }
     }
   );
+
+  assert.ok(validatedFileIds);
+  assert.equal(validatedFileIds.length, 1);
+  assert.equal(validatedFileIds[0].toString(), fileId);
 
   assert.ok(captured);
   assert.equal((captured.ownerId as Types.ObjectId).toString(), ownerId);
@@ -116,6 +126,52 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal((reminderSync.eventId as Types.ObjectId).toString(), eventId);
   assert.equal((reminderSync.eventDate as Date).toISOString(), "2026-06-01T10:00:00.000Z");
   assert.equal(reminderSync.reminderOffset, "week");
+});
+
+test("createPetEvent rejects fileIds outside the pet/owner scope with 400", async () => {
+  let createCalled = false;
+
+  await assert.rejects(
+    () =>
+      createPetEvent(
+        ownerId,
+        petId,
+        { ...validInput, fileIds: [fileId] },
+        {
+          findPetByIdForOwner: petFound,
+          validateFileIdsForPet: async () => {
+            throw new AppError(400, "INVALID_FILE_IDS", "fileIds must reference files belonging to the same pet");
+          },
+          createEventRecord: async () => {
+            createCalled = true;
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_FILE_IDS");
+      return true;
+    }
+  );
+
+  assert.equal(createCalled, false);
+});
+
+test("createPetEvent skips file validation when fileIds is empty", async () => {
+  let validationCalls = 0;
+
+  await createPetEvent(ownerId, petId, validInput, {
+    findPetByIdForOwner: petFound,
+    validateFileIdsForPet: async (_owner, _pet, ids) => {
+      validationCalls += 1;
+      assert.deepEqual(ids, []);
+    },
+    createEventRecord: async (input) => makeEventRecord({ fileIds: input.fileIds })
+  });
+
+  assert.equal(validationCalls, 1);
 });
 
 test("createPetEvent defaults fileIds to empty array when omitted", async () => {
