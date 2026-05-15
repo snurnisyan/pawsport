@@ -97,6 +97,18 @@ export interface DeleteOwnerExportsDependencies {
   deleteOwnerExports?: (ownerId: Types.ObjectId) => Promise<void>;
 }
 
+export interface DeletePetExportsDependencies {
+  storage?: FileStorage;
+  listPetExports?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId
+  ) => Promise<OwnerExportRecord[]>;
+  deletePetExports?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId
+  ) => Promise<void>;
+}
+
 const DEFAULT_SECTIONS: ExportSection[] = ["profile", "events"];
 
 const requireOwnerId = (ownerId: string): Types.ObjectId => {
@@ -306,6 +318,28 @@ export const getPetExport = async (
   return serializeExport(petExport, getPublicUrl);
 };
 
+const cleanupExportStorage = async (
+  records: OwnerExportRecord[],
+  storage: FileStorage
+): Promise<void> => {
+  for (const record of records) {
+    if (!record.fileKey) {
+      continue;
+    }
+    try {
+      await storage.deleteObject({ key: record.fileKey });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        throw new AppError(
+          502,
+          "EXPORT_STORAGE_DELETE_FAILED",
+          "Could not delete export from storage"
+        );
+      }
+    }
+  }
+};
+
 export const deleteAllExportsForOwner = async (
   ownerId: Types.ObjectId,
   dependencies: DeleteOwnerExportsDependencies = {}
@@ -322,23 +356,27 @@ export const deleteAllExportsForOwner = async (
   } = dependencies;
 
   const exports = await listOwnerExports(ownerId);
-
-  for (const record of exports) {
-    if (!record.fileKey) {
-      continue;
-    }
-    try {
-      await storage.deleteObject({ key: record.fileKey });
-    } catch (error) {
-      if (!isMissingObjectError(error)) {
-        throw new AppError(
-          502,
-          "EXPORT_STORAGE_DELETE_FAILED",
-          "Could not delete export from storage"
-        );
-      }
-    }
-  }
-
+  await cleanupExportStorage(exports, storage);
   await deleteOwnerExports(ownerId);
+};
+
+export const deleteAllExportsForPet = async (
+  ownerId: Types.ObjectId,
+  petId: Types.ObjectId,
+  dependencies: DeletePetExportsDependencies = {}
+): Promise<void> => {
+  const {
+    storage = s3Storage,
+    listPetExports = async (owner, pet) =>
+      ExportModel.find({ ownerId: owner, petId: pet })
+        .select({ _id: 1, fileKey: 1 })
+        .exec() as unknown as OwnerExportRecord[],
+    deletePetExports = async (owner, pet) => {
+      await ExportModel.deleteMany({ ownerId: owner, petId: pet }).exec();
+    }
+  } = dependencies;
+
+  const exports = await listPetExports(ownerId, petId);
+  await cleanupExportStorage(exports, storage);
+  await deletePetExports(ownerId, petId);
 };

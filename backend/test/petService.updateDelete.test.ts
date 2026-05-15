@@ -210,14 +210,40 @@ test("updatePet rejects invalid field formats", async () => {
   }
 });
 
-test("deletePet returns void and triggers cascade for events and reminders", async () => {
-  const seenCalls: string[] = [];
+test("deletePet cleans storage before domain records and removes the pet last", async () => {
+  const order: string[] = [];
 
   await deletePet(ownerId, petId, {
+    findPetForDeletion: async (id, owner) => {
+      assert.equal(id.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      order.push("find");
+      return { _id: id };
+    },
+    deleteFilesForPet: async (id, owner) => {
+      assert.equal(id.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      order.push("files");
+    },
+    deleteExportsForPet: async (id, owner) => {
+      assert.equal(id.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      order.push("exports");
+    },
+    deleteEventsForPet: async (id, owner) => {
+      assert.equal(id.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      order.push("events");
+    },
+    deleteRemindersForPet: async (id, owner) => {
+      assert.equal(id.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      order.push("reminders");
+    },
     deletePetRecord: async (id, owner) => {
       assert.equal(id.toString(), petId);
       assert.equal(owner.toString(), ownerId);
-      seenCalls.push("pet");
+      order.push("pet");
       return {
         _id: new Types.ObjectId(petId),
         ownerId: new Types.ObjectId(ownerId),
@@ -229,36 +255,35 @@ test("deletePet returns void and triggers cascade for events and reminders", asy
         createdAt: new Date(),
         updatedAt: new Date()
       };
-    },
-    deleteEventsForPet: async (id, owner) => {
-      assert.equal(id.toString(), petId);
-      assert.equal(owner.toString(), ownerId);
-      seenCalls.push("events");
-    },
-    deleteRemindersForPet: async (id, owner) => {
-      assert.equal(id.toString(), petId);
-      assert.equal(owner.toString(), ownerId);
-      seenCalls.push("reminders");
     }
   });
 
-  assert.equal(seenCalls[0], "pet");
-  assert.ok(seenCalls.includes("events"));
-  assert.ok(seenCalls.includes("reminders"));
+  assert.deepEqual(order, ["find", "files", "exports", "events", "reminders", "pet"]);
 });
 
 test("deletePet returns 404 when pet does not exist or belongs to another owner", async () => {
   let cascadeCalled = false;
+  let petRemoved = false;
 
   await assert.rejects(
     () =>
       deletePet(ownerId, petId, {
-        deletePetRecord: async () => null,
+        findPetForDeletion: async () => null,
+        deleteFilesForPet: async () => {
+          cascadeCalled = true;
+        },
+        deleteExportsForPet: async () => {
+          cascadeCalled = true;
+        },
         deleteEventsForPet: async () => {
           cascadeCalled = true;
         },
         deleteRemindersForPet: async () => {
           cascadeCalled = true;
+        },
+        deletePetRecord: async () => {
+          petRemoved = true;
+          return null;
         }
       }),
     (error: unknown) => {
@@ -270,6 +295,64 @@ test("deletePet returns 404 when pet does not exist or belongs to another owner"
   );
 
   assert.equal(cascadeCalled, false);
+  assert.equal(petRemoved, false);
+});
+
+test("deletePet propagates file storage failures and keeps domain records intact", async () => {
+  let domainTouched = false;
+  let petRemoved = false;
+
+  await assert.rejects(
+    () =>
+      deletePet(ownerId, petId, {
+        findPetForDeletion: async (id) => ({ _id: id }),
+        deleteFilesForPet: async () => {
+          throw new AppError(502, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+        },
+        deleteExportsForPet: async () => {
+          domainTouched = true;
+        },
+        deleteEventsForPet: async () => {
+          domainTouched = true;
+        },
+        deleteRemindersForPet: async () => {
+          domainTouched = true;
+        },
+        deletePetRecord: async () => {
+          petRemoved = true;
+          return null;
+        }
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 502);
+      assert.equal(error.code, "FILE_STORAGE_DELETE_FAILED");
+      return true;
+    }
+  );
+
+  assert.equal(domainTouched, false);
+  assert.equal(petRemoved, false);
+});
+
+test("deletePet returns 404 if the pet vanished during cleanup", async () => {
+  await assert.rejects(
+    () =>
+      deletePet(ownerId, petId, {
+        findPetForDeletion: async (id) => ({ _id: id }),
+        deleteFilesForPet: async () => {},
+        deleteExportsForPet: async () => {},
+        deleteEventsForPet: async () => {},
+        deleteRemindersForPet: async () => {},
+        deletePetRecord: async () => null
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 404);
+      assert.equal(error.code, "PET_NOT_FOUND");
+      return true;
+    }
+  );
 });
 
 test("deletePet rejects invalid petId with 400", async () => {

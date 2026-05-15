@@ -10,10 +10,18 @@ import {
   type EventUpdates
 } from "../src/services/eventService";
 
+const assertAppError = (statusCode: number, code: string) => (error: unknown): true => {
+  assert.ok(error instanceof AppError);
+  assert.equal(error.statusCode, statusCode);
+  assert.equal(error.code, code);
+  return true;
+};
+
 const ownerId = "507f1f77bcf86cd799439011";
 const otherOwnerId = "507f1f77bcf86cd799439099";
 const petId = "60a7c1aa9e1d4f1234567890";
 const eventId = "60a7c1aa9e1d4f12345678ab";
+const fileId = "60a7c1aa9e1d4f12345678cd";
 
 const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   _id: new Types.ObjectId(eventId),
@@ -225,6 +233,102 @@ test("updateEvent rejects invalid input", async () => {
   }
 });
 
+test("updateEvent validates fileIds against the existing event's pet", async () => {
+  let validatedIds: Types.ObjectId[] | undefined;
+
+  await updateEvent(
+    ownerId,
+    eventId,
+    { fileIds: [fileId] },
+    {
+      findEventByIdForOwner: async () => makeEventRecord(),
+      validateFileIdsForPet: async (owner, pet, ids) => {
+        assert.equal(owner.toString(), ownerId);
+        assert.equal(pet.toString(), petId);
+        validatedIds = ids;
+      },
+      updateEventRecord: async () => makeEventRecord({ fileIds: [new Types.ObjectId(fileId)] })
+    }
+  );
+
+  assert.ok(validatedIds);
+  assert.equal(validatedIds.length, 1);
+  assert.equal(validatedIds[0].toString(), fileId);
+});
+
+test("updateEvent rejects fileIds outside the pet/owner scope with 400", async () => {
+  let updateCalled = false;
+
+  await assert.rejects(
+    () =>
+      updateEvent(
+        ownerId,
+        eventId,
+        { fileIds: [fileId] },
+        {
+          findEventByIdForOwner: async () => makeEventRecord(),
+          validateFileIdsForPet: async () => {
+            throw new AppError(400, "INVALID_FILE_IDS", "fileIds must reference files belonging to the same pet");
+          },
+          updateEventRecord: async () => {
+            updateCalled = true;
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    assertAppError(400, "INVALID_FILE_IDS")
+  );
+
+  assert.equal(updateCalled, false);
+});
+
+test("updateEvent returns 404 when fileIds present but event missing", async () => {
+  await assert.rejects(
+    () =>
+      updateEvent(
+        ownerId,
+        eventId,
+        { fileIds: [fileId] },
+        {
+          findEventByIdForOwner: async () => null,
+          validateFileIdsForPet: async () => {
+            throw new Error("should not be called");
+          },
+          updateEventRecord: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    assertAppError(404, "EVENT_NOT_FOUND")
+  );
+});
+
+test("updateEvent allows clearing fileIds to empty array without scope validation", async () => {
+  let validationCalled = false;
+  let captured: EventUpdates | undefined;
+
+  await updateEvent(
+    ownerId,
+    eventId,
+    { fileIds: [] },
+    {
+      findEventByIdForOwner: async () => {
+        throw new Error("should not be called");
+      },
+      validateFileIdsForPet: async () => {
+        validationCalled = true;
+      },
+      updateEventRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeEventRecord({ fileIds: [] });
+      }
+    }
+  );
+
+  assert.equal(validationCalled, false);
+  assert.deepEqual(captured?.set, { fileIds: [] });
+});
+
 test("updateEvent rejects invalid eventId with 400", async () => {
   await assert.rejects(
     () => updateEvent(ownerId, "not-an-id", { title: "X" }),
@@ -237,7 +341,10 @@ test("updateEvent rejects invalid eventId with 400", async () => {
   );
 });
 
-test("deleteEvent removes event and cascades pending reminders", async () => {
+test("deleteEvent removes event, detaches files, and cascades pending reminders", async () => {
+  // Event-deletion file policy: files linked to the deleted event are DETACHED
+  // (the eventId field is unset) but the file metadata and S3 object remain
+  // under the pet. The user can still find them via GET /api/pets/:id/files.
   const seen: string[] = [];
 
   await deleteEvent(ownerId, eventId, {
@@ -247,6 +354,11 @@ test("deleteEvent removes event and cascades pending reminders", async () => {
       seen.push("event");
       return makeEventRecord();
     },
+    detachFilesFromEvent: async (owner, id) => {
+      assert.equal(id.toString(), eventId);
+      assert.equal(owner.toString(), ownerId);
+      seen.push("detachFiles");
+    },
     deleteRemindersForEvent: async (id, owner) => {
       assert.equal(id.toString(), eventId);
       assert.equal(owner.toString(), ownerId);
@@ -254,15 +366,21 @@ test("deleteEvent removes event and cascades pending reminders", async () => {
     }
   });
 
-  assert.deepEqual(seen, ["event", "reminders"]);
+  assert.equal(seen[0], "event");
+  assert.ok(seen.includes("detachFiles"));
+  assert.ok(seen.includes("reminders"));
 });
 
-test("deleteEvent returns 404 when event missing", async () => {
+test("deleteEvent returns 404 when event missing and does not touch files or reminders", async () => {
   let cascadeCalled = false;
+  let detachCalled = false;
   await assert.rejects(
     () =>
       deleteEvent(ownerId, eventId, {
         deleteEventRecord: async () => null,
+        detachFilesFromEvent: async () => {
+          detachCalled = true;
+        },
         deleteRemindersForEvent: async () => {
           cascadeCalled = true;
         }
@@ -276,6 +394,7 @@ test("deleteEvent returns 404 when event missing", async () => {
   );
 
   assert.equal(cascadeCalled, false);
+  assert.equal(detachCalled, false);
 });
 
 test("deleteEvent rejects invalid id with 400", async () => {

@@ -4,6 +4,8 @@ import { AppError } from "../middleware/errorHandler";
 import { EventModel } from "../models/Event";
 import { PetModel, PET_SEXES, type IPet, type PetSex } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
+import { deleteAllExportsForPet } from "./exportService";
+import { deleteAllFilesForPet } from "./fileService";
 
 export interface CreatePetInput {
   name?: unknown;
@@ -94,9 +96,15 @@ export interface PetServiceDependencies {
     ownerId: Types.ObjectId,
     updates: PetUpdates
   ) => Promise<PetRecord | null>;
+  findPetForDeletion?: (
+    petId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<Pick<IPet, "_id"> | null>;
   deletePetRecord?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
   deleteEventsForPet?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
   deleteRemindersForPet?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
+  deleteFilesForPet?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
+  deleteExportsForPet?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
 }
 
 const MICROCHIP_PATTERN = /^\d{15}$/;
@@ -450,6 +458,10 @@ export const deletePet = async (
   dependencies: PetServiceDependencies = {}
 ): Promise<void> => {
   const {
+    findPetForDeletion = async (id, owner) =>
+      PetModel.findOne({ _id: id, ownerId: owner })
+        .select({ _id: 1 })
+        .exec() as Promise<Pick<IPet, "_id"> | null>,
     deletePetRecord = async (id, owner) =>
       PetModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as PetRecord | null,
     deleteEventsForPet = async (id, owner) => {
@@ -457,19 +469,32 @@ export const deletePet = async (
     },
     deleteRemindersForPet = async (id, owner) => {
       await ReminderModel.deleteMany({ petId: id, ownerId: owner }).exec();
+    },
+    deleteFilesForPet = async (id, owner) => {
+      await deleteAllFilesForPet(owner, id);
+    },
+    deleteExportsForPet = async (id, owner) => {
+      await deleteAllExportsForPet(owner, id);
     }
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const petObjectId = requirePetObjectId(petId);
 
+  const existing = await findPetForDeletion(petObjectId, ownerObjectId);
+  if (!existing) {
+    throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+  }
+
+  // Storage-backed cleanup first so a failure leaves all metadata intact for safe retry.
+  await deleteFilesForPet(petObjectId, ownerObjectId);
+  await deleteExportsForPet(petObjectId, ownerObjectId);
+
+  await deleteEventsForPet(petObjectId, ownerObjectId);
+  await deleteRemindersForPet(petObjectId, ownerObjectId);
+
   const deleted = await deletePetRecord(petObjectId, ownerObjectId);
   if (!deleted) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
-
-  await Promise.all([
-    deleteEventsForPet(petObjectId, ownerObjectId),
-    deleteRemindersForPet(petObjectId, ownerObjectId)
-  ]);
 };

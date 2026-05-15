@@ -79,6 +79,7 @@ export interface FileServiceDependencies {
   listFilesForPet?: (ownerId: Types.ObjectId, petId: Types.ObjectId) => Promise<FileRecord[]>;
   findFileByIdForOwner?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<FileRecord | null>;
   deleteFileRecord?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<FileRecord | null>;
+  removeFileIdFromEvents?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
   now?: () => Date;
 }
 
@@ -308,7 +309,13 @@ export const deleteFile = async (
     findFileByIdForOwner = async (id, owner) =>
       FileModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
     deleteFileRecord = async (id, owner) =>
-      FileModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null
+      FileModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
+    removeFileIdFromEvents = async (id, owner) => {
+      await EventModel.updateMany(
+        { ownerId: owner, fileIds: id },
+        { $pull: { fileIds: id } }
+      ).exec();
+    }
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -331,6 +338,69 @@ export const deleteFile = async (
   if (!deleted) {
     throw new AppError(404, "FILE_NOT_FOUND", "File was not found");
   }
+
+  await removeFileIdFromEvents(fileObjectId, ownerObjectId);
+};
+
+export interface ValidateFileIdsDependencies {
+  countFilesForPet?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<number>;
+}
+
+export const validateFileIdsForPet = async (
+  ownerId: Types.ObjectId,
+  petId: Types.ObjectId,
+  fileIds: Types.ObjectId[],
+  dependencies: ValidateFileIdsDependencies = {}
+): Promise<void> => {
+  if (fileIds.length === 0) {
+    return;
+  }
+
+  const {
+    countFilesForPet = async (owner, pet, ids) =>
+      FileModel.countDocuments({ _id: { $in: ids }, ownerId: owner, petId: pet }).exec()
+  } = dependencies;
+
+  const uniqueIds = Array.from(
+    new Map(fileIds.map((id) => [id.toString(), id])).values()
+  );
+
+  const count = await countFilesForPet(ownerId, petId, uniqueIds);
+  if (count !== uniqueIds.length) {
+    throw new AppError(
+      400,
+      "INVALID_FILE_IDS",
+      "fileIds must reference files belonging to the same pet"
+    );
+  }
+};
+
+export interface DetachEventFromFilesDependencies {
+  detachEventFromFileRecords?: (
+    ownerId: Types.ObjectId,
+    eventId: Types.ObjectId
+  ) => Promise<void>;
+}
+
+export const detachEventFromFiles = async (
+  ownerId: Types.ObjectId,
+  eventId: Types.ObjectId,
+  dependencies: DetachEventFromFilesDependencies = {}
+): Promise<void> => {
+  const {
+    detachEventFromFileRecords = async (owner, event) => {
+      await FileModel.updateMany(
+        { ownerId: owner, eventId: event },
+        { $unset: { eventId: "" } }
+      ).exec();
+    }
+  } = dependencies;
+
+  await detachEventFromFileRecords(ownerId, eventId);
 };
 
 type OwnerFileRecord = Pick<IStoredFile, "_id" | "storageKey">;
@@ -340,6 +410,49 @@ export interface DeleteOwnerFilesDependencies {
   listOwnerFiles?: (ownerId: Types.ObjectId) => Promise<OwnerFileRecord[]>;
   deleteOwnerFiles?: (ownerId: Types.ObjectId) => Promise<void>;
 }
+
+export interface DeletePetFilesDependencies {
+  storage?: FileStorage;
+  listPetFiles?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId
+  ) => Promise<OwnerFileRecord[]>;
+  deletePetFileRecords?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId
+  ) => Promise<void>;
+}
+
+export const deleteAllFilesForPet = async (
+  ownerId: Types.ObjectId,
+  petId: Types.ObjectId,
+  dependencies: DeletePetFilesDependencies = {}
+): Promise<void> => {
+  const {
+    storage = s3Storage,
+    listPetFiles = async (owner, pet) =>
+      FileModel.find({ ownerId: owner, petId: pet })
+        .select({ _id: 1, storageKey: 1 })
+        .exec() as unknown as OwnerFileRecord[],
+    deletePetFileRecords = async (owner, pet) => {
+      await FileModel.deleteMany({ ownerId: owner, petId: pet }).exec();
+    }
+  } = dependencies;
+
+  const files = await listPetFiles(ownerId, petId);
+
+  for (const file of files) {
+    try {
+      await storage.deleteObject({ key: file.storageKey });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+      }
+    }
+  }
+
+  await deletePetFileRecords(ownerId, petId);
+};
 
 export const deleteAllFilesForOwner = async (
   ownerId: Types.ObjectId,
