@@ -43,6 +43,12 @@ const envSchema = z.object({
   REMINDER_SCHEDULER_ENABLED: booleanFromString.default(false),
   REMINDER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
 
+  BACKGROUND_JOB_RUNNER_ENABLED: booleanFromString.default(false),
+  BACKGROUND_JOB_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+  BACKGROUND_JOB_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  BACKGROUND_JOB_VISIBILITY_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+  BACKGROUND_JOB_DEFAULT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+
   SWAGGER_ENABLED: booleanFromString.default(false)
 });
 
