@@ -83,6 +83,14 @@ export interface CreatePetExportDependencies {
   randomToken?: () => string;
 }
 
+export interface GetPetExportDependencies {
+  findExportByIdForOwner?: (
+    exportId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<ExportRecord | null>;
+  getPublicUrl?: (key: string) => string;
+}
+
 export interface DeleteOwnerExportsDependencies {
   storage?: FileStorage;
   listOwnerExports?: (ownerId: Types.ObjectId) => Promise<OwnerExportRecord[]>;
@@ -103,6 +111,13 @@ const requirePetId = (petId: string): Types.ObjectId => {
     throw new AppError(400, "INVALID_PET_ID", "petId must be a valid id");
   }
   return new Types.ObjectId(petId);
+};
+
+const requireExportId = (exportId: string): Types.ObjectId => {
+  if (!Types.ObjectId.isValid(exportId)) {
+    throw new AppError(400, "INVALID_EXPORT_ID", "exportId must be a valid id");
+  }
+  return new Types.ObjectId(exportId);
 };
 
 const parseDateOnly = (value: unknown, field: string): Date | undefined => {
@@ -267,6 +282,28 @@ export const createPetExport = async (
   });
 
   return serializeExport(created, getPublicUrl);
+};
+
+export const getPetExport = async (
+  ownerId: string,
+  exportId: string,
+  dependencies: GetPetExportDependencies = {}
+): Promise<SerializedExport> => {
+  const {
+    findExportByIdForOwner = async (id, owner) =>
+      ExportModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as ExportRecord | null,
+    getPublicUrl = getObjectDownloadUrl
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const exportObjectId = requireExportId(exportId);
+
+  const petExport = await findExportByIdForOwner(exportObjectId, ownerObjectId);
+  if (!petExport) {
+    throw new AppError(404, "EXPORT_NOT_FOUND", "Export was not found");
+  }
+
+  return serializeExport(petExport, getPublicUrl);
 };
 
 export const deleteAllExportsForOwner = async (

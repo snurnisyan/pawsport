@@ -4,12 +4,14 @@ import test from "node:test";
 import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
-import { createPetExport, deleteAllExportsForOwner } from "../src/services/exportService";
+import { createPetExport, deleteAllExportsForOwner, getPetExport } from "../src/services/exportService";
 import type { FileStorage } from "../src/storage/s3Storage";
 
 const ownerId = "507f1f77bcf86cd799439011";
+const otherOwnerId = "507f1f77bcf86cd799439099";
 const petId = "507f1f77bcf86cd799439022";
 const otherPetId = "507f1f77bcf86cd799439033";
+const exportId = "507f1f77bcf86cd799439044";
 const now = new Date("2026-05-14T10:00:00.000Z");
 
 const makeStorage = (overrides: Partial<FileStorage> = {}): FileStorage => ({
@@ -163,6 +165,94 @@ test("createPetExport rejects invalid period and invalid sections", async () => 
   await assert.rejects(
     () => createPetExport(ownerId, petId, { sections: ["profile", "payments"] }),
     assertAppError(400, "INVALID_EXPORT_SECTIONS")
+  );
+});
+
+test("getPetExport returns pending, failed, and ready owned exports with the shared serialized shape", async () => {
+  const pending = makeExportRecord({
+    _id: oid(exportId),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    sections: ["profile", "events"],
+    status: "pending"
+  });
+  const failed = makeExportRecord({
+    _id: oid(exportId),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    period: { from: new Date("2026-05-01T00:00:00.000Z") },
+    sections: ["files"],
+    status: "failed"
+  });
+  const ready = makeExportRecord({
+    _id: oid(exportId),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    sections: ["profile", "reminders"],
+    status: "ready",
+    fileKey: "users/o/p/exports/report.pdf"
+  });
+
+  for (const record of [pending, failed, ready]) {
+    const result = await getPetExport(ownerId, exportId, {
+      findExportByIdForOwner: async (id, owner) => {
+        assert.equal(id.toString(), exportId);
+        assert.equal(owner.toString(), ownerId);
+        return record;
+      },
+      getPublicUrl: (key) => `https://download.example/${key}`
+    });
+
+    assert.equal(result.id, exportId);
+    assert.equal(result.ownerId, ownerId);
+    assert.equal(result.petId, petId);
+    assert.equal(result.status, record.status);
+    assert.deepEqual(result.sections, record.sections);
+    assert.equal(result.createdAt, now.toISOString());
+    assert.equal(result.updatedAt, now.toISOString());
+
+    if (record.status === "ready") {
+      assert.equal(result.fileKey, "users/o/p/exports/report.pdf");
+      assert.equal(result.downloadUrl, "https://download.example/users/o/p/exports/report.pdf");
+    } else {
+      assert.equal(result.fileKey, undefined);
+      assert.equal(result.downloadUrl, undefined);
+    }
+  }
+});
+
+test("getPetExport returns 400 for malformed export id", async () => {
+  await assert.rejects(
+    () => getPetExport(ownerId, "not-an-id"),
+    assertAppError(400, "INVALID_EXPORT_ID")
+  );
+});
+
+test("getPetExport returns 404 for missing or another user's export", async () => {
+  let queriedOwnerId: string | undefined;
+
+  await assert.rejects(
+    () =>
+      getPetExport(ownerId, exportId, {
+        findExportByIdForOwner: async (_id, owner) => {
+          queriedOwnerId = owner.toString();
+          return null;
+        }
+      }),
+    assertAppError(404, "EXPORT_NOT_FOUND")
+  );
+
+  assert.equal(queriedOwnerId, ownerId);
+
+  await assert.rejects(
+    () =>
+      getPetExport(otherOwnerId, exportId, {
+        findExportByIdForOwner: async (_id, owner) => {
+          assert.equal(owner.toString(), otherOwnerId);
+          return null;
+        }
+      }),
+    assertAppError(404, "EXPORT_NOT_FOUND")
   );
 });
 
