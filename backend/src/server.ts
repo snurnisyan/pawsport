@@ -2,9 +2,11 @@ import { connectDatabase, disconnectDatabase } from "./config/database";
 import { env } from "./config/env";
 import { createApp } from "./app";
 import { startReminderScheduler, stopReminderScheduler } from "./scheduler/reminderScheduler";
+import { startBackgroundJobRunner, stopBackgroundJobRunner } from "./jobs/backgroundJobRunner";
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   stopReminderScheduler();
+  await stopBackgroundJobRunner();
   await disconnectDatabase();
   process.stdout.write(`Received ${signal}. Backend stopped.\n`);
   process.exit(0);
@@ -20,6 +22,7 @@ const bootstrap = async (): Promise<void> => {
   });
 
   startReminderScheduler();
+  startBackgroundJobRunner();
 };
 
 process.on("SIGINT", (signal) => {
