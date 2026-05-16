@@ -118,3 +118,12 @@ export const unwrapApiResponse = async <T>(
 
   return data;
 };
+
+export const unwrapVoidApiResponse = async (
+  request: Promise<{ data?: unknown; error?: unknown; response: Response }>
+): Promise<void> => {
+  const { error, response } = await request;
+  if (error) {
+    throw normalizeApiError(error, response);
+  }
+};
