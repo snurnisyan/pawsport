@@ -78,11 +78,11 @@ export const PasswordResetConfirmRequestSchema = z
   })
   .openapi("PasswordResetConfirmRequest");
 
-export const ConfirmEmailQuerySchema = z
+export const ConfirmEmailRequestSchema = z
   .object({
-    token: z.string()
+    token: z.string().min(1)
   })
-  .openapi("ConfirmEmailQuery");
+  .openapi("ConfirmEmailRequest");
 
 export const AuthUserSchema = z
   .object({
@@ -96,7 +96,7 @@ export const AuthResponseSchema = z
   .object({
     accessToken: z.string(),
     user: AuthUserSchema,
-    nextStep: z.literal("onboarding")
+    nextStep: z.literal("onboarding").nullable()
   })
   .openapi("AuthResponse");
 

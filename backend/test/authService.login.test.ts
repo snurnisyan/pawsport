@@ -8,7 +8,7 @@ import { loginUser } from "../src/services/authService";
 
 const userId = "507f1f77bcf86cd799439011";
 
-test("loginUser returns JWT and safe user for valid credentials", async () => {
+test("loginUser returns JWT, safe user, and nextStep=onboarding when the user has no pets", async () => {
   const passwordHash = await bcrypt.hash("Password1", 10);
 
   const result = await loginUser(
@@ -22,7 +22,8 @@ test("loginUser returns JWT and safe user for valid credentials", async () => {
           emailVerified: true,
           passwordHash
         };
-      }
+      },
+      hasPetsForOwner: async () => false
     }
   );
 
@@ -36,6 +37,25 @@ test("loginUser returns JWT and safe user for valid credentials", async () => {
   assert.equal(typeof decoded, "object");
   assert.equal(decoded?.sub, userId);
   assert.equal(decoded?.email, "user@example.com");
+});
+
+test("loginUser returns nextStep=null when the user already has at least one pet", async () => {
+  const passwordHash = await bcrypt.hash("Password1", 10);
+
+  const result = await loginUser(
+    { email: "user@example.com", password: "Password1" },
+    {
+      findLoginUserByEmail: async () => ({
+        _id: { toString: () => userId } as never,
+        email: "user@example.com",
+        emailVerified: true,
+        passwordHash
+      }),
+      hasPetsForOwner: async () => true
+    }
+  );
+
+  assert.equal(result.nextStep, null);
 });
 
 test("loginUser rejects unknown user with INVALID_CREDENTIALS", async () => {

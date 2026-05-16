@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { Types } from "mongoose";
 import nodemailer from "nodemailer";
 
 import { env } from "../config/env";
 import { AppError } from "../middleware/errorHandler";
+import { PetModel } from "../models/Pet";
 import { UserModel, type IUser, type UserDocument } from "../models/User";
 
 const BCRYPT_ROUNDS = 12;
@@ -44,16 +46,21 @@ export interface SafeAuthUser {
   emailVerified: boolean;
 }
 
+export type NextStep = "onboarding" | null;
+
 export interface AuthResult {
   accessToken: string;
   user: SafeAuthUser;
-  nextStep: "onboarding";
+  nextStep: NextStep;
 }
 
 export type RegisterResult = AuthResult;
 export type LoginResult = AuthResult;
+export type EmailConfirmationResult = AuthResult;
 
-export type ConfirmationStatus = "success" | "invalid_or_expired";
+export interface EmailConfirmInput {
+  token?: unknown;
+}
 
 export interface ConfirmationEmailPayload {
   to: string;
@@ -72,7 +79,12 @@ interface CreateUserInput {
 
 type ConfirmationUser = Pick<
   UserDocument,
-  "emailVerified" | "verificationTokenExpiresAt" | "verificationTokenHash" | "save"
+  | "_id"
+  | "email"
+  | "emailVerified"
+  | "verificationTokenExpiresAt"
+  | "verificationTokenHash"
+  | "save"
 >;
 
 type LoginUser = Pick<IUser, "_id" | "email" | "emailVerified" | "passwordHash">;
@@ -99,6 +111,7 @@ export interface AuthServiceDependencies {
   findLoginUserByEmail?: (email: string) => Promise<LoginUser | null>;
   findPasswordResetUserByEmail?: (email: string) => Promise<PasswordResetRequestUser | null>;
   findUserByResetTokenHash?: (tokenHash: string) => Promise<PasswordResetConfirmUser | null>;
+  hasPetsForOwner?: (ownerId: Types.ObjectId) => Promise<boolean>;
   generateToken?: () => string;
   hashPassword?: (password: string) => Promise<string>;
   comparePassword?: (password: string, hash: string) => Promise<boolean>;
@@ -128,6 +141,11 @@ const defaultHashPassword = (password: string): Promise<string> => bcrypt.hash(p
 const defaultComparePassword = (password: string, hash: string): Promise<boolean> =>
   bcrypt.compare(password, hash);
 
+const defaultHasPetsForOwner = async (ownerId: Types.ObjectId): Promise<boolean> => {
+  const existing = await PetModel.exists({ ownerId }).exec();
+  return existing !== null;
+};
+
 const defaultSignJwt = (payload: JwtPayload): string => {
   const options: SignOptions = {
     expiresIn: env.JWT_EXPIRES_IN as SignOptions["expiresIn"]
@@ -136,13 +154,8 @@ const defaultSignJwt = (payload: JwtPayload): string => {
   return jwt.sign(payload, env.JWT_SECRET, options);
 };
 
-const getBackendAuthPath = (path: string): string => {
-  const prefix = env.API_PREFIX === "/" ? "" : env.API_PREFIX.replace(/\/$/, "");
-  return `${prefix}/auth/${path.replace(/^\//, "")}`;
-};
-
 const buildConfirmationUrl = (token: string): string => {
-  const url = new URL(getBackendAuthPath("confirm"), env.BACKEND_PUBLIC_URL);
+  const url = new URL("/auth/email-confirmed", env.FRONTEND_URL);
   url.searchParams.set("token", token);
   return url.toString();
 };
@@ -370,29 +383,39 @@ export const registerUser = async (
   };
 };
 
+const invalidConfirmationTokenError = (): AppError =>
+  new AppError(
+    400,
+    "INVALID_CONFIRMATION_TOKEN",
+    "Email confirmation token is invalid or has expired"
+  );
+
 export const confirmEmail = async (
-  token: unknown,
+  input: EmailConfirmInput,
   dependencies: AuthServiceDependencies = {}
-): Promise<ConfirmationStatus> => {
+): Promise<EmailConfirmationResult> => {
   const {
     findUserByVerificationTokenHash = async (tokenHash) =>
       UserModel.findOne({ verificationTokenHash: tokenHash }).exec(),
+    hasPetsForOwner = defaultHasPetsForOwner,
+    signJwt = defaultSignJwt,
     now = () => new Date()
   } = dependencies;
 
-  if (typeof token !== "string" || token.trim().length === 0) {
-    return "invalid_or_expired";
+  if (typeof input.token !== "string" || input.token.trim().length === 0) {
+    throw invalidConfirmationTokenError();
   }
 
-  const tokenHash = hashToken(token);
+  const tokenHash = hashToken(input.token);
   const user = await findUserByVerificationTokenHash(tokenHash);
 
-  if (!user || user.emailVerified || !user.verificationTokenExpiresAt) {
-    return "invalid_or_expired";
-  }
-
-  if (user.verificationTokenExpiresAt.getTime() <= now().getTime()) {
-    return "invalid_or_expired";
+  if (
+    !user ||
+    user.emailVerified ||
+    !user.verificationTokenExpiresAt ||
+    user.verificationTokenExpiresAt.getTime() <= now().getTime()
+  ) {
+    throw invalidConfirmationTokenError();
   }
 
   user.emailVerified = true;
@@ -400,7 +423,17 @@ export const confirmEmail = async (
   user.verificationTokenExpiresAt = undefined;
   await user.save();
 
-  return "success";
+  const safeUser = toSafeUser(user);
+  const nextStep: NextStep = (await hasPetsForOwner(user._id)) ? null : "onboarding";
+
+  return {
+    accessToken: signJwt({
+      sub: safeUser.id,
+      email: safeUser.email
+    }),
+    user: safeUser,
+    nextStep
+  };
 };
 
 const validateLoginInput = (input: LoginInput): { email: string; password: string } => {
@@ -425,6 +458,7 @@ export const loginUser = async (
     findLoginUserByEmail = async (email) =>
       UserModel.findOne({ email }).select("+passwordHash").exec() as Promise<LoginUser | null>,
     comparePassword = defaultComparePassword,
+    hasPetsForOwner = defaultHasPetsForOwner,
     signJwt = defaultSignJwt
   } = dependencies;
 
@@ -442,6 +476,7 @@ export const loginUser = async (
   }
 
   const safeUser = toSafeUser(user);
+  const nextStep: NextStep = (await hasPetsForOwner(user._id)) ? null : "onboarding";
 
   return {
     accessToken: signJwt({
@@ -449,7 +484,7 @@ export const loginUser = async (
       email: safeUser.email
     }),
     user: safeUser,
-    nextStep: "onboarding"
+    nextStep
   };
 };
 
