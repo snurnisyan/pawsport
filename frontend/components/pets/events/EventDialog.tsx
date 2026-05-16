@@ -8,6 +8,7 @@ type TEventDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event?: TPetEvent;
+  initialData?: Partial<TEventFormData>;
   onSubmit?: (data: TEventFormData) => void;
 };
 
@@ -24,15 +25,19 @@ const fromEvent = (event: TPetEvent): TEventFormData => ({
   files: [],
 });
 
-export function EventDialog({ open, onOpenChange, event, onSubmit }: TEventDialogProps) {
+export function EventDialog({ open, onOpenChange, event, initialData, onSubmit }: TEventDialogProps) {
   const isEdit = Boolean(event);
   const [data, setData] = useState<TEventFormData>(INITIAL_EVENT);
 
   useEffect(() => {
     if (open) {
-      setData(event ? fromEvent(event) : INITIAL_EVENT);
+      setData(
+        event
+          ? fromEvent(event)
+          : { ...INITIAL_EVENT, ...(initialData ?? {}) },
+      );
     }
-  }, [open, event]);
+  }, [open, event, initialData]);
 
   const handleSave = () => {
     onSubmit?.(data);

@@ -1,8 +1,8 @@
 import { Grid, GridItem, Stack } from "@chakra-ui/react";
-import { NotesSection } from "./overview/NotesSection";
-import { OverviewSection } from "./overview/OverviewSection";
-import { VaccinesSection } from "./overview/VaccinesSection";
-import { VetSection } from "./overview/VetSection";
+import { NotesSection } from "@/components/pets/overview/NotesSection";
+import { OverviewSection } from "@/components/pets/overview/OverviewSection";
+import { VaccinesSection } from "@/components/pets/overview/VaccinesSection";
+import { VetSection } from "@/components/pets/overview/VetSection";
 import type { TPet } from "@/store/pets";
 
 type TOverviewTabProps = {

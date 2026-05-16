@@ -19,3 +19,7 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+input[type="date"] {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,4 +1,5 @@
 import { Field, Grid, Stack, Textarea } from "@chakra-ui/react";
+import { DateInput } from "@/components/ui/DateInput";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
@@ -82,11 +83,10 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
       />
 
       <Grid templateColumns={["1fr", "1fr 1fr"]} gap="16px">
-        <TextField
+        <DateInput
           label="Дата"
-          type="date"
           value={data.date}
-          onChange={(e) => onChange({ date: e.target.value })}
+          onChange={(date) => onChange({ date })}
         />
         <TextField
           label="Время"
@@ -96,11 +96,10 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         />
       </Grid>
 
-      <TextField
+      <DateInput
         label="Следующая дата"
-        type="date"
         value={data.nextDate}
-        onChange={(e) => onChange({ nextDate: e.target.value })}
+        onChange={(nextDate) => onChange({ nextDate })}
       />
 
       <SelectField

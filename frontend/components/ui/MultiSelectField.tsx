@@ -57,8 +57,11 @@ export function MultiSelectField({ triggerLabel,
           cursor="pointer"
           _hover={{ borderColor: "border.default" }}
         >
-          <Text fontSize="14px">
-            {triggerLabel}: {displayText}
+          <Text fontSize="14px" color={"fg.muted"}>
+            {triggerLabel}:
+          </Text>
+          <Text>
+            {displayText}
           </Text>
           <Icon color="fg.muted">
             <LuChevronDown />

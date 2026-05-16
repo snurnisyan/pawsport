@@ -1,9 +1,18 @@
 import type { ReactNode } from "react";
-import { Box, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  IconButton,
+  Popover,
+  Portal,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { LuBell, LuCalendar, LuHouse, LuMenu } from "react-icons/lu";
+import { LuBell, LuCalendar, LuChevronDown, LuHouse, LuLogOut, LuMenu } from "react-icons/lu";
 import { Logo } from "@/components/ui/Logo";
 import { ChakraLink } from "@/components/ui/NextLink";
+import { Pressable } from "@/components/ui/Pressable";
 
 type TNavItem = {
   label: string;
@@ -44,12 +53,64 @@ function NavTab({ item, active }: TNavTabProps) {
   );
 }
 
+function EmptyRemindersBlock() {
+  return (
+    <Stack align="center" gap="6px" py="12px">
+      <Box color="fg.muted" fontSize="20px">
+        <LuBell />
+      </Box>
+      <Text fontSize="13px" color="fg.muted">
+        Нет напоминаний
+      </Text>
+    </Stack>
+  );
+}
+
+type TLogoutRowProps = {
+  onClick: () => void;
+};
+
+function LogoutRow({ onClick }: TLogoutRowProps) {
+  return (
+    <Pressable
+      type="button"
+      onClick={onClick}
+      display="flex"
+      alignItems="center"
+      gap="10px"
+      w="full"
+      px="12px"
+      py="10px"
+      rounded="md"
+      color="fg.default"
+      cursor="pointer"
+      _hover={{ bg: "secondary.700" }}
+    >
+      <Box color="fg.muted" fontSize="16px">
+        <LuLogOut />
+      </Box>
+      <Text fontSize="14px">Выйти</Text>
+    </Pressable>
+  );
+}
+
+const POPOVER_CONTENT_PROPS = {
+  bg: "bg.surface",
+  borderColor: "border.subtle",
+  borderWidth: "1px",
+  rounded: "card",
+  shadow: "card",
+  p: "12px",
+} as const;
+
 type THeaderProps = {
   userEmail?: string;
 };
 
 export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const router = useRouter();
+  const logout = () => router.push("/auth");
+
   return (
     <Box
       as="header"
@@ -82,32 +143,92 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
         </Flex>
 
         <Flex gap="12px" alignItems="center">
-          <IconButton
-            display={["none", "flex"]}
-            aria-label="Уведомления"
-            variant="ghost"
-            size="sm"
-            color="fg.muted"
-            _hover={{ color: "fg.default", bg: "secondary.700" }}
-          >
-            <LuBell />
-          </IconButton>
-          <Text
-            fontSize="14px"
-            color="fg.muted"
-            display={["none", "block"]}
-          >
-            {userEmail}
-          </Text>
-          <IconButton
-            aria-label="Меню"
-            variant="ghost"
-            size="sm"
-            color="fg.muted"
-            display={["inline-flex", null, "none"]}
-          >
-            <LuMenu />
-          </IconButton>
+          <Popover.Root positioning={{ placement: "bottom-end" }}>
+            <Popover.Trigger asChild>
+              <IconButton
+                display={["none", "none", "flex"]}
+                aria-label="Уведомления"
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
+                _hover={{ color: "fg.default", bg: "secondary.700" }}
+              >
+                <LuBell />
+              </IconButton>
+            </Popover.Trigger>
+            <Portal>
+              <Popover.Positioner>
+                <Popover.Content {...POPOVER_CONTENT_PROPS} minW="240px">
+                  <EmptyRemindersBlock />
+                </Popover.Content>
+              </Popover.Positioner>
+            </Portal>
+          </Popover.Root>
+
+          <Popover.Root positioning={{ placement: "bottom-end" }}>
+            <Popover.Trigger asChild>
+              <Pressable
+                type="button"
+                display={["none", "none", "flex"]}
+                alignItems="center"
+                gap="6px"
+                h="32px"
+                px="10px"
+                rounded="md"
+                color="fg.muted"
+                cursor="pointer"
+                _hover={{ color: "fg.default", bg: "secondary.700" }}
+              >
+                <Text fontSize="14px">{userEmail}</Text>
+                <Box fontSize="14px">
+                  <LuChevronDown />
+                </Box>
+              </Pressable>
+            </Popover.Trigger>
+            <Portal>
+              <Popover.Positioner>
+                <Popover.Content {...POPOVER_CONTENT_PROPS} minW="auto" w="140px">
+                  <LogoutRow onClick={logout} />
+                </Popover.Content>
+              </Popover.Positioner>
+            </Portal>
+          </Popover.Root>
+
+          <Popover.Root positioning={{ placement: "bottom-end" }}>
+            <Popover.Trigger asChild>
+              <IconButton
+                aria-label="Меню"
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
+                display={["inline-flex", null, "none"]}
+              >
+                <LuMenu />
+              </IconButton>
+            </Popover.Trigger>
+            <Portal>
+              <Popover.Positioner>
+                <Popover.Content {...POPOVER_CONTENT_PROPS} minW="240px">
+                  <Stack gap="4px">
+                    <Text
+                      fontSize="11px"
+                      fontWeight={700}
+                      color="fg.muted"
+                      textTransform="uppercase"
+                      letterSpacing="0.08em"
+                      px="12px"
+                      pt="4px"
+                    >
+                      Напоминания
+                    </Text>
+                    <EmptyRemindersBlock />
+                    <Box h="1px" bg="border.subtle" my="4px" />
+                    <LogoutRow onClick={logout} />
+                  </Stack>
+                </Popover.Content>
+              </Popover.Positioner>
+            </Portal>
+          </Popover.Root>
         </Flex>
       </Flex>
     </Box>

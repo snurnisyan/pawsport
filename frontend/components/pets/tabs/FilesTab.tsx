@@ -8,18 +8,20 @@ import {
   Text,
 } from "@chakra-ui/react";
 import {
-  LuCalendar,
   LuDownload,
   LuFileText,
   LuFileImage,
   LuFile,
-  LuSearch,
   LuTrash,
   LuUpload,
 } from "react-icons/lu";
 import { SecondaryButton } from "@/components/ui/Buttons";
-import { TextField } from "@/components/ui/TextField";
 import { FileUploadDialog } from "@/components/pets/files/FileUploadDialog";
+import {
+  FilesFilterBar,
+  INITIAL_FILES_FILTERS,
+  type TFilesFilters,
+} from "@/components/pets/files/FilesFilterBar";
 
 type TFileRow = {
   name: string;
@@ -58,6 +60,7 @@ const TYPE_META: Record<TFileRow["type"], { icon: ReactNode; bg: string; color: 
 
 export function FilesTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<TFilesFilters>(INITIAL_FILES_FILTERS);
   return (
     <Stack gap="24px">
       <HStack justify="space-between" flexWrap="wrap" gap="12px">
@@ -77,22 +80,7 @@ export function FilesTab() {
 
       <FileUploadDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 
-      <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>
-        <Box flex={1} minW="220px">
-          <TextField
-            placeholder="Поиск по названию..."
-            startElement={<LuSearch />}
-            uppercase={false}
-          />
-        </Box>
-        <Box w={["full", null, "200px"]}>
-          <TextField
-            placeholder="Период"
-            startElement={<LuCalendar />}
-            uppercase={false}
-          />
-        </Box>
-      </HStack>
+      <FilesFilterBar value={filters} onChange={setFilters} />
 
       <Stack gap="8px">
         {MOCK_FILES.map((f) => {

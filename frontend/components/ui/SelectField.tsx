@@ -10,6 +10,7 @@ type TSelectFieldProps = {
   options: TSelectOption[];
   placeholder?: string;
   uppercase?: boolean;
+  disabled?: boolean;
 };
 
 const StyledSelect = chakra("select");
@@ -19,7 +20,8 @@ export function SelectField({ label,
                               onChange,
                               options,
                               placeholder,
-                              uppercase = true }: TSelectFieldProps) {
+                              uppercase = true,
+                              disabled = false }: TSelectFieldProps) {
   return (
     <Field.Root>
       {label && (
