@@ -18,6 +18,11 @@ import {
   detachEventFromFiles as defaultDetachEventFromFiles,
   validateFileIdsForPet as defaultValidateFileIdsForPet
 } from "./fileService";
+import {
+  parseOptionalDateRange,
+  type DateRangeQuery,
+  type OptionalDateRange
+} from "./dateRange";
 
 export interface CreateEventInput {
   type?: unknown;
@@ -105,7 +110,8 @@ export interface EventServiceDependencies {
   createEventRecord?: (input: CreateEventPersistInput) => Promise<EventRecord>;
   listEventsForOwnerPet?: (
     ownerId: Types.ObjectId,
-    petId: Types.ObjectId
+    petId: Types.ObjectId,
+    range: OptionalDateRange
   ) => Promise<EventRecord[]>;
   findPetByIdForOwner?: (
     petId: Types.ObjectId,
@@ -139,6 +145,24 @@ export interface EventServiceDependencies {
     eventId: Types.ObjectId
   ) => Promise<void>;
 }
+
+const isEventServiceDependencies = (
+  value: DateRangeQuery | EventServiceDependencies
+): value is EventServiceDependencies => {
+  const candidate = value as EventServiceDependencies;
+  return (
+    typeof candidate.createEventRecord === "function" ||
+    typeof candidate.listEventsForOwnerPet === "function" ||
+    typeof candidate.findPetByIdForOwner === "function" ||
+    typeof candidate.findEventByIdForOwner === "function" ||
+    typeof candidate.updateEventRecord === "function" ||
+    typeof candidate.deleteEventRecord === "function" ||
+    typeof candidate.syncPendingReminderForEvent === "function" ||
+    typeof candidate.deleteRemindersForEvent === "function" ||
+    typeof candidate.validateFileIdsForPet === "function" ||
+    typeof candidate.detachFilesFromEvent === "function"
+  );
+};
 
 const requireString = (value: unknown, code: string, message: string): string => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -488,25 +512,41 @@ export const createPetEvent = async (
 export const listPetEvents = async (
   ownerId: string,
   petId: string,
-  dependencies: EventServiceDependencies = {}
+  queryOrDependencies: DateRangeQuery | EventServiceDependencies = {},
+  maybeDependencies?: EventServiceDependencies
 ): Promise<SerializedEvent[]> => {
+  const thirdArgumentIsDependencies = isEventServiceDependencies(queryOrDependencies);
+  const query = maybeDependencies
+    ? (queryOrDependencies as DateRangeQuery)
+    : thirdArgumentIsDependencies
+      ? {}
+      : (queryOrDependencies as DateRangeQuery);
+  const dependencies = maybeDependencies ?? (thirdArgumentIsDependencies ? queryOrDependencies : {});
   const {
-    listEventsForOwnerPet = async (owner, pet) =>
-      EventModel.find({ ownerId: owner, petId: pet })
+    listEventsForOwnerPet = async (owner, pet, range) => {
+      const filter: Record<string, unknown> = { ownerId: owner, petId: pet };
+      const eventDate: Record<string, Date> = {};
+      if (range.from) eventDate.$gte = range.from;
+      if (range.to) eventDate.$lte = range.to;
+      if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
+
+      return EventModel.find(filter)
         .sort({ eventDate: -1 })
-        .exec() as unknown as EventRecord[],
+        .exec() as unknown as EventRecord[];
+    },
     findPetByIdForOwner = defaultFindPet
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const petObjectId = requirePetId(petId);
+  const range = parseOptionalDateRange(query);
 
   const pet = await findPetByIdForOwner(petObjectId, ownerObjectId);
   if (!pet) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
 
-  const events = await listEventsForOwnerPet(ownerObjectId, petObjectId);
+  const events = await listEventsForOwnerPet(ownerObjectId, petObjectId, range);
   return events.map(serializeEvent);
 };
 

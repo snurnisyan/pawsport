@@ -16,10 +16,20 @@ const contentDisposition = (filename: string): string => {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 };
 
-export const listPetFiles = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const items = await fileService.listPetFiles(requireUserId(req), req.params.id);
-  res.status(200).json({ items });
-});
+export interface ListPetFilesHandlerDependencies {
+  listPetFiles?: typeof fileService.listPetFiles;
+}
+
+export const listPetFilesHandler = (dependencies: ListPetFilesHandlerDependencies = {}) => {
+  const { listPetFiles: listPetFilesFn = fileService.listPetFiles } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const items = await listPetFilesFn(requireUserId(req), req.params.id, req.query ?? {});
+    res.status(200).json({ items });
+  });
+};
+
+export const listPetFiles = listPetFilesHandler();
 
 export const uploadPetFile = asyncHandler(async (req: AuthenticatedRequest, res) => {
   const file = await fileService.uploadPetFile(requireUserId(req), req.params.id, {

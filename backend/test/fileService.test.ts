@@ -235,6 +235,65 @@ test("listPetFiles returns files for owner and pet in uploadedAt desc order", as
   assert.equal(result[1].uploadedAt, "2026-05-12T00:00:00.000Z");
 });
 
+test("listPetFiles passes an optional from/to uploadedAt range to the repository", async () => {
+  let observedRange: { from?: Date; to?: Date } | undefined;
+
+  const result = await listPetFiles(
+    ownerId,
+    petId,
+    { from: "2026-05-12", to: "2026-05-13" },
+    {
+      findPetByIdForOwner: petFound,
+      listFilesForPet: async (_owner, _pet, range) => {
+        observedRange = range;
+        return [];
+      }
+    }
+  );
+
+  assert.deepEqual(result, []);
+  assert.equal(observedRange?.from?.toISOString(), "2026-05-12T00:00:00.000Z");
+  assert.equal(observedRange?.to?.toISOString(), "2026-05-13T23:59:59.999Z");
+});
+
+test("listPetFiles leaves missing date bounds unrestricted", async () => {
+  let observedRange: { from?: Date; to?: Date } | undefined;
+
+  await listPetFiles(
+    ownerId,
+    petId,
+    { to: "2026-05-13" },
+    {
+      findPetByIdForOwner: petFound,
+      listFilesForPet: async (_owner, _pet, range) => {
+        observedRange = range;
+        return [];
+      }
+    }
+  );
+
+  assert.equal(observedRange?.from, undefined);
+  assert.equal(observedRange?.to?.toISOString(), "2026-05-13T23:59:59.999Z");
+});
+
+test("listPetFiles rejects malformed date bounds", async () => {
+  await assert.rejects(
+    () =>
+      listPetFiles(
+        ownerId,
+        petId,
+        { from: "05/12/2026" },
+        {
+          findPetByIdForOwner: petFound,
+          listFilesForPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    assertAppError(400, "INVALID_FROM")
+  );
+});
+
 test("listPetFiles returns 404 for a pet outside the owner scope", async () => {
   await assert.rejects(
     () =>
