@@ -1,6 +1,7 @@
 import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
+import * as fileService from "../services/fileService";
 import * as petService from "../services/petService";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
@@ -15,10 +16,79 @@ export const listPets = asyncHandler(async (req: AuthenticatedRequest, res) => {
   res.status(200).json({ items });
 });
 
-export const createPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const pet = await petService.createPet(requireUserId(req), req.body ?? {});
-  res.status(201).json({ pet });
-});
+export const parsePetFieldsFromMultipart = (raw: unknown): Record<string, unknown> => {
+  if (raw === undefined || raw === null || raw === "") {
+    return {};
+  }
+  if (typeof raw !== "string") {
+    throw new AppError(400, "INVALID_PET_PAYLOAD", "pet field must be a JSON string");
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new AppError(400, "INVALID_PET_PAYLOAD", "pet field must encode a JSON object");
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(400, "INVALID_PET_PAYLOAD", "pet field is not valid JSON");
+  }
+};
+
+export interface CreatePetHandlerDependencies {
+  createPet?: typeof petService.createPet;
+  deletePet?: typeof petService.deletePet;
+  serializePet?: typeof petService.serializePet;
+  uploadPetPhoto?: typeof fileService.uploadPetPhoto;
+}
+
+export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}) => {
+  const {
+    createPet = petService.createPet,
+    deletePet = petService.deletePet,
+    serializePet = petService.serializePet,
+    uploadPetPhoto = fileService.uploadPetPhoto
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const photoFile = req.file;
+    const petInput = photoFile
+      ? parsePetFieldsFromMultipart((req.body as Record<string, unknown> | undefined)?.pet)
+      : (req.body ?? {});
+
+    if (photoFile && petInput.photoFileId !== undefined && petInput.photoFileId !== null) {
+      throw new AppError(
+        400,
+        "PHOTO_FILE_ID_CONFLICT",
+        "Pass either photoFileId or an inline photo file, not both"
+      );
+    }
+
+    const pet = await createPet(userId, petInput);
+
+    if (!photoFile) {
+      res.status(201).json({ pet });
+      return;
+    }
+
+    try {
+      const { pet: petWithPhoto } = await uploadPetPhoto(userId, pet.id, {
+        file: photoFile
+      });
+      res.status(201).json({ pet: serializePet(petWithPhoto) });
+    } catch (error) {
+      try {
+        await deletePet(userId, pet.id);
+      } catch {
+        // Best effort: surface the original upload failure to the caller.
+      }
+      throw error;
+    }
+  });
+};
+
+export const createPet = createPetHandler();
 
 export const getPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
   const pet = await petService.getPet(requireUserId(req), req.params.id);
