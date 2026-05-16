@@ -372,13 +372,17 @@ export const ReminderListResponseSchema = z
 export const CalendarQuerySchema = z.object({
   from: DateSchema.optional(),
   to: DateSchema.optional(),
-  petId: ObjectIdSchema.optional()
+  petIds: z.array(ObjectIdSchema).optional().openapi({
+    description: "Pet ids to include. Omit or pass an empty list to include all pets."
+  }),
+  eventTypes: z.array(z.enum(EVENT_TYPES)).optional().openapi({
+    description: "Event types to include. Omit or pass an empty list to include all event types."
+  })
 });
 
 export const CalendarResponseSchema = z
   .object({
-    events: z.array(EventSchema),
-    reminders: z.array(ReminderSchema)
+    events: z.array(EventSchema)
   })
   .openapi("CalendarResponse");
 

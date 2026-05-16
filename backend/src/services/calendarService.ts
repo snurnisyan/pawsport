@@ -1,59 +1,32 @@
 import { Types, isValidObjectId } from "mongoose";
 
 import { AppError } from "../middleware/errorHandler";
-import { EventModel } from "../models/Event";
-import { ReminderModel } from "../models/Reminder";
+import { EVENT_TYPES, EventModel, type EventType } from "../models/Event";
 import {
   serializeEvent,
   type EventRecord,
   type SerializedEvent
 } from "./eventService";
-import {
-  serializeReminder,
-  type SerializedReminder
-} from "./reminderService";
-import type { IReminder } from "../models/Reminder";
 
 export interface CalendarQuery {
   from?: unknown;
   to?: unknown;
-  petId?: unknown;
+  petIds?: unknown;
+  eventTypes?: unknown;
 }
 
 export interface CalendarResult {
   events: SerializedEvent[];
-  reminders: SerializedReminder[];
 }
-
-type ReminderRecord = Pick<
-  IReminder,
-  | "_id"
-  | "ownerId"
-  | "petId"
-  | "eventId"
-  | "channel"
-  | "dueAt"
-  | "sendAt"
-  | "offset"
-  | "status"
-  | "lastError"
-  | "createdAt"
-  | "updatedAt"
->;
 
 export interface CalendarServiceDependencies {
   listEventsInRange?: (params: {
     ownerId: Types.ObjectId;
     from: Date;
     to: Date;
-    petId?: Types.ObjectId;
+    petIds?: Types.ObjectId[];
+    eventTypes?: EventType[];
   }) => Promise<EventRecord[]>;
-  listRemindersInRange?: (params: {
-    ownerId: Types.ObjectId;
-    from: Date;
-    to: Date;
-    petId?: Types.ObjectId;
-  }) => Promise<ReminderRecord[]>;
   now?: () => Date;
 }
 
@@ -106,15 +79,55 @@ const parseOptionalString = (value: unknown, code: string, message: string): str
   return value;
 };
 
-const parseOptionalPetId = (value: unknown): Types.ObjectId | undefined => {
-  const raw = parseOptionalString(value, "INVALID_PET_ID", "petId must be a valid id");
-  if (raw === undefined) {
+const parseOptionalStringList = (value: unknown, code: string, message: string): string[] | undefined => {
+  if (value === undefined || value === null || value === "") {
     return undefined;
   }
-  if (!isValidObjectId(raw)) {
-    throw new AppError(400, "INVALID_PET_ID", "petId must be a valid id");
+
+  const rawValues = Array.isArray(value) ? value : [value];
+  const values = rawValues.flatMap((item) => {
+    if (typeof item !== "string") {
+      throw new AppError(400, code, message);
+    }
+    return item
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  });
+
+  return values.length > 0 ? values : undefined;
+};
+
+const parseOptionalPetIds = (value: unknown): Types.ObjectId[] | undefined => {
+  const rawValues = parseOptionalStringList(value, "INVALID_PET_IDS", "petIds must be a list of valid ids");
+  if (!rawValues) {
+    return undefined;
   }
-  return new Types.ObjectId(raw);
+  return rawValues.map((raw) => {
+    if (!isValidObjectId(raw)) {
+      throw new AppError(400, "INVALID_PET_IDS", "petIds must be a list of valid ids");
+    }
+    return new Types.ObjectId(raw);
+  });
+};
+
+const parseOptionalEventTypes = (value: unknown): EventType[] | undefined => {
+  const rawValues = parseOptionalStringList(
+    value,
+    "INVALID_EVENT_TYPES",
+    "eventTypes must be a list of valid event types"
+  );
+  if (!rawValues) {
+    return undefined;
+  }
+
+  const allowedTypes = new Set<string>(EVENT_TYPES);
+  return rawValues.map((raw) => {
+    if (!allowedTypes.has(raw)) {
+      throw new AppError(400, "INVALID_EVENT_TYPES", "eventTypes must be a list of valid event types");
+    }
+    return raw as EventType;
+  });
 };
 
 export const getCalendar = async (
@@ -123,21 +136,14 @@ export const getCalendar = async (
   dependencies: CalendarServiceDependencies = {}
 ): Promise<CalendarResult> => {
   const {
-    listEventsInRange = async ({ ownerId: owner, from, to, petId }) => {
+    listEventsInRange = async ({ ownerId: owner, from, to, petIds, eventTypes }) => {
       const filter: Record<string, unknown> = {
         ownerId: owner,
         eventDate: { $gte: from, $lte: to }
       };
-      if (petId) filter.petId = petId;
+      if (petIds) filter.petId = { $in: petIds };
+      if (eventTypes) filter.type = { $in: eventTypes };
       return EventModel.find(filter).sort({ eventDate: 1 }).exec() as unknown as EventRecord[];
-    },
-    listRemindersInRange = async ({ ownerId: owner, from, to, petId }) => {
-      const filter: Record<string, unknown> = {
-        ownerId: owner,
-        sendAt: { $gte: from, $lte: to }
-      };
-      if (petId) filter.petId = petId;
-      return ReminderModel.find(filter).sort({ sendAt: 1 }).exec() as unknown as ReminderRecord[];
     },
     now = () => new Date()
   } = dependencies;
@@ -146,7 +152,8 @@ export const getCalendar = async (
 
   const fromRaw = parseOptionalString(query.from, "INVALID_FROM", "from must be a YYYY-MM-DD date");
   const toRaw = parseOptionalString(query.to, "INVALID_TO", "to must be a YYYY-MM-DD date");
-  const petObjectId = parseOptionalPetId(query.petId);
+  const petIds = parseOptionalPetIds(query.petIds);
+  const eventTypes = parseOptionalEventTypes(query.eventTypes);
 
   const reference = now();
   const from = fromRaw
@@ -160,13 +167,9 @@ export const getCalendar = async (
     throw new AppError(400, "INVALID_RANGE", "from must be on or before to");
   }
 
-  const [events, reminders] = await Promise.all([
-    listEventsInRange({ ownerId: ownerObjectId, from, to, petId: petObjectId }),
-    listRemindersInRange({ ownerId: ownerObjectId, from, to, petId: petObjectId })
-  ]);
+  const events = await listEventsInRange({ ownerId: ownerObjectId, from, to, petIds, eventTypes });
 
   return {
-    events: events.map(serializeEvent),
-    reminders: reminders.map(serializeReminder)
+    events: events.map(serializeEvent)
   };
 };

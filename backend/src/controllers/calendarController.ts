@@ -10,7 +10,17 @@ const requireUserId = (req: AuthenticatedRequest): string => {
   return req.user.id;
 };
 
-export const getCalendar = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const result = await calendarService.getCalendar(requireUserId(req), req.query ?? {});
-  res.status(200).json(result);
-});
+export interface GetCalendarHandlerDependencies {
+  getCalendar?: typeof calendarService.getCalendar;
+}
+
+export const getCalendarHandler = (dependencies: GetCalendarHandlerDependencies = {}) => {
+  const { getCalendar: getCalendarFn = calendarService.getCalendar } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const result = await getCalendarFn(requireUserId(req), req.query ?? {});
+    res.status(200).json(result);
+  });
+};
+
+export const getCalendar = getCalendarHandler();
