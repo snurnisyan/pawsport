@@ -13,7 +13,7 @@ export type TPet = {
   sex: "male" | "female";
   ageLabel: string;
   weightKg: number;
-  imageUrl: string;
+  imageUrl?: string;
   chipNumber?: string;
   birthDate?: string;
   status?: TPetStatus;
@@ -44,8 +44,6 @@ const PETS: TPet[] = [
     sex: "male",
     ageLabel: "4 года",
     weightKg: 32.5,
-    imageUrl:
-      "https://images.unsplash.com/photo-1633722715534-de41b3a06acc?w=1200&q=80",
     chipNumber: "#982000344211",
     birthDate: "12 мая 2021",
     nextEvent: "Следующий визит: июнь 13",

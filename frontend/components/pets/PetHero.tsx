@@ -1,16 +1,18 @@
+import { useState } from "react";
 import {
   AspectRatio,
   Box,
   HStack,
   Icon,
   IconButton,
-  Image,
   Stack,
   Text,
 } from "@chakra-ui/react";
 import { LuCake, LuPenLine } from "react-icons/lu";
 import { FaMars, FaVenus } from "react-icons/fa6";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PetImage } from "@/components/pets/PetImage";
+import { PhotoUploadDialog } from "@/components/pets/PhotoUploadDialog";
 import type { TPet } from "@/store/pets";
 
 type TPetHeroProps = {
@@ -18,71 +20,92 @@ type TPetHeroProps = {
 };
 
 export function PetHero({ pet }: TPetHeroProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(pet.imageUrl);
+
   return (
-    <Box
-      position="relative"
-      rounded="card"
-      overflow="hidden"
-      borderWidth="1px"
-      borderColor="border.subtle"
-    >
-      <AspectRatio ratio={[16 / 10, null, 21 / 9]}>
-        <Image
-          src={pet.imageUrl}
-          alt={pet.name}
-          objectFit="cover"
-          w="full"
-          h="full"
-        />
-      </AspectRatio>
+    <>
       <Box
-        position="absolute"
-        inset={0}
-        bgGradient="linear(to-t, rgba(5,8,16,0.95) 0%, rgba(5,8,16,0.4) 50%, rgba(5,8,16,0) 100%)"
+        position="relative"
+        rounded="card"
+        overflow="hidden"
+        borderWidth="1px"
+        borderColor="border.subtle"
+      >
+        <AspectRatio ratio={[16 / 10, null, 21 / 9]}>
+          <PetImage src={photoUrl} alt={pet.name} />
+        </AspectRatio>
+        <Box
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          bgGradient="to-t"
+          gradientFrom="rgba(5,8,16,0.98)"
+          gradientVia="rgba(5,8,16,0.65) 35%"
+          gradientTo="rgba(5,8,16,0)"
+        />
+        <IconButton
+          aria-label="Редактировать фото"
+          position="absolute"
+          top="16px"
+          right="16px"
+          size="md"
+          rounded="full"
+          bg="bg.canvas/85"
+          color="primary.300"
+          borderWidth="1px"
+          borderColor="border.default"
+          backdropFilter="blur(10px)"
+          shadow="card"
+          onClick={() => setDialogOpen(true)}
+          _hover={{
+            bg: "bg.canvas",
+            borderColor: "border.accent",
+            color: "primary.200",
+          }}
+        >
+          <LuPenLine />
+        </IconButton>
+        <Stack
+          position="absolute"
+          bottom={["16px", null, "24px"]}
+          left={["16px", null, "24px"]}
+          right={["16px", null, "24px"]}
+          gap="8px"
+        >
+          <HStack gap="12px" flexWrap="wrap">
+            <Text
+              fontSize={["30px", null, "48px"]}
+              fontWeight={700}
+              lineHeight={1}
+              color="white"
+              textShadow="0 2px 12px rgba(0,0,0,0.5)"
+            >
+              {pet.name}
+            </Text>
+            <StatusBadge tone="info">{pet.breed}</StatusBadge>
+          </HStack>
+          <HStack gap="16px" color="fg.subtle" fontSize="14px">
+            <HStack gap="4px">
+              <Icon>
+                <LuCake />
+              </Icon>
+              <Text>{pet.ageLabel}</Text>
+            </HStack>
+            <HStack gap="4px">
+              <Icon>{pet.sex === "male" ? <FaMars /> : <FaVenus />}</Icon>
+              <Text>{pet.sex === "male" ? "Мальчик" : "Девочка"}</Text>
+            </HStack>
+          </HStack>
+        </Stack>
+      </Box>
+
+      <PhotoUploadDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        petName={pet.name}
+        onSave={(file) => setPhotoUrl(URL.createObjectURL(file))}
       />
-      <IconButton
-        aria-label="Редактировать"
-        position="absolute"
-        top="16px"
-        right="16px"
-        size="sm"
-        rounded="full"
-        bg="bg.canvas/80"
-        color="primary.400"
-        backdropFilter="blur(8px)"
-        _hover={{ bg: "bg.canvas" }}
-      >
-        <LuPenLine />
-      </IconButton>
-      <Stack
-        position="absolute"
-        bottom={["16px", null, "24px"]}
-        left={["16px", null, "24px"]}
-        gap="8px"
-      >
-        <HStack gap="12px" flexWrap="wrap">
-          <Text
-            fontSize={["30px", null, "48px"]}
-            fontWeight={700}
-            lineHeight={1}
-          >
-            {pet.name}
-          </Text>
-          <StatusBadge tone="info">{pet.breed}</StatusBadge>
-        </HStack>
-        <HStack gap="16px" color="fg.subtle" fontSize="14px">
-          <HStack gap="4px">
-            <Icon>
-              <LuCake />
-            </Icon>
-            <Text>{pet.ageLabel}</Text>
-          </HStack>
-          <HStack gap="4px">
-            <Icon>{pet.sex === "male" ? <FaMars /> : <FaVenus />}</Icon>
-            <Text>{pet.sex === "male" ? "Мальчик" : "Девочка"}</Text>
-          </HStack>
-        </HStack>
-      </Stack>
-    </Box>
+    </>
   );
 }
