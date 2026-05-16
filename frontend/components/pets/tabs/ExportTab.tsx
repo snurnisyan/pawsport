@@ -51,7 +51,7 @@ export function ExportTab() {
       borderWidth="1px"
       borderColor="border.subtle"
       rounded="card"
-      p={{ base: "20px", md: "28px" }}
+      p={["20px", null, "28px"]}
     >
       <Stack gap="24px">
         <Stack gap="4px">
@@ -148,7 +148,7 @@ export function ExportTab() {
           </Stack>
         </Stack>
 
-        <SimpleGrid columns={{ base: 1, sm: 2 }} gap="12px" pt="8px">
+        <SimpleGrid columns={[1, 2]} gap="12px" pt="8px">
           <PrimaryButton>
             <HStack gap="8px">
               <LuDownload />

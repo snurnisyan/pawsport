@@ -74,7 +74,7 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
     <VStack gap="24px" align="stretch" w="full" maxW="640px" mx="auto">
       <VStack gap="8px" align="center">
         <StepProgress current={3} total={3} />
-        <Text fontSize={{ base: "30px", md: "36px" }} fontWeight={700} mt="24px">
+        <Text fontSize={["30px", null, "36px"]} fontWeight={700} mt="24px">
           Первое напоминание
         </Text>
         <Text color="fg.muted" textAlign="center">

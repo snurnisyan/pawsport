@@ -28,7 +28,7 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
     <VStack gap="32px" align="stretch" w="full" maxW="640px" mx="auto">
       <VStack gap="8px" align="center">
         <StepProgress current={2} total={3} />
-        <Text fontSize={{ base: "30px", md: "36px" }} fontWeight={700} mt="24px">
+        <Text fontSize={["30px", null, "36px"]} fontWeight={700} mt="24px">
           Первый питомец
         </Text>
         <Text color="fg.muted">Коротко расскажи о своем питомце</Text>

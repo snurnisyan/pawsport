@@ -69,14 +69,14 @@ function CardHeader({ icon,
 export function OverviewTab({ pet }: TOverviewTabProps) {
   return (
     <Grid
-      templateColumns={{ base: "1fr", lg: "2fr 1fr" }}
+      templateColumns={["1fr", null, null, "2fr 1fr"]}
       gap="20px"
     >
       <GridItem>
         <Stack gap="20px">
           <Card>
             <CardHeader icon={<LuUser />} title="Обзор" />
-            <Grid templateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap="16px">
+            <Grid templateColumns={["1fr", "1fr 1fr"]} gap="16px">
               <TextField
                 label="Номер чипа"
                 defaultValue={pet.chipNumber}
@@ -93,7 +93,7 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
                 readOnly
               />
               <TextField label="Вес" defaultValue={`${pet.weightKg} кг`} readOnly />
-              <Box gridColumn={{ base: "auto", sm: "1 / -1" }}>
+              <Box gridColumn={["auto", "1 / -1"]}>
                 <TextField label="Порода" defaultValue={pet.breed} readOnly />
               </Box>
             </Grid>

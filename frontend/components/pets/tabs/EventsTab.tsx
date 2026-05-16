@@ -137,7 +137,7 @@ export function EventsTab({ events }: TEventsTabProps) {
         </PrimaryButton>
       </HStack>
 
-      <HStack gap="12px" flexWrap={{ base: "wrap", md: "nowrap" }}>
+      <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>
         <Box flex={1} minW="220px">
           <TextField
             placeholder="Поиск по названию, заметкам..."
@@ -145,10 +145,10 @@ export function EventsTab({ events }: TEventsTabProps) {
             uppercase={false}
           />
         </Box>
-        <Box w={{ base: "full", md: "180px" }}>
+        <Box w={["full", null, "180px"]}>
           <TextField placeholder="Тип: Все" uppercase={false} />
         </Box>
-        <Box w={{ base: "full", md: "200px" }}>
+        <Box w={["full", null, "200px"]}>
           <TextField
             placeholder="Период"
             startElement={<LuCalendar />}

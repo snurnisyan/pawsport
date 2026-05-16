@@ -44,7 +44,7 @@ export function RegisterStep({ email, password, onChange, onNext }: TRegisterSte
         </Text>
       </VStack>
 
-      <Card w="full" maxW="420px" p={{ base: "20px", md: "24px" }}>
+      <Card w="full" maxW="420px" p={["20px", null, "24px"]}>
         <VStack gap="20px" align="stretch">
           <StepProgress current={1} total={3} />
           <Text fontSize="24px" fontWeight={700}>

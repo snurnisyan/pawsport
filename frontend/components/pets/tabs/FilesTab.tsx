@@ -73,7 +73,7 @@ export function FilesTab() {
         </SecondaryButton>
       </HStack>
 
-      <HStack gap="12px" flexWrap={{ base: "wrap", md: "nowrap" }}>
+      <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>
         <Box flex={1} minW="220px">
           <TextField
             placeholder="Поиск по названию..."
@@ -81,7 +81,7 @@ export function FilesTab() {
             uppercase={false}
           />
         </Box>
-        <Box w={{ base: "full", md: "200px" }}>
+        <Box w={["full", null, "200px"]}>
           <TextField
             placeholder="Период"
             startElement={<LuCalendar />}

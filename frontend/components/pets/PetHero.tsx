@@ -26,7 +26,7 @@ export function PetHero({ pet }: TPetHeroProps) {
       borderWidth="1px"
       borderColor="border.subtle"
     >
-      <AspectRatio ratio={{ base: 16 / 10, md: 21 / 9 }}>
+      <AspectRatio ratio={[16 / 10, null, 21 / 9]}>
         <Image
           src={pet.imageUrl}
           alt={pet.name}
@@ -56,13 +56,13 @@ export function PetHero({ pet }: TPetHeroProps) {
       </IconButton>
       <Stack
         position="absolute"
-        bottom={{ base: "16px", md: "24px" }}
-        left={{ base: "16px", md: "24px" }}
+        bottom={["16px", null, "24px"]}
+        left={["16px", null, "24px"]}
         gap="8px"
       >
         <HStack gap="12px" flexWrap="wrap">
           <Text
-            fontSize={{ base: "30px", md: "48px" }}
+            fontSize={["30px", null, "48px"]}
             fontWeight={700}
             lineHeight={1}
           >

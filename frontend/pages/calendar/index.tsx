@@ -37,8 +37,8 @@ export default function CalendarPage() {
       </Head>
       <AppWrapper maxW="1440px">
         <Grid
-          templateColumns={{ base: "1fr", lg: "1fr 240px" }}
-          gap={{ base: "16px", lg: "32px" }}
+          templateColumns={["1fr", null, null, "1fr 240px"]}
+          gap={["16px", null, null, "32px"]}
           alignItems="start"
         >
           <Stack gap="20px">
@@ -67,7 +67,7 @@ export default function CalendarPage() {
                 </IconButton>
               </HStack>
               <GhostButton
-                display={{ base: "inline-flex", lg: "none" }}
+                display={["inline-flex", null, null, "none"]}
                 onClick={drawer.onOpen}
                 h="40px"
                 px="16px"
@@ -80,7 +80,7 @@ export default function CalendarPage() {
             </HStack>
 
             <Grid
-              templateColumns={{ base: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" }}
+              templateColumns={["1fr", "1fr 1fr", "repeat(3, 1fr)"]}
               gap="16px"
             >
               {Array.from({ length: 12 }).map((_, m) => (
@@ -94,7 +94,7 @@ export default function CalendarPage() {
             </Grid>
           </Stack>
 
-          <Box display={{ base: "none", lg: "block" }} position="sticky" top="80px">
+          <Box display={["none", null, null, "block"]} position="sticky" top="80px">
             <CalendarFilters />
           </Box>
         </Grid>

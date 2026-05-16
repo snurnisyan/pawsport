@@ -15,10 +15,10 @@ export default function PetsPage() {
       </Head>
       <AppWrapper>
         <Stack gap="24px">
-          <Heading as="h1" size={{ base: "xl", md: "2xl" }}>
+          <Heading as="h1" size={["xl", null, "2xl"]}>
             Мои питомцы
           </Heading>
-          <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap="20px">
+          <SimpleGrid columns={[1, 2, null, 3]} gap="20px">
             {pets.map((pet) => (
               <PetCard key={pet.id} pet={pet} />
             ))}
