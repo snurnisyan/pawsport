@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
 import {
-  Box,
-  HStack,
+  Box, Flex,
   Icon,
-  SimpleGrid,
   Stack,
   Switch,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuBug, LuCalendar, LuPill, LuShieldCheck, LuSyringe, LuWorm } from "react-icons/lu";
+import {
+  LuBug,
+  LuCalendar, LuChevronDown,
+  LuShieldCheck,
+  LuSyringe,
+  LuWorm
+} from "react-icons/lu";
 import { Card } from "@/components/ui/Card";
 import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { StepProgress } from "@/components/ui/StepProgress";
@@ -39,7 +43,7 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     id: "rabies",
     label: "Вакцина от бешенства",
     icon: <LuShieldCheck />,
-    iconColor: "#EF4444",
+    iconColor: "#A855F7",
     enabled: true,
     lastDate: "12.10.2025",
     frequency: "Каждые 3 года",
@@ -57,7 +61,7 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     id: "internal",
     label: "Обработка от внутренних паразитов",
     icon: <LuWorm />,
-    iconColor: "#14B8A6",
+    iconColor: "#10B981",
     enabled: true,
     lastDate: "05.04.2026",
     frequency: "Ежемесячно",
@@ -86,41 +90,42 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
         {DEFAULT_REMINDERS.map((r) => (
           <Card key={r.id} p="20px">
             <Stack gap="16px">
-              <HStack justify="space-between">
-                <HStack gap="12px">
+              <Flex justifyContent="space-between">
+                <Flex gap="12px" alignItems="center">
                   <Box
-                    w="36px"
-                    h="36px"
-                    rounded="lg"
+                    w={["28px", "28px", "36px"]}
+                    h={["28px", "28px", "36px"]}
+                    rounded="full"
                     bg="secondary.700"
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
                     color={r.iconColor}
+                    flexShrink={0}
                   >
                     <Icon boxSize="16px">{r.icon}</Icon>
                   </Box>
                   <Text fontWeight={600}>{r.label}</Text>
-                </HStack>
+                </Flex>
                 <Switch.Root defaultChecked={r.enabled} colorPalette="blue">
                   <Switch.HiddenInput />
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
                 </Switch.Root>
-              </HStack>
-              <SimpleGrid columns={2} gap="12px">
+              </Flex>
+              <Flex flexDir={["column", "column", "row"]} gap="12px">
                 <TextField
                   label="Последняя обработка"
                   placeholder={r.lastDate}
-                  startElement={<LuCalendar />}
+                  endElement={<LuCalendar />}
                 />
                 <TextField
                   label="Частота"
                   placeholder={r.frequency}
-                  endElement={<LuPill />}
+                  endElement={<LuChevronDown />}
                 />
-              </SimpleGrid>
+              </Flex>
             </Stack>
           </Card>
         ))}

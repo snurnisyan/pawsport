@@ -127,7 +127,7 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
             letterSpacing="0.08em"
             mb="8px"
           >
-            Пол
+            Пол (необязательно)
           </Text>
           <SimpleGrid columns={2} gap="12px">
             <ChoiceCard

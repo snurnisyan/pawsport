@@ -27,6 +27,7 @@ type TCardHeaderProps = {
   title: string;
   iconBg?: string;
   iconColor?: string;
+  withEdit?: boolean;
 };
 
 type TOverviewTabProps = {
@@ -36,7 +37,8 @@ type TOverviewTabProps = {
 function CardHeader({ icon,
                       title,
                       iconBg = "secondary.700",
-                      iconColor = "primary.400" }: TCardHeaderProps) {
+                      iconColor = "primary.400",
+                      withEdit = true }: TCardHeaderProps) {
   return (
     <HStack justify="space-between" mb="20px">
       <HStack gap="12px">
@@ -54,14 +56,17 @@ function CardHeader({ icon,
         </Box>
         <Text fontWeight={700}>{title}</Text>
       </HStack>
-      <IconButton
-        aria-label="Редактировать"
-        size="xs"
-        variant="ghost"
-        color="fg.muted"
-      >
-        <LuPenLine />
-      </IconButton>
+      {withEdit && (
+        <IconButton
+          aria-label="Редактировать"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          _hover={{ color: "fg.default", bg: "secondary.700" }}
+        >
+          <LuPenLine />
+        </IconButton>
+      )}
     </HStack>
   );
 }
@@ -103,8 +108,7 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
             <CardHeader
               icon={<LuSyringe />}
               title="Вакцины и обработки"
-              iconBg="rgba(168, 85, 247, 0.15)"
-              iconColor="#D8B4FE"
+              withEdit={false}
             />
             <Stack gap="12px">
               {[
@@ -158,8 +162,6 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
             <CardHeader
               icon={<LuFileText />}
               title="Заметки"
-              iconBg="rgba(20, 184, 166, 0.15)"
-              iconColor="#5EEAD4"
             />
             <Stack gap="8px">
               {pet.notes.length === 0 && (
@@ -187,11 +189,9 @@ export function OverviewTab({ pet }: TOverviewTabProps) {
               <CardHeader
                 icon={<LuStethoscope />}
                 title="Ветеринар"
-                iconBg="rgba(59, 130, 246, 0.15)"
-                iconColor="#93C5FD"
               />
               <Stack gap="12px">
-                <Text fontWeight={600}>{pet.vet.name}</Text>
+                <TextField defaultValue={pet.vet.name} readOnly />
                 <HStack color="fg.muted" fontSize="14px" gap="8px">
                   <LuPhone />
                   <Text>{pet.vet.phone}</Text>

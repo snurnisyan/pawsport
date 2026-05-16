@@ -7,11 +7,16 @@ type TAppWrapperProps = {
   maxW?: string;
 };
 
-export function AppWrapper({ children, maxW = "1280px" }: TAppWrapperProps) {
+export function AppWrapper({ children, maxW = "1024px" }: TAppWrapperProps) {
   return (
     <Box minH="100vh" bg="bg.canvas">
       <Header />
-      <Container maxW={maxW} px={["16px", null, "24px"]} py={["24px", null, "40px"]}>
+      <Container
+        maxW={maxW}
+        px={["16px", null, "24px"]}
+        py={["24px", null, "40px"]}
+        mx={"auto"}
+      >
         {children}
       </Container>
     </Box>

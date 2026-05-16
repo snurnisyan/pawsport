@@ -13,9 +13,9 @@ export default function PetsPage() {
       <Head>
         <title>Мои питомцы — PawsPort</title>
       </Head>
-      <AppWrapper>
-        <Stack gap="24px">
-          <Heading as="h1" size={["xl", null, "2xl"]}>
+      <AppWrapper maxW="1440px">
+        <Stack gap={["24px", "24px", "36px", "48px"]}>
+          <Heading as="h1" size={["xl", "2xl", "3xl"]}>
             Мои питомцы
           </Heading>
           <SimpleGrid columns={[1, 2, null, 3]} gap="20px">
