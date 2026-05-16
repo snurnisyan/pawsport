@@ -24,16 +24,17 @@ const PETS: TFilter[] = [
 type TFilterRowProps = {
   f: TFilter;
   checked: boolean;
+  showCircle?: boolean;
 };
 
-function FilterRow({ f, checked }: TFilterRowProps) {
+function FilterRow({ f, checked, showCircle }: TFilterRowProps) {
   return (
     <Checkbox.Root defaultChecked={checked} colorPalette="blue">
       <Checkbox.HiddenInput />
       <Checkbox.Control />
       <Checkbox.Label>
         <HStack gap="8px">
-          <Box w="8px" h="8px" rounded="full" bg={f.color} />
+          {showCircle && <Box w="8px" h="8px" rounded="full" bg={f.color} />}
           <Text fontSize="14px">{f.label}</Text>
         </HStack>
       </Checkbox.Label>
@@ -56,7 +57,7 @@ export function CalendarFilters() {
         </Text>
         <Stack gap="8px">
           {EVENT_TYPES.map((f) => (
-            <FilterRow key={f.id} f={f} checked />
+            <FilterRow key={f.id} f={f} checked showCircle />
           ))}
         </Stack>
       </Stack>

@@ -2,13 +2,12 @@ import {
   Box,
   HStack,
   Heading,
-  Icon,
   IconButton,
   Stack,
   Text,
 } from "@chakra-ui/react";
 import { LuCalendar, LuClock, LuMapPin, LuPenLine, LuPlus, LuSearch } from "react-icons/lu";
-import { PrimaryButton } from "@/components/ui/Buttons";
+import { SecondaryButton } from "@/components/ui/Buttons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TextField } from "@/components/ui/TextField";
 import type { TPetEvent, TPetEventType } from "@/store/pets";
@@ -129,12 +128,12 @@ export function EventsTab({ events }: TEventsTabProps) {
             Будущие и прошедшие события по питомцу
           </Text>
         </Stack>
-        <PrimaryButton h="44px" px="20px">
+        <SecondaryButton h="44px" px="20px">
           <HStack gap="8px">
             <LuPlus />
             <Text>Добавить событие</Text>
           </HStack>
-        </PrimaryButton>
+        </SecondaryButton>
       </HStack>
 
       <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>

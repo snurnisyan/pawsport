@@ -98,8 +98,8 @@ export function MiniMonth({ year, month, marks = {}, onDayClick }: TMiniMonthPro
                     {dayMarks.slice(0, 3).map((m, idx) => (
                       <Box
                         key={idx}
-                        w="3px"
-                        h="3px"
+                        w="6px"
+                        h="6px"
                         rounded="full"
                         bg={MARK_COLOR[m]}
                       />
