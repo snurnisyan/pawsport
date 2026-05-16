@@ -10,7 +10,7 @@ import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
   AuthResponseSchema,
-  ConfirmEmailQuerySchema,
+  ConfirmEmailRequestSchema,
   ErrorResponseSchema,
   LoginRequestSchema,
   MessageResponseSchema,
@@ -30,20 +30,13 @@ auth.route("post", "/register", {
   handlers: [register]
 });
 
-auth.route("get", "/confirm", {
+auth.route("post", "/confirm", {
   operationId: "confirmEmail",
-  summary: "Confirm a user's email",
-  request: { query: ConfirmEmailQuerySchema },
+  summary: "Confirm a user's email and issue an access token",
+  request: { body: jsonRequestBody(ConfirmEmailRequestSchema) },
   responses: {
-    302: {
-      description: "Email confirmation processed; redirects to the frontend confirmation page",
-      headers: {
-        Location: {
-          schema: { type: "string", format: "uri" },
-          description: "Frontend confirmation page URL"
-        }
-      }
-    }
+    200: jsonResponse("Email confirmed", AuthResponseSchema),
+    400: jsonResponse("Invalid or expired confirmation token", ErrorResponseSchema)
   },
   handlers: [confirmEmail]
 });

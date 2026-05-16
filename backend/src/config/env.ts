@@ -21,7 +21,6 @@ const envSchema = z
   API_PREFIX: z.string().default("/api"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
-  BACKEND_PUBLIC_URL: z.string().url().default("http://localhost:4000"),
 
   MONGODB_URI: z.string().min(1),
 
