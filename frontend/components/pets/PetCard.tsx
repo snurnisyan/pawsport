@@ -1,7 +1,8 @@
-import { AspectRatio, Box, HStack, Image, Stack, Text } from "@chakra-ui/react";
+import { AspectRatio, Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { LuArrowRight, LuCalendar } from "react-icons/lu";
 import { ChakraLink } from "@/components/ui/NextLink";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PetImage } from "@/components/pets/PetImage";
 import type { TPet } from "@/store/pets";
 
 const SEX_LABEL: Record<TPet["sex"], string> = {
@@ -30,13 +31,7 @@ export function PetCard({ pet }: TPetCardProps) {
     >
       <Box position="relative">
         <AspectRatio ratio={4 / 3}>
-          <Image
-            src={pet.imageUrl}
-            alt={pet.name}
-            objectFit="cover"
-            w="full"
-            h="full"
-          />
+          <PetImage src={pet.imageUrl} alt={pet.name} />
         </AspectRatio>
         {pet.status && (
           <Box position="absolute" top="12px" right="12px">
@@ -57,7 +52,7 @@ export function PetCard({ pet }: TPetCardProps) {
               {pet.ageLabel} · {SEX_LABEL[pet.sex]} · {pet.weightKg} кг
             </Text>
           </Stack>
-          <Box color="primary.400" mt="4px">
+          <Box color="fg.accent" mt="4px">
             <LuArrowRight />
           </Box>
         </HStack>
