@@ -7,7 +7,12 @@ import { ALLOWED_FILE_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../middleware/uplo
 import { EventModel, type IEvent } from "../models/Event";
 import { FileModel, type AllowedFileMimeType, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
-import { isMissingObjectError, s3Storage, type FileStorage } from "../storage/s3Storage";
+import {
+  getObjectDownloadUrl,
+  isMissingObjectError,
+  s3Storage,
+  type FileStorage
+} from "../storage/s3Storage";
 
 export const ALLOWED_PHOTO_MIME_TYPES = ["image/png", "image/jpeg"] as const;
 export type AllowedPhotoMimeType = (typeof ALLOWED_PHOTO_MIME_TYPES)[number];
@@ -434,6 +439,43 @@ export const uploadPetPhoto = async (
   }
 
   return { file: serializeFile(created), pet: updatedPet };
+};
+
+export interface ResolvePetPhotoUrlDependencies {
+  findFileByIdForOwner?: (
+    fileId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<Pick<FileRecord, "_id" | "storageKey"> | null>;
+  getDownloadUrl?: (key: string, expiresInSeconds?: number) => string;
+}
+
+export const resolvePetPhotoUrl = async (
+  ownerId: string,
+  photoFileId: string,
+  expiresInSeconds: number,
+  dependencies: ResolvePetPhotoUrlDependencies = {}
+): Promise<string | null> => {
+  const {
+    findFileByIdForOwner = async (id, owner) =>
+      FileModel.findOne({ _id: id, ownerId: owner })
+        .select({ _id: 1, storageKey: 1 })
+        .exec() as unknown as Pick<FileRecord, "_id" | "storageKey"> | null,
+    getDownloadUrl = getObjectDownloadUrl
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const fileObjectId = requireObjectId(
+    photoFileId,
+    "INVALID_PHOTO_FILE_ID",
+    "photoFileId must be a valid id"
+  );
+
+  const file = await findFileByIdForOwner(fileObjectId, ownerObjectId);
+  if (!file) {
+    return null;
+  }
+
+  return getDownloadUrl(file.storageKey, expiresInSeconds);
 };
 
 export const listPetFiles = async (

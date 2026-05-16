@@ -186,6 +186,21 @@ export const PetResponseSchema = z
   })
   .openapi("PetResponse");
 
+export const PetDetailSchema = PetSchema.omit({ photoFileId: true })
+  .extend({
+    photoUrl: z.string().url().optional().openapi({
+      description:
+        "Pre-signed, time-limited S3 URL for the pet photo. Can be fetched without an Authorization header until it expires."
+    })
+  })
+  .openapi("PetDetail");
+
+export const PetDetailResponseSchema = z
+  .object({
+    pet: PetDetailSchema
+  })
+  .openapi("PetDetailResponse");
+
 export const PetListResponseSchema = z
   .object({
     items: z.array(PetSchema)
