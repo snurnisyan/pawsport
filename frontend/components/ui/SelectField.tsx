@@ -40,6 +40,7 @@ export function SelectField({ label,
         <StyledSelect
           value={value ?? ""}
           onChange={(e) => onChange?.(e.target.value)}
+          disabled={disabled}
           bg="bg.field"
           borderWidth="1px"
           borderColor="border.subtle"
@@ -52,7 +53,7 @@ export function SelectField({ label,
           color={value ? "fg.default" : "fg.muted"}
           fontSize="14px"
           appearance="none"
-          cursor="pointer"
+          cursor={disabled ? "default" : "pointer"}
           outline="none"
           _hover={{ borderColor: "border.default" }}
           _focusVisible={{
