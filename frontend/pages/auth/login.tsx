@@ -115,6 +115,16 @@ export default function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
+                <Box textAlign="right" mt="-8px">
+                  <ChakraLink
+                    href="/auth/forgot-password"
+                    color="primary.400"
+                    fontSize="13px"
+                    fontWeight={600}
+                  >
+                    Забыли пароль?
+                  </ChakraLink>
+                </Box>
               </Stack>
 
               {loginMutation.isError && (
