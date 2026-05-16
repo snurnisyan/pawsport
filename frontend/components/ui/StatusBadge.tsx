@@ -5,6 +5,7 @@ type TTone = "danger" | "warning" | "success" | "info" | "purple" | "teal";
 
 type TStatusBadgeProps = {
   tone?: TTone;
+  variant?: "simple" | "bright";
   children: ReactNode;
 };
 
@@ -17,8 +18,17 @@ const STYLES: Record<TTone, { bg: string; color: string }> = {
   teal: { bg: "rgba(20, 184, 166, 0.18)", color: "#5EEAD4" },
 };
 
-export function StatusBadge({ tone = "info", children }: TStatusBadgeProps) {
-  const s = STYLES[tone];
+const STYLES_BRIGHT: Record<TTone, { bg: string; color: string }> = {
+  danger: { bg: "rgba(239, 68, 68)", color: "#FFFFFF" },
+  warning: { bg: "rgba(245, 158, 11)", color: "#FFFFFF" },
+  success: { bg: "rgba(16, 185, 129)", color: "#FFFFFF" },
+  info: { bg: "rgba(59, 130, 246)", color: "#FFFFFF" },
+  purple: { bg: "rgba(168, 85, 247)", color: "#FFFFFF" },
+  teal: { bg: "rgba(20, 184, 166)", color: "#FFFFFF" },
+};
+
+export function StatusBadge({ tone = "info", children, variant = "simple" }: TStatusBadgeProps) {
+  const s = variant === "simple" ? STYLES[tone] : STYLES_BRIGHT[tone];
   return (
     <Badge
       bg={s.bg}

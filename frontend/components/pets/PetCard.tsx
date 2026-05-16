@@ -40,7 +40,9 @@ export function PetCard({ pet }: TPetCardProps) {
         </AspectRatio>
         {pet.status && (
           <Box position="absolute" top="12px" right="12px">
-            <StatusBadge tone={pet.status.tone}>{pet.status.label}</StatusBadge>
+            <StatusBadge tone={pet.status.tone} variant={"bright"}>
+              {pet.status.label}
+            </StatusBadge>
           </Box>
         )}
       </Box>
