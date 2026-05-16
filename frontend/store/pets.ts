@@ -10,7 +10,7 @@ export type TPet = {
   name: string;
   species: "dog" | "cat" | "other";
   breed: string;
-  sex: "male" | "female";
+  sex: "male" | "female" | "unknown";
   ageLabel: string;
   weightKg: number;
   imageUrl?: string;

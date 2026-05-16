@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuArrowRight } from "react-icons/lu";
 import { PetForm, type TPetFormData } from "@/components/pets/PetForm";
 import { PrimaryButton } from "@/components/ui/Buttons";
@@ -9,10 +9,20 @@ export type { TPetFormData as TPetData };
 type TPetStepProps = {
   data: TPetFormData;
   onChange: (patch: Partial<TPetFormData>) => void;
+  isSubmitting?: boolean;
+  errorText?: string;
   onNext: () => void;
 };
 
-export function PetStep({ data, onChange, onNext }: TPetStepProps) {
+export function PetStep({
+  data,
+  onChange,
+  isSubmitting = false,
+  errorText,
+  onNext,
+}: TPetStepProps) {
+  const canSubmit = Boolean(data.name.trim() && data.species && !isSubmitting);
+
   return (
     <VStack gap="32px" align="stretch" w="full" maxW="640px" mx="auto">
       <VStack gap="8px" align="center">
@@ -25,7 +35,21 @@ export function PetStep({ data, onChange, onNext }: TPetStepProps) {
 
       <PetForm data={data} onChange={onChange} />
 
-      <PrimaryButton onClick={onNext}>
+      {errorText && (
+        <Box
+          bg="red.950"
+          borderWidth="1px"
+          borderColor="red.700"
+          color="red.100"
+          rounded="field"
+          px="14px"
+          py="10px"
+        >
+          <Text fontSize="13px">{errorText}</Text>
+        </Box>
+      )}
+
+      <PrimaryButton onClick={onNext} disabled={!canSubmit} loading={isSubmitting}>
         <HStack gap="8px">
           <Text>Далее</Text>
           <LuArrowRight />

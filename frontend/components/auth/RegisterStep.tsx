@@ -1,6 +1,6 @@
-import { Box, HStack, Icon, IconButton, Stack, Text, VStack } from "@chakra-ui/react";
+import { Box, Checkbox, HStack, IconButton, Stack, Text, VStack } from "@chakra-ui/react";
 import { ChakraLink } from "@/components/ui/NextLink";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { LuArrowRight, LuEye, LuEyeOff, LuLock, LuMail } from "react-icons/lu";
 import PawIcon from "@/icons/paw.svg";
 import { Card } from "@/components/ui/Card";
@@ -11,12 +11,29 @@ import { TextField } from "@/components/ui/TextField";
 type TRegisterStepProps = {
   email: string;
   password: string;
-  onChange: (patch: { email?: string; password?: string }) => void;
+  personalDataConsent: boolean;
+  isSubmitting?: boolean;
+  errorText?: string;
+  onChange: (patch: { email?: string; password?: string; personalDataConsent?: boolean }) => void;
   onNext: () => void;
 };
 
-export function RegisterStep({ email, password, onChange, onNext }: TRegisterStepProps) {
+export function RegisterStep({
+  email,
+  password,
+  personalDataConsent,
+  isSubmitting = false,
+  errorText,
+  onChange,
+  onNext,
+}: TRegisterStepProps) {
   const [showPwd, setShowPwd] = useState(false);
+  const canSubmit = Boolean(email.trim() && password && personalDataConsent && !isSubmitting);
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (canSubmit) onNext();
+  };
 
   return (
     <VStack gap="32px">
@@ -45,7 +62,7 @@ export function RegisterStep({ email, password, onChange, onNext }: TRegisterSte
       </VStack>
 
       <Card w="full" maxW="420px" p={["20px", null, "24px"]}>
-        <VStack gap="20px" align="stretch">
+        <VStack as="form" gap="20px" align="stretch" onSubmit={handleSubmit}>
           <StepProgress current={1} total={3} />
           <Text fontSize="24px" fontWeight={700}>
             Регистрация
@@ -79,7 +96,35 @@ export function RegisterStep({ email, password, onChange, onNext }: TRegisterSte
               onChange={(e) => onChange({ password: e.target.value })}
             />
           </Stack>
-          <PrimaryButton onClick={onNext}>
+          <Checkbox.Root
+            checked={personalDataConsent}
+            onCheckedChange={(details) =>
+              onChange({ personalDataConsent: Boolean(details.checked) })
+            }
+            colorPalette="blue"
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label>
+              <Text fontSize="13px" color="fg.muted">
+                Я согласен на обработку персональных данных
+              </Text>
+            </Checkbox.Label>
+          </Checkbox.Root>
+          {errorText && (
+            <Box
+              bg="red.950"
+              borderWidth="1px"
+              borderColor="red.700"
+              color="red.100"
+              rounded="field"
+              px="14px"
+              py="10px"
+            >
+              <Text fontSize="13px">{errorText}</Text>
+            </Box>
+          )}
+          <PrimaryButton type="submit" disabled={!canSubmit} loading={isSubmitting}>
             <HStack gap="8px">
               <Text>Далее к созданию питомца</Text>
               <LuArrowRight />

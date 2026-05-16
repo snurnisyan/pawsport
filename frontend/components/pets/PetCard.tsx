@@ -11,6 +11,7 @@ import type { TPet } from "@/store/pets";
 const SEX_LABEL: Record<TPet["sex"], string> = {
   male: "Мальчик",
   female: "Девочка",
+  unknown: "Пол не указан",
 };
 
 const RECURRING_LABEL: Record<"vaccine" | "treatment", string> = {
@@ -81,7 +82,8 @@ export function PetCard({ pet }: TPetCardProps) {
                 {pet.name}
               </Text>
               <Text fontSize="14px" color="fg.muted">
-                {pet.ageLabel} · {SEX_LABEL[pet.sex]} · {pet.weightKg} кг
+                {pet.ageLabel} · {SEX_LABEL[pet.sex]}
+                {pet.weightKg > 0 ? ` · ${pet.weightKg} кг` : ""}
               </Text>
             </Stack>
             <Box color="fg.accent" mt="4px">
