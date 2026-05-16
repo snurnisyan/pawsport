@@ -25,8 +25,8 @@ export function TextField({ label,
       borderColor="border.subtle"
       rounded="field"
       h="48px"
-      ps={hasStart ? "52px" : 4}
-      pe={hasEnd ? "52px" : 4}
+      ps={hasStart ? ["40px", "52px"] : "16px"}
+      pe={hasEnd ? "52px" : "16px"}
       color="fg.default"
       _placeholder={{ color: "fg.muted" }}
       _hover={{ borderColor: "border.default" }}
