@@ -9,6 +9,9 @@ import { FileModel, type AllowedFileMimeType, type IStoredFile } from "../models
 import { PetModel, type IPet } from "../models/Pet";
 import { isMissingObjectError, s3Storage, type FileStorage } from "../storage/s3Storage";
 
+export const ALLOWED_PHOTO_MIME_TYPES = ["image/png", "image/jpeg"] as const;
+export type AllowedPhotoMimeType = (typeof ALLOWED_PHOTO_MIME_TYPES)[number];
+
 export interface UploadedFileInput {
   originalname: string;
   mimetype: string;
@@ -240,6 +243,197 @@ export const uploadPetFile = async (
   });
 
   return serializeFile(created);
+};
+
+export interface UploadPetPhotoInput {
+  file?: UploadedFileInput;
+}
+
+export type PetPhotoPetRecord = Pick<
+  IPet,
+  | "_id"
+  | "ownerId"
+  | "name"
+  | "species"
+  | "breed"
+  | "birthDate"
+  | "sex"
+  | "weight"
+  | "photoFileId"
+  | "microchipNumber"
+  | "tags"
+  | "notes"
+  | "vetContact"
+  | "createdAt"
+  | "updatedAt"
+>;
+
+export interface UploadPetPhotoResult {
+  file: SerializedFile;
+  pet: PetPhotoPetRecord;
+}
+
+export interface UploadPetPhotoDependencies {
+  storage?: FileStorage;
+  findPetWithPhotoForOwner?: (
+    petId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<PetPhotoPetRecord | null>;
+  createFileRecord?: (input: CreateFilePersistInput) => Promise<FileRecord>;
+  setPetPhoto?: (
+    petId: Types.ObjectId,
+    ownerId: Types.ObjectId,
+    photoFileId: Types.ObjectId
+  ) => Promise<PetPhotoPetRecord | null>;
+  findFileByIdForOwner?: (
+    fileId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<FileRecord | null>;
+  deleteFileRecord?: (
+    fileId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<FileRecord | null>;
+  now?: () => Date;
+}
+
+const isAllowedPhotoMimeType = (mimeType: string): mimeType is AllowedPhotoMimeType =>
+  (ALLOWED_PHOTO_MIME_TYPES as readonly string[]).includes(mimeType);
+
+const PET_PHOTO_FIELDS = {
+  _id: 1,
+  ownerId: 1,
+  name: 1,
+  species: 1,
+  breed: 1,
+  birthDate: 1,
+  sex: 1,
+  weight: 1,
+  photoFileId: 1,
+  microchipNumber: 1,
+  tags: 1,
+  notes: 1,
+  vetContact: 1,
+  createdAt: 1,
+  updatedAt: 1
+} as const;
+
+const defaultFindPetWithPhoto: NonNullable<
+  UploadPetPhotoDependencies["findPetWithPhotoForOwner"]
+> = async (petId, ownerId) =>
+  PetModel.findOne({ _id: petId, ownerId })
+    .select(PET_PHOTO_FIELDS)
+    .exec() as Promise<PetPhotoPetRecord | null>;
+
+const defaultSetPetPhoto: NonNullable<UploadPetPhotoDependencies["setPetPhoto"]> = async (
+  petId,
+  ownerId,
+  photoFileId
+) =>
+  PetModel.findOneAndUpdate(
+    { _id: petId, ownerId },
+    { $set: { photoFileId } },
+    { new: true, projection: PET_PHOTO_FIELDS }
+  ).exec() as Promise<PetPhotoPetRecord | null>;
+
+export const uploadPetPhoto = async (
+  ownerId: string,
+  petId: string,
+  input: UploadPetPhotoInput,
+  dependencies: UploadPetPhotoDependencies = {}
+): Promise<UploadPetPhotoResult> => {
+  const {
+    storage = s3Storage,
+    findPetWithPhotoForOwner = defaultFindPetWithPhoto,
+    createFileRecord = async (payload) => FileModel.create(payload) as unknown as FileRecord,
+    setPetPhoto = defaultSetPetPhoto,
+    findFileByIdForOwner = async (id, owner) =>
+      FileModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
+    deleteFileRecord = async (id, owner) =>
+      FileModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
+    now = () => new Date()
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const petObjectId = requireObjectId(petId, "INVALID_PET_ID", "petId must be a valid id");
+  const file = input.file;
+
+  if (!file) {
+    throw new AppError(400, "FILE_REQUIRED", "file is required");
+  }
+  if (!isAllowedPhotoMimeType(file.mimetype)) {
+    throw new AppError(
+      400,
+      "UNSUPPORTED_PHOTO_TYPE",
+      "Pet photo must be image/png or image/jpeg"
+    );
+  }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new AppError(400, "FILE_TOO_LARGE", "file exceeds the maximum allowed size");
+  }
+  if (file.size <= 0) {
+    throw new AppError(400, "EMPTY_FILE", "file must not be empty");
+  }
+
+  const existingPet = await findPetWithPhotoForOwner(petObjectId, ownerObjectId);
+  if (!existingPet) {
+    throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+  }
+  const previousPhotoFileId = existingPet.photoFileId;
+
+  const fileObjectId = new Types.ObjectId();
+  const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, file.originalname);
+  const uploadedAt = now();
+
+  try {
+    await storage.putObject({
+      key: storageKey,
+      body: file.buffer,
+      contentType: file.mimetype
+    });
+  } catch (error) {
+    throw toStorageError(error, "FILE_STORAGE_PUT_FAILED", "Could not upload file to storage");
+  }
+
+  const created = await createFileRecord({
+    _id: fileObjectId,
+    ownerId: ownerObjectId,
+    petId: petObjectId,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    sizeBytes: file.size,
+    storageKey,
+    uploadedAt
+  });
+
+  const updatedPet = await setPetPhoto(petObjectId, ownerObjectId, fileObjectId);
+  if (!updatedPet) {
+    // Pet was deleted between read and write — roll back the just-uploaded photo.
+    await deleteFileRecord(fileObjectId, ownerObjectId);
+    try {
+      await storage.deleteObject({ key: storageKey });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+      }
+    }
+    throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+  }
+
+  if (previousPhotoFileId && !previousPhotoFileId.equals(fileObjectId)) {
+    const previous = await findFileByIdForOwner(previousPhotoFileId, ownerObjectId);
+    if (previous) {
+      try {
+        await storage.deleteObject({ key: previous.storageKey });
+      } catch (error) {
+        if (!isMissingObjectError(error)) {
+          throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+        }
+      }
+      await deleteFileRecord(previousPhotoFileId, ownerObjectId);
+    }
+  }
+
+  return { file: serializeFile(created), pet: updatedPet };
 };
 
 export const listPetFiles = async (
