@@ -36,6 +36,7 @@ yarn-error.log*
 !.env.test
 .cert/
 .smtp/
+.tasks/
 
 # OS
 .DS_Store
@@ -55,3 +56,5 @@ Thumbs.db
 
 # Misc
 *.pem
+backend/mockups/
+backend/scripts/smoke-*.ts

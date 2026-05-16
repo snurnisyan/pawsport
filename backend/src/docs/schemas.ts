@@ -166,6 +166,18 @@ export const CreatePetRequestSchema = PetMutableSchema.extend({
   notes: z.array(z.string()).default([])
 }).openapi("CreatePetRequest");
 
+export const CreatePetMultipartRequestSchema = z
+  .object({
+    pet: z.string().openapi({
+      description: "JSON-encoded CreatePetRequest payload (omit photoFileId when sending photo)."
+    }),
+    photo: z.string().openapi({
+      format: "binary",
+      description: "Optional pet photo (image/png or image/jpeg). When set, replaces photoFileId."
+    })
+  })
+  .openapi("CreatePetMultipartRequest");
+
 export const UpdatePetRequestSchema = PetMutableSchema.partial().openapi("UpdatePetRequest");
 
 export const PetResponseSchema = z

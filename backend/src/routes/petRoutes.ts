@@ -2,12 +2,15 @@ import { createPet, deletePet, getPet, listPets, updatePet } from "../controller
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
+  CreatePetMultipartRequestSchema,
   CreatePetRequestSchema,
   IdPathParamsSchema,
   PetListResponseSchema,
   PetResponseSchema,
   UpdatePetRequestSchema
 } from "../docs/schemas";
+import { upload } from "../middleware/uploadMiddleware";
+import { multipartOnly } from "../middleware/multipartOnly";
 
 const pets = createDocumentedRouter({ basePath: "/pets", tags: ["Pets"], auth: true });
 
@@ -20,10 +23,18 @@ pets.route("get", "/", {
 
 pets.route("post", "/", {
   operationId: "createPet",
-  summary: "Create a pet profile",
-  request: { body: jsonRequestBody(CreatePetRequestSchema) },
+  summary: "Create a pet profile (optionally with an inline photo via multipart/form-data)",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: CreatePetRequestSchema },
+        "multipart/form-data": { schema: CreatePetMultipartRequestSchema }
+      }
+    }
+  },
   responses: { 201: jsonResponse("Pet created", PetResponseSchema) },
-  handlers: [createPet]
+  handlers: [multipartOnly(upload.single("photo")), createPet]
 });
 
 pets.route("get", "/:id", {
