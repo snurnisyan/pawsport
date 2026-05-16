@@ -260,6 +260,11 @@ export const EventResponseSchema = z
   })
   .openapi("EventResponse");
 
+export const DateRangeQuerySchema = z.object({
+  from: DateSchema.optional(),
+  to: DateSchema.optional()
+});
+
 export const EventListResponseSchema = z
   .object({
     items: z.array(EventSchema)
@@ -369,9 +374,7 @@ export const ReminderListResponseSchema = z
   })
   .openapi("ReminderListResponse");
 
-export const CalendarQuerySchema = z.object({
-  from: DateSchema.optional(),
-  to: DateSchema.optional(),
+export const CalendarQuerySchema = DateRangeQuerySchema.extend({
   petIds: z.array(ObjectIdSchema).optional().openapi({
     description: "Pet ids to include. Omit or pass an empty list to include all pets."
   }),

@@ -10,10 +10,20 @@ const requireUserId = (req: AuthenticatedRequest): string => {
   return req.user.id;
 };
 
-export const listPetEvents = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const items = await eventService.listPetEvents(requireUserId(req), req.params.id);
-  res.status(200).json({ items });
-});
+export interface ListPetEventsHandlerDependencies {
+  listPetEvents?: typeof eventService.listPetEvents;
+}
+
+export const listPetEventsHandler = (dependencies: ListPetEventsHandlerDependencies = {}) => {
+  const { listPetEvents: listPetEventsFn = eventService.listPetEvents } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const items = await listPetEventsFn(requireUserId(req), req.params.id, req.query ?? {});
+    res.status(200).json({ items });
+  });
+};
+
+export const listPetEvents = listPetEventsHandler();
 
 export const createPetEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
   const event = await eventService.createPetEvent(

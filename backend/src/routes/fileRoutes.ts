@@ -8,6 +8,7 @@ import {
 import { createDocumentedRouter } from "../docs/route";
 import { jsonResponse } from "../docs/routeContent";
 import {
+  DateRangeQuerySchema,
   FileListResponseSchema,
   FileResponseSchema,
   IdPathParamsSchema,
@@ -34,7 +35,7 @@ const petFiles = createDocumentedRouter({
 petFiles.route("get", "/", {
   operationId: "listPetFiles",
   summary: "List files attached to a pet",
-  request: { params: IdPathParamsSchema },
+  request: { params: IdPathParamsSchema, query: DateRangeQuerySchema },
   responses: { 200: jsonResponse("File list", FileListResponseSchema) },
   handlers: [listPetFiles]
 });

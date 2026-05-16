@@ -3,6 +3,7 @@ import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
   CreateEventRequestSchema,
+  DateRangeQuerySchema,
   EventListResponseSchema,
   EventResponseSchema,
   IdPathParamsSchema,
@@ -19,7 +20,7 @@ const petEvents = createDocumentedRouter({
 petEvents.route("get", "/", {
   operationId: "listPetEvents",
   summary: "List events for a pet",
-  request: { params: IdPathParamsSchema },
+  request: { params: IdPathParamsSchema, query: DateRangeQuerySchema },
   responses: { 200: jsonResponse("Event list", EventListResponseSchema) },
   handlers: [listPetEvents]
 });

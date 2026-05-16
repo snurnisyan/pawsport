@@ -13,6 +13,11 @@ import {
   s3Storage,
   type FileStorage
 } from "../storage/s3Storage";
+import {
+  parseOptionalDateRange,
+  type DateRangeQuery,
+  type OptionalDateRange
+} from "./dateRange";
 
 export const ALLOWED_PHOTO_MIME_TYPES = ["image/png", "image/jpeg"] as const;
 export type AllowedPhotoMimeType = (typeof ALLOWED_PHOTO_MIME_TYPES)[number];
@@ -84,12 +89,33 @@ export interface FileServiceDependencies {
   findPetByIdForOwner?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
   findEventByIdForOwner?: (eventId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<EventRecord | null>;
   createFileRecord?: (input: CreateFilePersistInput) => Promise<FileRecord>;
-  listFilesForPet?: (ownerId: Types.ObjectId, petId: Types.ObjectId) => Promise<FileRecord[]>;
+  listFilesForPet?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId,
+    range: OptionalDateRange
+  ) => Promise<FileRecord[]>;
   findFileByIdForOwner?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<FileRecord | null>;
   deleteFileRecord?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<FileRecord | null>;
   removeFileIdFromEvents?: (fileId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<void>;
   now?: () => Date;
 }
+
+const isFileServiceDependencies = (
+  value: DateRangeQuery | FileServiceDependencies
+): value is FileServiceDependencies => {
+  const candidate = value as FileServiceDependencies;
+  return (
+    candidate.storage !== undefined ||
+    typeof candidate.findPetByIdForOwner === "function" ||
+    typeof candidate.findEventByIdForOwner === "function" ||
+    typeof candidate.createFileRecord === "function" ||
+    typeof candidate.listFilesForPet === "function" ||
+    typeof candidate.findFileByIdForOwner === "function" ||
+    typeof candidate.deleteFileRecord === "function" ||
+    typeof candidate.removeFileIdFromEvents === "function" ||
+    typeof candidate.now === "function"
+  );
+};
 
 const requireOwnerId = (ownerId: string): Types.ObjectId => {
   if (!isValidObjectId(ownerId)) {
@@ -481,25 +507,41 @@ export const resolvePetPhotoUrl = async (
 export const listPetFiles = async (
   ownerId: string,
   petId: string,
-  dependencies: FileServiceDependencies = {}
+  queryOrDependencies: DateRangeQuery | FileServiceDependencies = {},
+  maybeDependencies?: FileServiceDependencies
 ): Promise<SerializedFile[]> => {
+  const thirdArgumentIsDependencies = isFileServiceDependencies(queryOrDependencies);
+  const query = maybeDependencies
+    ? (queryOrDependencies as DateRangeQuery)
+    : thirdArgumentIsDependencies
+      ? {}
+      : (queryOrDependencies as DateRangeQuery);
+  const dependencies = maybeDependencies ?? (thirdArgumentIsDependencies ? queryOrDependencies : {});
   const {
     findPetByIdForOwner = defaultFindPet,
-    listFilesForPet = async (owner, pet) =>
-      FileModel.find({ ownerId: owner, petId: pet })
+    listFilesForPet = async (owner, pet, range) => {
+      const filter: Record<string, unknown> = { ownerId: owner, petId: pet };
+      const uploadedAt: Record<string, Date> = {};
+      if (range.from) uploadedAt.$gte = range.from;
+      if (range.to) uploadedAt.$lte = range.to;
+      if (Object.keys(uploadedAt).length > 0) filter.uploadedAt = uploadedAt;
+
+      return FileModel.find(filter)
         .sort({ uploadedAt: -1 })
-        .exec() as unknown as FileRecord[]
+        .exec() as unknown as FileRecord[];
+    }
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const petObjectId = requireObjectId(petId, "INVALID_PET_ID", "petId must be a valid id");
+  const range = parseOptionalDateRange(query);
 
   const pet = await findPetByIdForOwner(petObjectId, ownerObjectId);
   if (!pet) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
 
-  const files = await listFilesForPet(ownerObjectId, petObjectId);
+  const files = await listFilesForPet(ownerObjectId, petObjectId, range);
   return files.map(serializeFile);
 };
 

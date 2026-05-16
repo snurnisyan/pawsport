@@ -340,6 +340,70 @@ test("listPetEvents filters by owner+pet and returns serialized events sorted de
   assert.equal(result[0].eventDate, "2026-07-01T00:00:00.000Z");
 });
 
+test("listPetEvents passes an optional from/to eventDate range to the repository", async () => {
+  let observedRange: { from?: Date; to?: Date } | undefined;
+
+  const result = await listPetEvents(
+    ownerId,
+    petId,
+    { from: "2026-05-01", to: "2026-05-31" },
+    {
+      findPetByIdForOwner: petFound,
+      listEventsForOwnerPet: async (_owner, _pet, range) => {
+        observedRange = range;
+        return [];
+      }
+    }
+  );
+
+  assert.deepEqual(result, []);
+  assert.equal(observedRange?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
+  assert.equal(observedRange?.to?.toISOString(), "2026-05-31T23:59:59.999Z");
+});
+
+test("listPetEvents leaves missing date bounds unrestricted", async () => {
+  let observedRange: { from?: Date; to?: Date } | undefined;
+
+  await listPetEvents(
+    ownerId,
+    petId,
+    { from: "2026-05-01" },
+    {
+      findPetByIdForOwner: petFound,
+      listEventsForOwnerPet: async (_owner, _pet, range) => {
+        observedRange = range;
+        return [];
+      }
+    }
+  );
+
+  assert.equal(observedRange?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
+  assert.equal(observedRange?.to, undefined);
+});
+
+test("listPetEvents rejects an inverted date range", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { from: "2026-06-01", to: "2026-05-01" },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_RANGE");
+      return true;
+    }
+  );
+});
+
 test("listPetEvents returns 404 when pet does not belong to owner", async () => {
   await assert.rejects(
     () =>
