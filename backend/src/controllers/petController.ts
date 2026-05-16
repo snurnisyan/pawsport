@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as fileService from "../services/fileService";
 import * as petService from "../services/petService";
+import { serializePetForApi, serializePetsForApi } from "./petResponse";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
   if (!req.user) {
@@ -11,10 +12,25 @@ const requireUserId = (req: AuthenticatedRequest): string => {
   return req.user.id;
 };
 
-export const listPets = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const items = await petService.listPets(requireUserId(req));
-  res.status(200).json({ items });
-});
+export interface ListPetsHandlerDependencies {
+  listPets?: typeof petService.listPets;
+  resolvePetPhotoUrl?: typeof fileService.resolvePetPhotoUrl;
+}
+
+export const listPetsHandler = (dependencies: ListPetsHandlerDependencies = {}) => {
+  const {
+    listPets: listPetsFn = petService.listPets,
+    resolvePetPhotoUrl = fileService.resolvePetPhotoUrl
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const items = await listPetsFn(userId);
+    res.status(200).json({ items: await serializePetsForApi(userId, items, resolvePetPhotoUrl) });
+  });
+};
+
+export const listPets = listPetsHandler();
 
 export const parsePetFieldsFromMultipart = (raw: unknown): Record<string, unknown> => {
   if (raw === undefined || raw === null || raw === "") {
@@ -38,6 +54,7 @@ export const parsePetFieldsFromMultipart = (raw: unknown): Record<string, unknow
 export interface CreatePetHandlerDependencies {
   createPet?: typeof petService.createPet;
   deletePet?: typeof petService.deletePet;
+  resolvePetPhotoUrl?: typeof fileService.resolvePetPhotoUrl;
   serializePet?: typeof petService.serializePet;
   uploadPetPhoto?: typeof fileService.uploadPetPhoto;
 }
@@ -46,6 +63,7 @@ export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}
   const {
     createPet = petService.createPet,
     deletePet = petService.deletePet,
+    resolvePetPhotoUrl = fileService.resolvePetPhotoUrl,
     serializePet = petService.serializePet,
     uploadPetPhoto = fileService.uploadPetPhoto
   } = dependencies;
@@ -68,7 +86,7 @@ export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}
     const pet = await createPet(userId, petInput);
 
     if (!photoFile) {
-      res.status(201).json({ pet });
+      res.status(201).json({ pet: await serializePetForApi(userId, pet, resolvePetPhotoUrl) });
       return;
     }
 
@@ -76,7 +94,10 @@ export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}
       const { pet: petWithPhoto } = await uploadPetPhoto(userId, pet.id, {
         file: photoFile
       });
-      res.status(201).json({ pet: serializePet(petWithPhoto) });
+      const serializedPet = serializePet(petWithPhoto);
+      res.status(201).json({
+        pet: await serializePetForApi(userId, serializedPet, resolvePetPhotoUrl)
+      });
     } catch (error) {
       try {
         await deletePet(userId, pet.id);
@@ -89,11 +110,6 @@ export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}
 };
 
 export const createPet = createPetHandler();
-
-// Pet photos are not sensitive (just pictures) and the same pet detail page is
-// the only place that surfaces the URL, so we sign with the AWS SigV4 maximum
-// to maximise browser cache reuse and minimise re-signing overhead.
-const PET_PHOTO_URL_EXPIRES_SECONDS = 7 * 24 * 60 * 60;
 
 export interface GetPetHandlerDependencies {
   getPet?: typeof petService.getPet;
@@ -110,23 +126,33 @@ export const getPetHandler = (dependencies: GetPetHandlerDependencies = {}) => {
     const userId = requireUserId(req);
     const pet = await getPetFn(userId, req.params.id);
 
-    const { photoFileId, ...rest } = pet;
-    const photoUrl = photoFileId
-      ? await resolvePetPhotoUrl(userId, photoFileId, PET_PHOTO_URL_EXPIRES_SECONDS)
-      : null;
-
     res.status(200).json({
-      pet: photoUrl ? { ...rest, photoUrl } : rest
+      pet: await serializePetForApi(userId, pet, resolvePetPhotoUrl)
     });
   });
 };
 
 export const getPet = getPetHandler();
 
-export const updatePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const pet = await petService.updatePet(requireUserId(req), req.params.id, req.body ?? {});
-  res.status(200).json({ pet });
-});
+export interface UpdatePetHandlerDependencies {
+  updatePet?: typeof petService.updatePet;
+  resolvePetPhotoUrl?: typeof fileService.resolvePetPhotoUrl;
+}
+
+export const updatePetHandler = (dependencies: UpdatePetHandlerDependencies = {}) => {
+  const {
+    updatePet: updatePetFn = petService.updatePet,
+    resolvePetPhotoUrl = fileService.resolvePetPhotoUrl
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const pet = await updatePetFn(userId, req.params.id, req.body ?? {});
+    res.status(200).json({ pet: await serializePetForApi(userId, pet, resolvePetPhotoUrl) });
+  });
+};
+
+export const updatePet = updatePetHandler();
 
 export const deletePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
   await petService.deletePet(requireUserId(req), req.params.id);
