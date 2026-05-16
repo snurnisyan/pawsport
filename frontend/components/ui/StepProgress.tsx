@@ -17,14 +17,14 @@ export function StepProgress({ current, total }: TStepProgressProps) {
       >
         Шаг {current} из {total}
       </Text>
-      <HStack gap="8px" w="full" maxW="320px">
+      <HStack gap="8px" w="full">
         {Array.from({ length: total }).map((_, i) => (
           <Box
             key={i}
             flex={1}
-            h="3px"
+            h="6px"
             rounded="full"
-            bg={i < current ? "primary.400" : "secondary.500"}
+            bg={i < current ? "fg.accent" : "secondary.500"}
           />
         ))}
       </HStack>

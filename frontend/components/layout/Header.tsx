@@ -32,14 +32,14 @@ function NavTab({ item, active }: TNavTabProps) {
       py="8px"
       rounded="12px"
       fontSize="14px"
-      fontWeight={500}
+      fontWeight={600}
       color={active ? "fg.accent" : "fg.muted"}
       bg={active ? "secondary.700" : "transparent"}
       _hover={{ color: "fg.accent", bg: "secondary.700" }}
       transition="all 0.15s"
     >
       <Box fontSize="16px">{item.icon}</Box>
-      <Text display={{ base: "none", sm: "block" }}>{item.label}</Text>
+      <Text display={["none", "block"]}>{item.label}</Text>
     </ChakraLink>
   );
 }
@@ -68,7 +68,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
         py="18px"
         gap="16px"
       >
-        <Flex gap="32px">
+        <Flex gap={["20px", "20px", "32px"]}>
           <Logo />
           <Flex gap="4px">
             {NAV.map((item) => (
@@ -81,8 +81,9 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
           </Flex>
         </Flex>
 
-        <HStack gap="12px">
+        <Flex gap="12px" alignItems="center">
           <IconButton
+            display={["none", "flex"]}
             aria-label="Уведомления"
             variant="ghost"
             size="sm"
@@ -94,7 +95,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
           <Text
             fontSize="14px"
             color="fg.muted"
-            display={{ base: "none", sm: "block" }}
+            display={["none", "block"]}
           >
             {userEmail}
           </Text>
@@ -103,26 +104,11 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
             variant="ghost"
             size="sm"
             color="fg.muted"
-            display={{ base: "inline-flex", md: "none" }}
+            display={["inline-flex", null, "none"]}
           >
             <LuMenu />
           </IconButton>
-        </HStack>
-      </Flex>
-      <Flex
-        gap="8px"
-        px="16px"
-        pb="12px"
-        display={{ base: "flex", md: "none" }}
-        overflowX="auto"
-      >
-        {NAV.map((item) => (
-          <NavTab
-            key={item.href}
-            item={item}
-            active={router.pathname.startsWith(item.href)}
-          />
-        ))}
+        </Flex>
       </Flex>
     </Box>
   );

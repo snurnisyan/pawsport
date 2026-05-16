@@ -30,7 +30,7 @@ export function SegmentedTabs({ tabs, value, onChange }: TSegmentedTabsProps) {
               key={tab.value}
               type="button"
               onClick={() => onChange(tab.value)}
-              px={{ base: "20px", md: "32px" }}
+              px={["20px", null, "32px"]}
               py="10px"
               rounded="full"
               bg={active ? "primary.500" : "transparent"}

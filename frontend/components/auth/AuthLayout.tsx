@@ -27,9 +27,9 @@ export function AuthLayout({ children,
           w="100%"
         >
           <HStack
-            maxW="1280px"
+            w="100%"
             mx="auto"
-            px={{ base: "16px", md: "24px" }}
+            px={["16px", null, "24px"]}
             py="12px"
             gap="12px"
           >
@@ -38,8 +38,9 @@ export function AuthLayout({ children,
                 aria-label="Назад"
                 variant="ghost"
                 size="sm"
-                color="primary.400"
+                color="fg.accent"
                 onClick={onBack}
+                _hover={{ color: "fg.default", bg: "secondary.700" }}
               >
                 <LuArrowLeft />
               </IconButton>
@@ -53,8 +54,8 @@ export function AuthLayout({ children,
         w="100%"
         align="center"
         justify="center"
-        px={{ base: "16px", md: "24px" }}
-        py={{ base: "32px", md: "48px" }}
+        px={["16px", null, "24px"]}
+        py={["32px"]}
       >
         <Box w="100%" maxW="640px">
           {children}

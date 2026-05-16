@@ -21,7 +21,7 @@ export function Logo({ href = "/pets", size = "md" }: TLogoProps) {
       <Icon boxSize={iconSize}>
         <PawIcon />
       </Icon>
-      <Text fontSize={fontSize} fontWeight={700}>
+      <Text fontSize={fontSize} fontWeight={700} color={"fg.accent"}>
         PawsPort
       </Text>
     </ChakraLink>
