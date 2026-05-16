@@ -1,11 +1,19 @@
-import { deleteFile, downloadFile, listPetFiles, uploadPetFile } from "../controllers/fileController";
+import {
+  deleteFile,
+  downloadFile,
+  listPetFiles,
+  uploadPetFile,
+  uploadPetPhoto
+} from "../controllers/fileController";
 import { createDocumentedRouter } from "../docs/route";
 import { jsonResponse } from "../docs/routeContent";
 import {
   FileListResponseSchema,
   FileResponseSchema,
   IdPathParamsSchema,
-  UploadPetFileRequestSchema
+  PetPhotoResponseSchema,
+  UploadPetFileRequestSchema,
+  UploadPetPhotoRequestSchema
 } from "../docs/schemas";
 import { upload } from "../middleware/uploadMiddleware";
 
@@ -45,6 +53,29 @@ petFiles.route("post", "/", {
   handlers: [upload.single("file"), uploadPetFile]
 });
 
+const petPhoto = createDocumentedRouter({
+  basePath: "/pets/:id/photo",
+  tags: ["Pets"],
+  auth: true,
+  mergeParams: true
+});
+
+petPhoto.route("post", "/", {
+  operationId: "uploadPetPhoto",
+  summary: "Upload and set the pet's profile photo in a single request",
+  request: {
+    params: IdPathParamsSchema,
+    body: {
+      required: true,
+      content: { "multipart/form-data": { schema: UploadPetPhotoRequestSchema } }
+    }
+  },
+  responses: {
+    201: jsonResponse("Photo uploaded and attached to the pet", PetPhotoResponseSchema)
+  },
+  handlers: [upload.single("file"), uploadPetPhoto]
+});
+
 const files = createDocumentedRouter({ basePath: "/files", tags: ["Files"], auth: true });
 
 files.route("get", "/:id/download", {
@@ -64,4 +95,5 @@ files.route("delete", "/:id", {
 });
 
 export const petFileRoutes = petFiles.router;
+export const petPhotoRoutes = petPhoto.router;
 export const fileRoutes = files.router;

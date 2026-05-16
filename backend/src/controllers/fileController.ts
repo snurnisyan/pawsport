@@ -2,6 +2,7 @@ import { AppError } from "../middleware/errorHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as fileService from "../services/fileService";
+import { serializePet } from "../services/petService";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
   if (!req.user) {
@@ -26,6 +27,13 @@ export const uploadPetFile = asyncHandler(async (req: AuthenticatedRequest, res)
     eventId: req.body?.eventId
   });
   res.status(201).json({ file });
+});
+
+export const uploadPetPhoto = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const { file, pet } = await fileService.uploadPetPhoto(requireUserId(req), req.params.id, {
+    file: req.file
+  });
+  res.status(201).json({ file, pet: serializePet(pet) });
 });
 
 export const downloadFile = asyncHandler(async (req: AuthenticatedRequest, res) => {

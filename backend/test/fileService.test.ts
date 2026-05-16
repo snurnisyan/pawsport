@@ -13,7 +13,9 @@ import {
   listPetFiles,
   serializeFile,
   uploadPetFile,
+  uploadPetPhoto,
   validateFileIdsForPet,
+  type PetPhotoPetRecord,
   type UploadedFileInput
 } from "../src/services/fileService";
 import type { FileStorage } from "../src/storage/s3Storage";
@@ -647,6 +649,236 @@ test("deleteAllFilesForPet tolerates already-missing storage objects", async () 
   });
 
   assert.equal(metadataDeleted, true);
+});
+
+const makePetWithPhoto = (
+  overrides: Partial<PetPhotoPetRecord> = {}
+): PetPhotoPetRecord => ({
+  _id: new Types.ObjectId(petId),
+  ownerId: new Types.ObjectId(ownerId),
+  name: "Cooper",
+  species: "dog",
+  sex: "male",
+  tags: [],
+  notes: [],
+  createdAt,
+  updatedAt,
+  ...overrides
+});
+
+const makePhotoUpload = (overrides: Partial<UploadedFileInput> = {}): UploadedFileInput => ({
+  originalname: "cooper.jpg",
+  mimetype: "image/jpeg",
+  size: 1234,
+  buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+  ...overrides
+});
+
+test("uploadPetPhoto uploads to storage, creates file record, and sets pet.photoFileId", async () => {
+  let stored: { key: string; body: Buffer; contentType: string } | undefined;
+  let setPhotoCall: { petId: string; ownerId: string; photoFileId: string } | undefined;
+
+  const result = await uploadPetPhoto(
+    ownerId,
+    petId,
+    { file: makePhotoUpload() },
+    {
+      storage: makeStorage({
+        putObject: async (input) => {
+          stored = input;
+        }
+      }),
+      findPetWithPhotoForOwner: async (id, owner) => {
+        assert.equal(id.toString(), petId);
+        assert.equal(owner.toString(), ownerId);
+        return makePetWithPhoto();
+      },
+      createFileRecord: async (input) =>
+        makeFileRecord({
+          _id: input._id,
+          ownerId: input.ownerId,
+          petId: input.petId,
+          originalName: input.originalName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          storageKey: input.storageKey,
+          uploadedAt: input.uploadedAt
+        }),
+      setPetPhoto: async (id, owner, photoFileId) => {
+        setPhotoCall = {
+          petId: id.toString(),
+          ownerId: owner.toString(),
+          photoFileId: photoFileId.toString()
+        };
+        return makePetWithPhoto({ photoFileId });
+      },
+      findFileByIdForOwner: async () => {
+        throw new Error("should not look up previous photo when none exists");
+      },
+      deleteFileRecord: async () => {
+        throw new Error("should not delete a previous photo when none exists");
+      },
+      now: () => uploadedAt
+    }
+  );
+
+  assert.ok(stored);
+  assert.equal(stored.contentType, "image/jpeg");
+  assert.match(stored.key, new RegExp(`^users/${ownerId}/pets/${petId}/files/[a-f0-9]{24}/cooper\\.jpg$`));
+
+  assert.ok(setPhotoCall);
+  assert.equal(setPhotoCall.petId, petId);
+  assert.equal(setPhotoCall.ownerId, ownerId);
+  assert.equal(setPhotoCall.photoFileId, result.file.id);
+
+  assert.equal(result.file.mimeType, "image/jpeg");
+  assert.equal(result.file.originalName, "cooper.jpg");
+  assert.equal(result.pet.photoFileId?.toString(), result.file.id);
+});
+
+test("uploadPetPhoto rejects non-image MIME types with UNSUPPORTED_PHOTO_TYPE", async () => {
+  await assert.rejects(
+    () =>
+      uploadPetPhoto(ownerId, petId, { file: makePhotoUpload({ mimetype: "application/pdf" }) }),
+    assertAppError(400, "UNSUPPORTED_PHOTO_TYPE")
+  );
+});
+
+test("uploadPetPhoto rejects missing file with FILE_REQUIRED", async () => {
+  await assert.rejects(
+    () => uploadPetPhoto(ownerId, petId, {}),
+    assertAppError(400, "FILE_REQUIRED")
+  );
+});
+
+test("uploadPetPhoto rejects invalid pet id with INVALID_PET_ID", async () => {
+  await assert.rejects(
+    () => uploadPetPhoto(ownerId, "not-an-id", { file: makePhotoUpload() }),
+    assertAppError(400, "INVALID_PET_ID")
+  );
+});
+
+test("uploadPetPhoto returns 404 for a pet outside the owner scope", async () => {
+  await assert.rejects(
+    () =>
+      uploadPetPhoto(
+        ownerId,
+        petId,
+        { file: makePhotoUpload() },
+        {
+          findPetWithPhotoForOwner: async () => null,
+          createFileRecord: async () => {
+            throw new Error("should not create metadata");
+          }
+        }
+      ),
+    assertAppError(404, "PET_NOT_FOUND")
+  );
+});
+
+test("uploadPetPhoto deletes the previous photo storage object and metadata when replacing", async () => {
+  const previousFileId = new Types.ObjectId();
+  const previousStorageKey = `users/${ownerId}/pets/${petId}/files/${previousFileId.toString()}/old.jpg`;
+  const deletedStorageKeys: string[] = [];
+  const deletedFileIds: string[] = [];
+
+  await uploadPetPhoto(
+    ownerId,
+    petId,
+    { file: makePhotoUpload() },
+    {
+      storage: makeStorage({
+        deleteObject: async ({ key }) => {
+          deletedStorageKeys.push(key);
+        }
+      }),
+      findPetWithPhotoForOwner: async () =>
+        makePetWithPhoto({ photoFileId: previousFileId }),
+      createFileRecord: async (input) => makeFileRecord({ _id: input._id, storageKey: input.storageKey }),
+      setPetPhoto: async (_id, _owner, photoFileId) =>
+        makePetWithPhoto({ photoFileId }),
+      findFileByIdForOwner: async (id, owner) => {
+        assert.equal(id.toString(), previousFileId.toString());
+        assert.equal(owner.toString(), ownerId);
+        return makeFileRecord({ _id: previousFileId, storageKey: previousStorageKey });
+      },
+      deleteFileRecord: async (id) => {
+        deletedFileIds.push(id.toString());
+        return makeFileRecord({ _id: id });
+      }
+    }
+  );
+
+  assert.deepEqual(deletedStorageKeys, [previousStorageKey]);
+  assert.deepEqual(deletedFileIds, [previousFileId.toString()]);
+});
+
+test("uploadPetPhoto tolerates the previous photo already being missing from storage", async () => {
+  const previousFileId = new Types.ObjectId();
+  const missing = Object.assign(new Error("missing"), { name: "NoSuchKey" });
+  let metadataDeleted = false;
+
+  await uploadPetPhoto(
+    ownerId,
+    petId,
+    { file: makePhotoUpload() },
+    {
+      storage: makeStorage({
+        deleteObject: async () => {
+          throw missing;
+        }
+      }),
+      findPetWithPhotoForOwner: async () =>
+        makePetWithPhoto({ photoFileId: previousFileId }),
+      createFileRecord: async (input) => makeFileRecord({ _id: input._id, storageKey: input.storageKey }),
+      setPetPhoto: async (_id, _owner, photoFileId) =>
+        makePetWithPhoto({ photoFileId }),
+      findFileByIdForOwner: async () =>
+        makeFileRecord({ _id: previousFileId, storageKey: "old/key" }),
+      deleteFileRecord: async () => {
+        metadataDeleted = true;
+        return makeFileRecord({ _id: previousFileId });
+      }
+    }
+  );
+
+  assert.equal(metadataDeleted, true);
+});
+
+test("uploadPetPhoto rolls back the new file when the pet disappears between read and write", async () => {
+  const deletedStorageKeys: string[] = [];
+  const deletedFileIds: string[] = [];
+
+  await assert.rejects(
+    () =>
+      uploadPetPhoto(
+        ownerId,
+        petId,
+        { file: makePhotoUpload() },
+        {
+          storage: makeStorage({
+            deleteObject: async ({ key }) => {
+              deletedStorageKeys.push(key);
+            }
+          }),
+          findPetWithPhotoForOwner: async () => makePetWithPhoto(),
+          createFileRecord: async (input) =>
+            makeFileRecord({ _id: input._id, storageKey: input.storageKey }),
+          setPetPhoto: async () => null,
+          deleteFileRecord: async (id) => {
+            deletedFileIds.push(id.toString());
+            return makeFileRecord({ _id: id });
+          },
+          findFileByIdForOwner: async () => {
+            throw new Error("should not query previous photo on rollback");
+          }
+        }
+      ),
+    assertAppError(404, "PET_NOT_FOUND")
+  );
+
+  assert.equal(deletedStorageKeys.length, 1);
+  assert.equal(deletedFileIds.length, 1);
 });
 
 test("deleteAllFilesForPet throws on hard storage failure and keeps metadata", async () => {

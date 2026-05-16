@@ -7,6 +7,7 @@ import { PET_SEXES } from "../models/Pet";
 import { REMINDER_CHANNELS, REMINDER_STATUSES } from "../models/Reminder";
 import { USER_STATUSES } from "../models/User";
 import { ALLOWED_FILE_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../middleware/uploadMiddleware";
+import { ALLOWED_PHOTO_MIME_TYPES } from "../services/fileService";
 
 extendZodWithOpenApi(z);
 
@@ -271,6 +272,22 @@ export const UploadPetFileRequestSchema = z
     eventId: ObjectIdSchema.optional()
   })
   .openapi("UploadPetFileRequest");
+
+export const UploadPetPhotoRequestSchema = z
+  .object({
+    file: z.string().openapi({
+      format: "binary",
+      description: `Pet photo image. Allowed types: ${ALLOWED_PHOTO_MIME_TYPES.join(", ")}.`
+    })
+  })
+  .openapi("UploadPetPhotoRequest");
+
+export const PetPhotoResponseSchema = z
+  .object({
+    pet: PetSchema,
+    file: FileSchema
+  })
+  .openapi("PetPhotoResponse");
 
 export const ReminderSchema = z
   .object({
