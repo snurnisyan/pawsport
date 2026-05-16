@@ -34,7 +34,7 @@ const StyledSelect = chakra("select");
 const buildForm = (pet: TPet) => ({
   chipNumber: pet.chipNumber ?? "",
   birthDate: pet.birthDate ?? "",
-  sex: (pet.sex as TFormSex) ?? "unspecified",
+  sex: pet.sex === "unknown" ? "unspecified" : pet.sex,
   weightValue:
     pet.weightKg > 0 ? String(pet.weightKg).replace(".", ",") : "",
   weightUnit: "kg" as TWeightUnit,

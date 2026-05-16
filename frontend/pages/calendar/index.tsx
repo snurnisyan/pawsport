@@ -39,7 +39,11 @@ const MARK_TO_EVENT: Record<TMark, { type: TDayEventType; title: string }> = {
 
 const TIMES = ["09:00", "10:30", "14:00", "16:30"];
 
-const SEX_LABEL: Record<TPet["sex"], string> = { male: "мальчик", female: "девочка" };
+const SEX_LABEL: Record<TPet["sex"], string> = {
+  male: "мальчик",
+  female: "девочка",
+  unknown: "пол не указан",
+};
 const SPECIES_LABEL: Record<TPet["species"], string> = {
   dog: "собака",
   cat: "кот",

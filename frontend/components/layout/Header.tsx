@@ -13,6 +13,7 @@ import { LuBell, LuCalendar, LuChevronDown, LuHouse, LuLogOut, LuMenu } from "re
 import { Logo } from "@/components/ui/Logo";
 import { ChakraLink } from "@/components/ui/NextLink";
 import { Pressable } from "@/components/ui/Pressable";
+import { clearAuthSession, useAuthSession } from "@/lib/session";
 
 type TNavItem = {
   label: string;
@@ -109,7 +110,12 @@ type THeaderProps = {
 
 export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const router = useRouter();
-  const logout = () => router.push("/auth");
+  const session = useAuthSession();
+  const email = session?.user.email ?? userEmail;
+  const logout = () => {
+    clearAuthSession();
+    router.push("/auth");
+  };
 
   return (
     <Box
@@ -179,7 +185,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
                 cursor="pointer"
                 _hover={{ color: "fg.default", bg: "secondary.700" }}
               >
-                <Text fontSize="14px">{userEmail}</Text>
+                <Text fontSize="14px">{email}</Text>
                 <Box fontSize="14px">
                   <LuChevronDown />
                 </Box>

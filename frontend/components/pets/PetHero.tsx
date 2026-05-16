@@ -8,7 +8,7 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import { LuCake, LuPenLine } from "react-icons/lu";
+import { LuCake, LuCircleHelp, LuPenLine } from "react-icons/lu";
 import { FaMars, FaVenus } from "react-icons/fa6";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
@@ -22,6 +22,12 @@ type TPetHeroProps = {
 export function PetHero({ pet }: TPetHeroProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(pet.imageUrl);
+  const sexMeta =
+    pet.sex === "male"
+      ? { icon: <FaMars />, label: "Мальчик" }
+      : pet.sex === "female"
+        ? { icon: <FaVenus />, label: "Девочка" }
+        : { icon: <LuCircleHelp />, label: "Пол не указан" };
 
   return (
     <>
@@ -93,8 +99,8 @@ export function PetHero({ pet }: TPetHeroProps) {
               <Text>{pet.ageLabel}</Text>
             </HStack>
             <HStack gap="4px">
-              <Icon>{pet.sex === "male" ? <FaMars /> : <FaVenus />}</Icon>
-              <Text>{pet.sex === "male" ? "Мальчик" : "Девочка"}</Text>
+              <Icon>{sexMeta.icon}</Icon>
+              <Text>{sexMeta.label}</Text>
             </HStack>
           </HStack>
         </Stack>
