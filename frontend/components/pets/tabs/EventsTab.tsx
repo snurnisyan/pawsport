@@ -1,124 +1,41 @@
-import {
-  Box,
-  HStack,
-  Heading,
-  IconButton,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { LuCalendar, LuClock, LuMapPin, LuPenLine, LuPlus, LuSearch } from "react-icons/lu";
+import { useMemo, useState } from "react";
+import { HStack, Heading, Icon, Stack, Text } from "@chakra-ui/react";
+import { LuCalendarOff, LuPlus } from "react-icons/lu";
 import { SecondaryButton } from "@/components/ui/Buttons";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { TextField } from "@/components/ui/TextField";
-import type { TPetEvent, TPetEventType } from "@/store/pets";
-
-const TYPE_TONE: Record<TPetEventType, "info" | "purple" | "teal" | "warning"> = {
-  visit: "info",
-  vaccine: "purple",
-  treatment: "teal",
-  operation: "warning",
-};
-const TYPE_LABEL: Record<TPetEventType, string> = {
-  visit: "Визит",
-  vaccine: "Вакцинация",
-  treatment: "Обработка",
-  operation: "Операция",
-};
-
-const RU_MONTH = [
-  "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря",
-];
-
-function groupByMonth(events: TPetEvent[]) {
-  const sorted = [...events].sort((a, b) => (a.date < b.date ? 1 : -1));
-  const groups = new Map<string, TPetEvent[]>();
-  for (const e of sorted) {
-    const d = new Date(e.date);
-    const key = `${RU_MONTH[d.getMonth()]} ${d.getFullYear()}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(e);
-  }
-  return Array.from(groups.entries());
-}
-
-type TEventRowProps = {
-  event: TPetEvent;
-};
-
-function EventRow({ event }: TEventRowProps) {
-  const d = new Date(event.date);
-  return (
-    <HStack
-      align="flex-start"
-      gap="16px"
-      bg="bg.surface"
-      borderWidth="1px"
-      borderColor="border.subtle"
-      rounded="card"
-      p="16px"
-    >
-      <Stack
-        align="center"
-        justify="center"
-        minW="56px"
-        bg="secondary.700"
-        rounded="lg"
-        px="12px"
-        py="8px"
-      >
-        <Text fontSize="12px" textTransform="uppercase" color="fg.muted" letterSpacing="0.08em">
-          {RU_MONTH[d.getMonth()].slice(0, 3)}
-        </Text>
-        <Text fontSize="24px" fontWeight={700} lineHeight={1}>
-          {d.getDate()}
-        </Text>
-      </Stack>
-      <Stack flex={1} gap="4px">
-        <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap="8px">
-          <Text fontWeight={600}>{event.title}</Text>
-          <StatusBadge tone={TYPE_TONE[event.type]}>
-            {TYPE_LABEL[event.type]}
-          </StatusBadge>
-        </HStack>
-        <HStack gap="16px" fontSize="14px" color="fg.muted" flexWrap="wrap">
-          {event.time && (
-            <HStack gap="4px">
-              <LuClock />
-              <Text>{event.time}</Text>
-            </HStack>
-          )}
-          {event.place && (
-            <HStack gap="4px">
-              <LuMapPin />
-              <Text>{event.place}</Text>
-            </HStack>
-          )}
-        </HStack>
-        {event.comment && (
-          <Text fontSize="14px" color="fg.subtle">
-            {event.comment}
-          </Text>
-        )}
-      </Stack>
-      <IconButton
-        aria-label="Редактировать"
-        size="xs"
-        variant="ghost"
-        color="fg.muted"
-      >
-        <LuPenLine />
-      </IconButton>
-    </HStack>
-  );
-}
+import { EventDialog } from "@/components/pets/events/EventDialog";
+import { EventsFeed } from "@/components/pets/events/EventsFeed";
+import { EventsFilterBar } from "@/components/pets/events/EventsFilterBar";
+import {
+  INITIAL_FILTERS,
+  filterEvents,
+  type TEventsFilters,
+} from "@/components/pets/events/eventsShared";
+import type { TPetEvent } from "@/store/pets";
 
 type TEventsTabProps = {
   events: TPetEvent[];
 };
 
 export function EventsTab({ events }: TEventsTabProps) {
-  const groups = groupByMonth(events);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<TPetEvent | null>(null);
+  const [filters, setFilters] = useState<TEventsFilters>(INITIAL_FILTERS);
+
+  const filtered = useMemo(() => filterEvents(events, filters), [events, filters]);
+
+  const openCreate = () => {
+    setEditingEvent(null);
+    setDialogOpen(true);
+  };
+  const openEdit = (event: TPetEvent) => {
+    setEditingEvent(event);
+    setDialogOpen(true);
+  };
+  const handleOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) setEditingEvent(null);
+  };
+
   return (
     <Stack gap="24px">
       <HStack justify="space-between" flexWrap="wrap" gap="12px">
@@ -128,7 +45,7 @@ export function EventsTab({ events }: TEventsTabProps) {
             Будущие и прошедшие события по питомцу
           </Text>
         </Stack>
-        <SecondaryButton h="44px" px="20px">
+        <SecondaryButton h="44px" px="20px" onClick={openCreate}>
           <HStack gap="8px">
             <LuPlus />
             <Text>Добавить событие</Text>
@@ -136,46 +53,36 @@ export function EventsTab({ events }: TEventsTabProps) {
         </SecondaryButton>
       </HStack>
 
-      <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>
-        <Box flex={1} minW="220px">
-          <TextField
-            placeholder="Поиск по названию, заметкам..."
-            startElement={<LuSearch />}
-            uppercase={false}
-          />
-        </Box>
-        <Box w={["full", null, "180px"]}>
-          <TextField placeholder="Тип: Все" uppercase={false} />
-        </Box>
-        <Box w={["full", null, "200px"]}>
-          <TextField
-            placeholder="Период"
-            startElement={<LuCalendar />}
-            uppercase={false}
-          />
-        </Box>
-      </HStack>
+      <EventDialog
+        open={dialogOpen}
+        onOpenChange={handleOpenChange}
+        event={editingEvent ?? undefined}
+      />
 
-      <Stack gap="24px">
-        {groups.map(([month, items]) => (
-          <Stack key={month} gap="12px">
-            <Text
-              fontSize="12px"
-              fontWeight={700}
-              letterSpacing="0.12em"
-              textTransform="uppercase"
-              color="fg.muted"
-            >
-              {month}
-            </Text>
-            <Stack gap="8px">
-              {items.map((e) => (
-                <EventRow key={e.id} event={e} />
-              ))}
-            </Stack>
-          </Stack>
-        ))}
-      </Stack>
+      {events.length === 0 ? (
+        <Stack
+          align="center"
+          gap="12px"
+          py="64px"
+          bg="bg.surface"
+          borderWidth="1px"
+          borderStyle="dashed"
+          borderColor="border.subtle"
+          rounded="card"
+        >
+          <Icon boxSize="32px" color="fg.muted">
+            <LuCalendarOff />
+          </Icon>
+          <Text color="fg.muted" fontSize="14px">
+            У этого питомца ещё нет событий
+          </Text>
+        </Stack>
+      ) : (
+        <>
+          <EventsFilterBar value={filters} onChange={setFilters} />
+          <EventsFeed events={filtered} onEdit={openEdit} />
+        </>
+      )}
     </Stack>
   );
 }

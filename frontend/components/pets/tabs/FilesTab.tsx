@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Box,
   HStack,
@@ -19,6 +19,7 @@ import {
 } from "react-icons/lu";
 import { SecondaryButton } from "@/components/ui/Buttons";
 import { TextField } from "@/components/ui/TextField";
+import { FileUploadDialog } from "@/components/pets/files/FileUploadDialog";
 
 type TFileRow = {
   name: string;
@@ -56,6 +57,7 @@ const TYPE_META: Record<TFileRow["type"], { icon: ReactNode; bg: string; color: 
 };
 
 export function FilesTab() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <Stack gap="24px">
       <HStack justify="space-between" flexWrap="wrap" gap="12px">
@@ -65,13 +67,15 @@ export function FilesTab() {
             Управление и доступ ко всем файлам питомца
           </Text>
         </Stack>
-        <SecondaryButton h="44px" px="20px">
+        <SecondaryButton h="44px" px="20px" onClick={() => setDialogOpen(true)}>
           <HStack gap="8px">
             <LuUpload />
             <Text>Загрузить файл</Text>
           </HStack>
         </SecondaryButton>
       </HStack>
+
+      <FileUploadDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 
       <HStack gap="12px" flexWrap={["wrap", null, "nowrap"]}>
         <Box flex={1} minW="220px">
