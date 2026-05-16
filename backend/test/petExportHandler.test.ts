@@ -320,3 +320,61 @@ test("pet export template renders base64 profile photos without escaping the dat
   assert.match(html, /<img src="data:image\/png;base64,cG5nLWRhdGE=" alt="Miso"/);
   assert.deepEqual(assets, []);
 });
+
+test("pet export template renders compact timeline cards and clickable file links", async () => {
+  const eventId = "607f1f77bcf86cd799439088";
+  const fileId = "607f1f77bcf86cd799439099";
+
+  const { html } = await renderPetExportTemplate({
+    exportId: exportId.toString(),
+    ownerId: ownerId.toString(),
+    petId: petId.toString(),
+    generatedAt: now.toISOString(),
+    sections: ["profile", "events", "files"],
+    profile: {
+      id: petId.toString(),
+      name: "Baron",
+      species: "dog",
+      breed: "Labrador Retriever",
+      birthDate: "2021-04-12",
+      sex: "male",
+      weight: 28.5,
+      microchipNumber: "123456789012345",
+      tags: ["active"],
+      notes: ["Mild grain allergy."],
+      vetContact: { name: "Dr. Anna Volkova", email: "anna@example.test" }
+    },
+    events: [
+      {
+        id: eventId,
+        type: "vaccination",
+        title: "Rabies booster",
+        eventDate: "2024-08-15T00:00:00.000Z",
+        clinicName: "City Vet Clinic",
+        comment: "Annual booster.",
+        fileIds: [fileId]
+      }
+    ],
+    files: [
+      {
+        id: fileId,
+        eventId,
+        originalName: "rabies-certificate.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 840_000,
+        uploadedAt: "2024-08-15T10:00:00.000Z",
+        eventTitle: "Rabies booster",
+        downloadUrl: "https://download.example/rabies-certificate.pdf"
+      }
+    ]
+  });
+
+  assert.match(html, /Microchip 123456789012345/);
+  assert.doesNotMatch(html, /years old/i);
+  assert.doesNotMatch(html, /Veterinarian|Dr\. Anna Volkova/);
+  assert.match(html, /<article class="tl-event past">/);
+  assert.match(html, /break-inside: avoid/);
+  assert.match(html, /page-break-inside: avoid/);
+  assert.match(html, /<a class="file-chip" href="https:\/\/download\.example\/rabies-certificate\.pdf">/);
+  assert.match(html, /<td><a href="https:\/\/download\.example\/rabies-certificate\.pdf">rabies-certificate\.pdf<\/a><\/td>/);
+});
