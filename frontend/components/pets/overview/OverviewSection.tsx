@@ -81,6 +81,7 @@ export function OverviewSection({ pet }: TOverviewSectionProps) {
             label="Пол"
             options={SEX_OPTIONS}
             value={form.sex}
+            disabled={!editing}
             onChange={(v) =>
               setForm((f) => ({ ...f, sex: v as TFormSex }))
             }
