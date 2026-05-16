@@ -1,306 +1,579 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Pawsport export report</title>
+    <title>Pawsport pet report</title>
     <style>
       @page {
-        margin: 0;
         size: A4;
+        margin: 11mm 10mm;
       }
 
-      * {
-        box-sizing: border-box;
+      :root {
+        --paper: #ffffff;
+        --ink: #232631;
+        --muted: #687083;
+        --subtle: #939bab;
+        --line: #e3e6ee;
+        --line-strong: #ccd2de;
+        --brand: #6d3ee8;
+        --brand-soft: #f0e9ff;
+        --brand-line: #ddcffc;
+        --panel: #fafbfe;
+        --vac-bg: #e7f7ee;
+        --vac-fg: #167a3a;
+        --vet-bg: #e7efff;
+        --vet-fg: #1e40af;
+        --med-bg: #fff2d7;
+        --med-fg: #92500a;
+        --gro-bg: #fde8f1;
+        --gro-fg: #a8266a;
+        --sur-bg: #fde2e2;
+        --sur-fg: #a31818;
+        --oth-bg: #ececf2;
+        --oth-fg: #4b5563;
       }
 
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
       body {
-        background: #f4f7fb;
-        color: #1f2937;
-        font-family: Arial, sans-serif;
-        font-size: 13px;
-        line-height: 1.5;
-        margin: 0;
+        background: #fff;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        font-size: 11px;
+        line-height: 1.4;
       }
 
       .page {
-        background: white;
-        min-height: 297mm;
-        padding: 28px;
+        background: var(--paper);
+        min-height: 275mm;
       }
 
-      .hero {
-        align-items: stretch;
-        background: linear-gradient(135deg, #17324d, #2b6f77);
-        border-radius: 18px;
-        color: white;
-        display: grid;
-        gap: 22px;
-        grid-template-columns: 1fr 188px;
-        margin-bottom: 22px;
-        overflow: hidden;
-        padding: 26px;
+      .doc-head {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        padding-bottom: 9mm;
       }
 
-      .eyebrow {
-        color: #b7f7e3;
-        font-size: 11px;
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+      }
+
+      .brand-mark {
+        align-items: center;
+        background: var(--brand);
+        border-radius: 7px;
+        color: #fff;
+        display: flex;
+        font-size: 13px;
+        font-weight: 800;
+        height: 24px;
+        justify-content: center;
+        width: 24px;
+      }
+
+      .brand-name {
+        font-size: 14px;
         font-weight: 700;
-        letter-spacing: 0.08em;
-        margin: 0 0 10px;
-        text-transform: uppercase;
       }
 
-      h1 {
-        font-size: 28px;
-        line-height: 1.05;
-        margin: 0 0 16px;
+      .brand-name span {
+        color: var(--muted);
+        font-weight: 500;
+        margin-left: 8px;
       }
 
-      .hero-meta {
-        color: #d7e8ee;
+      .doc-meta {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 11px;
+        gap: 14px;
+        justify-content: flex-end;
+      }
+
+      .doc-meta b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .profile-card {
+        break-inside: avoid;
+        margin-top: 9mm;
+        page-break-inside: avoid;
+      }
+
+      .profile-top {
+        align-items: center;
         display: grid;
-        gap: 5px;
-        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        grid-template-columns: 96px 1fr;
       }
 
-      .photo-frame {
-        align-self: center;
+      .avatar {
+        align-items: center;
         aspect-ratio: 1;
-        background: rgba(255, 255, 255, 0.16);
-        border: 1px solid rgba(255, 255, 255, 0.24);
-        border-radius: 16px;
-        display: grid;
+        background: linear-gradient(135deg, #bba5ff 0%, #eda9f5 100%);
+        border: 3px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px var(--line), 0 8px 18px rgba(109, 62, 232, 0.16);
+        color: #fff;
+        display: flex;
+        font-size: 40px;
+        font-weight: 800;
+        justify-content: center;
         overflow: hidden;
-        place-items: center;
+        width: 96px;
       }
 
-      .photo-frame img {
+      .avatar img {
         height: 100%;
         object-fit: cover;
         width: 100%;
       }
 
-      .photo-placeholder {
-        color: #d7e8ee;
-        font-size: 12px;
-        padding: 20px;
-        text-align: center;
-      }
+      .profile-info { min-width: 0; }
 
-      .section-grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: 1fr 1fr;
-      }
-
-      section {
-        background: #ffffff;
-        border: 1px solid #d7dde7;
-        border-radius: 14px;
-        box-shadow: 0 10px 28px rgba(31, 41, 55, 0.08);
-        margin-bottom: 16px;
-        overflow: hidden;
-      }
-
-      .section-full {
-        grid-column: 1 / -1;
-      }
-
-      h2 {
-        background: #f7fafc;
-        border-bottom: 1px solid #d7dde7;
-        font-size: 16px;
-        margin: 0;
-        padding: 12px 14px;
-      }
-
-      .kv {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: 112px 1fr;
-        padding: 14px;
-      }
-
-      .k {
-        color: #64748b;
+      .species-tag {
+        background: var(--brand-soft);
+        border-radius: 999px;
+        color: var(--brand);
+        display: inline-block;
         font-size: 11px;
         font-weight: 700;
+        margin-bottom: 5px;
+        padding: 3px 10px;
+      }
+
+      .pet-name {
+        font-size: 29px;
+        letter-spacing: 0;
+        line-height: 1.08;
+        margin: 0 0 7px;
+      }
+
+      .summary-list {
+        align-items: center;
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px 10px;
+      }
+
+      .summary-item strong {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .summary-dot {
+        background: var(--subtle);
+        border-radius: 50%;
+        height: 3px;
+        width: 3px;
+      }
+
+      .summary-chip {
+        background: #f6f7fb;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        display: inline-block;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        padding: 2px 8px;
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 9px;
+      }
+
+      .tag {
+        background: #f4f3fa;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 10.5px;
+        padding: 2px 8px;
+      }
+
+      .notes-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-top: 10px;
+        padding: 10px 12px;
+      }
+
+      .subhead {
+        color: var(--muted);
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin: 0 0 5px;
         text-transform: uppercase;
       }
 
-      .v {
-        overflow-wrap: anywhere;
+      .notes-list {
+        margin: 0;
+        padding-left: 16px;
       }
 
-      table {
+      .notes-list li { margin: 0 0 3px; }
+      .notes-list li:last-child { margin-bottom: 0; }
+
+      .section-head {
+        align-items: baseline;
+        display: flex;
+        justify-content: space-between;
+        margin: 10mm 0 5mm;
+      }
+
+      .section-title {
+        font-size: 19px;
+        line-height: 1.1;
+        margin: 0;
+      }
+
+      .section-sub {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .section-sub b { color: var(--ink); }
+
+      .timeline {
+        position: relative;
+      }
+
+      .tl-event {
+        break-inside: avoid;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 34px 1fr;
+        margin-bottom: 8px;
+        page-break-inside: avoid;
+        -webkit-column-break-inside: avoid;
+      }
+
+      .tl-event::before {
+        background: var(--line-strong);
+        content: "";
+        grid-column: 1;
+        grid-row: 1;
+        height: calc(100% + 8px);
+        justify-self: center;
+        width: 2px;
+      }
+
+      .tl-event:last-child::before { height: 100%; }
+
+      .tl-icon {
+        align-items: center;
+        align-self: start;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        display: flex;
+        grid-column: 1;
+        grid-row: 1;
+        height: 34px;
+        justify-content: center;
+        justify-self: center;
+        position: relative;
+        width: 34px;
+        z-index: 1;
+      }
+
+      .tl-icon svg { height: 15px; width: 15px; }
+      .vac { background: var(--vac-bg); color: var(--vac-fg); }
+      .vet { background: var(--vet-bg); color: var(--vet-fg); }
+      .med { background: var(--med-bg); color: var(--med-fg); }
+      .gro { background: var(--gro-bg); color: var(--gro-fg); }
+      .sur { background: var(--sur-bg); color: var(--sur-fg); }
+      .oth { background: var(--oth-bg); color: var(--oth-fg); }
+
+      .tl-event.future .tl-icon { background: #fff; }
+
+      .tl-card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+        padding: 10px 12px;
+      }
+
+      .tl-event.future .tl-card {
+        background: linear-gradient(180deg, #fbf8ff 0%, #fff 100%);
+        border-color: var(--brand-line);
+      }
+
+      .tl-card-head {
+        align-items: flex-start;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        margin-bottom: 3px;
+      }
+
+      .tl-date {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .tl-type {
+        border-radius: 999px;
+        flex: 0 0 auto;
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        padding: 2px 8px;
+        text-transform: uppercase;
+      }
+
+      .tl-title {
+        font-size: 13.5px;
+        font-weight: 750;
+        line-height: 1.25;
+        margin-bottom: 2px;
+      }
+
+      .tl-context {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+      }
+
+      .tl-comment {
+        background: var(--panel);
+        border-left: 3px solid var(--line-strong);
+        border-radius: 0 6px 6px 0;
+        margin-top: 7px;
+        padding: 6px 9px;
+      }
+
+      .tl-extras {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 7px;
+      }
+
+      .file-chip,
+      .reminder-chip {
+        align-items: center;
+        background: #f6f7fb;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        display: inline-flex;
+        font-size: 10.5px;
+        gap: 5px;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        padding: 2px 8px;
+        text-decoration: none;
+      }
+
+      .file-chip[href] { color: #2454b8; }
+      .file-chip svg,
+      .reminder-chip svg { flex: 0 0 auto; height: 11px; width: 11px; }
+      .reminder-chip { background: #fff8e0; border-color: #f1dda1; color: #674b09; }
+
+      .file-table {
         border-collapse: collapse;
+        margin-top: 5mm;
         width: 100%;
       }
 
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 8px 10px;
+      .file-table th,
+      .file-table td {
+        border-bottom: 1px solid var(--line);
+        padding: 5px 6px;
         text-align: left;
         vertical-align: top;
       }
 
-      th {
-        background: #f8fafc;
-        color: #475569;
-        font-size: 11px;
+      .file-table th {
+        color: var(--muted);
+        font-size: 9.5px;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
       }
 
-      tbody tr:nth-child(even) {
-        background: #fbfdff;
-      }
+      .file-table a { color: #2454b8; text-decoration: none; }
 
-      .badge-list {
+      .doc-foot {
+        border-top: 1px solid var(--line);
+        color: var(--subtle);
         display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
+        font-size: 9.5px;
+        justify-content: space-between;
+        margin-top: 10mm;
+        padding-top: 5mm;
       }
 
-      .badge {
-        background: #e8f7f0;
-        border: 1px solid #bfe8d6;
-        border-radius: 999px;
-        color: #176448;
-        display: inline-block;
-        font-size: 12px;
-        padding: 2px 8px;
+      @media print {
+        .tl-event { break-inside: avoid-page; }
       }
     </style>
   </head>
   <body>
     <main class="page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Pawsport export report</p>
-          <h1>{{#if profile}}{{profile.name}}{{else}}Pet report{{/if}}</h1>
-          <div class="hero-meta">
-            <span>Export ID: {{report.exportId}}</span>
-            <span>Generated: {{report.generatedAt}}</span>
-            {{#if report.period}}
-              <span>From: {{report.period.from}}</span>
-              <span>To: {{report.period.to}}</span>
-            {{else}}
-              <span>Period: all time</span>
-            {{/if}}
-          </div>
+      <header class="doc-head">
+        <div class="brand">
+          <span class="brand-mark">P</span>
+          <span class="brand-name">Pawsport <span>Pet report</span></span>
         </div>
-        <div class="photo-frame">
-          {{#if profile.photo}}
-            <img src="{{{profile.photo.src}}}" alt="{{profile.name}}" />
-          {{else}}
-            <div class="photo-placeholder">No profile photo</div>
-          {{/if}}
+        <div class="doc-meta">
+          <span><b>Period</b> {{report.periodLabel}}</span>
+          <span><b>Generated</b> {{report.generatedLabel}}</span>
         </div>
       </header>
 
-      <div class="section-grid">
-        {{#if profile}}
-          <section>
-            <h2>Profile</h2>
-            <div class="kv">
-              <span class="k">Name</span><span class="v">{{profile.name}}</span>
-              <span class="k">Species</span><span class="v">{{profile.species}}</span>
-              <span class="k">Breed</span><span class="v">{{profile.breed}}</span>
-              <span class="k">Sex</span><span class="v">{{profile.sex}}</span>
-              <span class="k">Microchip</span><span class="v">{{profile.microchipNumber}}</span>
+      {{#if profile}}
+        <section class="profile-card">
+          <div class="profile-top">
+            <div class="avatar">
               {{#if profile.photo}}
-                <span class="k">Photo</span><span class="v">{{profile.photo.originalName}} ({{profile.photo.mimeType}})</span>
+                <img src="{{{profile.photo.src}}}" alt="{{profile.name}}" />
+              {{else}}
+                {{profile.initial}}
               {{/if}}
-              <span class="k">Tags</span>
-              <span class="v badge-list">
-                {{#each profile.tags}}<span class="badge">{{this}}</span>{{/each}}
-              </span>
-              <span class="k">Notes</span><span class="v">{{#each profile.notes}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</span>
             </div>
-          </section>
-        {{/if}}
-
-        {{#if events}}
-          <section class="section-full">
-            <h2>Events</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Title</th>
-                  <th>Clinic</th>
-                  <th>Comment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {{#each events}}
-                  <tr>
-                    <td>{{eventDate}}</td>
-                    <td>{{type}}</td>
-                    <td>{{title}}</td>
-                    <td>{{clinicName}}</td>
-                    <td>{{comment}}</td>
-                  </tr>
+            <div class="profile-info">
+              {{#if profile.speciesLabel}}<div class="species-tag">{{profile.speciesLabel}}</div>{{/if}}
+              <h1 class="pet-name">{{profile.name}}</h1>
+              <div class="summary-list">
+                {{#each profile.summaryParts}}
+                  {{#unless @first}}<span class="summary-dot"></span>{{/unless}}
+                  <span class="summary-item summary-chip">{{this}}</span>
                 {{/each}}
-              </tbody>
-            </table>
-          </section>
-        {{/if}}
+              </div>
+              {{#if profile.tags}}
+                <div class="tag-list">
+                  {{#each profile.tags}}<span class="tag">{{this}}</span>{{/each}}
+                </div>
+              {{/if}}
+            </div>
+          </div>
+          {{#if profile.notes}}
+            <div class="notes-card">
+              <p class="subhead">Owner notes</p>
+              <ul class="notes-list">
+                {{#each profile.notes}}<li>{{this}}</li>{{/each}}
+              </ul>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
 
-        {{#if files}}
-          <section class="section-full">
-            <h2>Files</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Uploaded</th>
-                  <th>Name</th>
-                  <th>MIME</th>
-                  <th>Event</th>
-                </tr>
-              </thead>
-              <tbody>
-                {{#each files}}
-                  <tr>
-                    <td>{{uploadedAt}}</td>
-                    <td>{{originalName}}</td>
-                    <td>{{mimeType}}</td>
-                    <td>{{eventTitle}}</td>
-                  </tr>
-                {{/each}}
-              </tbody>
-            </table>
-          </section>
-        {{/if}}
+      {{#if events}}
+        <section>
+          <div class="section-head">
+            <h2 class="section-title">History of care</h2>
+            <div class="section-sub">
+              <b>{{counts.pastEvents}}</b> past events &middot;
+              <b>{{counts.futureEvents}}</b> upcoming &middot;
+              <b>{{counts.files}}</b> documents
+            </div>
+          </div>
 
-        {{#if reminders}}
-          <section class="section-full">
-            <h2>Reminders</h2>
-            <table>
-              <thead>
+          <div class="timeline">
+            {{#each events}}
+              <article class="tl-event {{stateClass}}">
+                <div class="tl-icon {{typeClass}}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z" />
+                    <path d="M9 12l2 2 4-4" />
+                  </svg>
+                </div>
+                <div class="tl-card">
+                  <div class="tl-card-head">
+                    <span class="tl-date">{{dateLabel}}</span>
+                    <span class="tl-type {{typeClass}}">{{typeLabel}}</span>
+                  </div>
+                  <div class="tl-title">{{title}}</div>
+                  {{#if contextParts}}
+                    <div class="tl-context">
+                      {{#each contextParts}}
+                        {{#unless @first}}<span>&middot;</span>{{/unless}}
+                        <span>{{this}}</span>
+                      {{/each}}
+                    </div>
+                  {{/if}}
+                  {{#if comment}}<div class="tl-comment">{{comment}}</div>{{/if}}
+                  {{#if files}}
+                    <div class="tl-extras">
+                      {{#each files}}
+                        <a class="file-chip" href="{{downloadUrl}}">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+                          <span>{{originalName}} &middot; {{sizeLabel}}</span>
+                        </a>
+                      {{/each}}
+                    </div>
+                  {{/if}}
+                  {{#if reminders}}
+                    <div class="tl-extras">
+                      {{#each reminders}}
+                        <span class="reminder-chip">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+                          <span>{{channel}} reminder &middot; {{sendAtLabel}}</span>
+                        </span>
+                      {{/each}}
+                    </div>
+                  {{/if}}
+                </div>
+              </article>
+            {{/each}}
+          </div>
+        </section>
+      {{/if}}
+
+      {{#if files}}
+        <section>
+          <div class="section-head">
+            <h2 class="section-title">Documents</h2>
+            <div class="section-sub"><b>{{counts.files}}</b> files</div>
+          </div>
+          <table class="file-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Uploaded</th>
+                <th>Size</th>
+                <th>Event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each files}}
                 <tr>
-                  <th>Send at</th>
-                  <th>Channel</th>
-                  <th>Status</th>
-                  <th>Event</th>
+                  <td><a href="{{downloadUrl}}">{{originalName}}</a></td>
+                  <td>{{uploadedLabel}}</td>
+                  <td>{{sizeLabel}}</td>
+                  <td>{{eventTitle}}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {{#each reminders}}
-                  <tr>
-                    <td>{{sendAt}}</td>
-                    <td>{{channel}}</td>
-                    <td>{{status}}</td>
-                    <td>{{eventTitle}}</td>
-                  </tr>
-                {{/each}}
-              </tbody>
-            </table>
-          </section>
-        {{/if}}
-      </div>
+              {{/each}}
+            </tbody>
+          </table>
+        </section>
+      {{/if}}
+
+      <footer class="doc-foot">
+        <span>Pawsport pet health report</span>
+        <span>Report ID {{report.exportId}}</span>
+      </footer>
     </main>
   </body>
 </html>

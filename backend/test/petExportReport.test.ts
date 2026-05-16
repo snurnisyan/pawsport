@@ -98,3 +98,53 @@ test("buildPetExportReport omits profile photo when storage cannot read it", asy
 
   assert.equal(report.profile?.photo, undefined);
 });
+
+test("buildPetExportReport adds clickable download URLs to file metadata", async () => {
+  const fileId = new Types.ObjectId("507f1f77bcf86cd799439055");
+  const eventId = new Types.ObjectId("507f1f77bcf86cd799439066");
+
+  const report = await buildPetExportReport(
+    {
+      exportId,
+      ownerId,
+      petId,
+      pet: makePet(),
+      sections: ["events", "files"],
+      generatedAt: now
+    },
+    {
+      listEventsForPet: async () => [
+        {
+          _id: eventId,
+          ownerId,
+          petId,
+          type: "vaccination",
+          title: "Rabies booster",
+          eventDate: new Date("2026-01-10T00:00:00.000Z"),
+          fileIds: [fileId],
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      listFileMetadataForPet: async () => [
+        {
+          _id: fileId,
+          ownerId,
+          petId,
+          eventId,
+          originalName: "rabies-certificate.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 840_000,
+          storageKey: "users/o/p/files/rabies-certificate.pdf",
+          uploadedAt: new Date("2026-01-11T00:00:00.000Z"),
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      getFileDownloadUrl: (key) => `https://download.example/${key}`
+    }
+  );
+
+  assert.equal(report.files?.[0]?.downloadUrl, "https://download.example/users/o/p/files/rabies-certificate.pdf");
+  assert.equal(report.files?.[0]?.eventTitle, "Rabies booster");
+});

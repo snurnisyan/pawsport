@@ -5,7 +5,7 @@ import type { ExportSection, IExportPeriod } from "../models/Export";
 import { FileModel, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
 import { ReminderModel, type IReminder } from "../models/Reminder";
-import { s3Storage, type FileStorage } from "../storage/s3Storage";
+import { getObjectDownloadUrl, s3Storage, type FileStorage } from "../storage/s3Storage";
 
 export interface PdfExportPeriod {
   from?: string;
@@ -62,6 +62,7 @@ export interface PdfFileMetadata {
   sizeBytes: number;
   uploadedAt: string;
   eventTitle?: string;
+  downloadUrl: string;
 }
 
 export interface PdfReminder {
@@ -203,6 +204,7 @@ export interface BuildPetExportReportDependencies {
     petId: Types.ObjectId
   ) => Promise<PhotoFileRecord | null>;
   storage?: FileStorage;
+  getFileDownloadUrl?: (key: string) => string;
 }
 
 export const toDateOnly = (date: Date): string => date.toISOString().slice(0, 10);
@@ -376,13 +378,17 @@ const serializeEventForPdf = (event: EventRecord): PdfEvent => {
   return result;
 };
 
-const serializeFileForPdf = (file: FileMetadataRecord): PdfFileMetadata => {
+const serializeFileForPdf = (
+  file: FileMetadataRecord,
+  getFileDownloadUrl: (key: string) => string
+): PdfFileMetadata => {
   const result: PdfFileMetadata = {
     id: file._id.toString(),
     originalName: file.originalName,
     mimeType: file.mimeType,
     sizeBytes: file.sizeBytes,
-    uploadedAt: file.uploadedAt.toISOString()
+    uploadedAt: file.uploadedAt.toISOString(),
+    downloadUrl: getFileDownloadUrl(file.storageKey)
   };
 
   const eventId = optionalId(file.eventId);
@@ -409,7 +415,8 @@ export const buildPetExportReport = async (
     listFileMetadataForPet = defaultListFiles,
     listRemindersForPet = defaultListReminders,
     findPhotoFileForPet = defaultFindPhotoFile,
-    storage = s3Storage
+    storage = s3Storage,
+    getFileDownloadUrl = getObjectDownloadUrl
   } = dependencies;
 
   const range = buildExportDateRange(input.period);
@@ -441,7 +448,7 @@ export const buildPetExportReport = async (
   }
   if (input.sections.includes("files")) {
     report.files = (await listFileMetadataForPet(input.ownerId, input.petId, range)).map((file) => {
-      const serialized = serializeFileForPdf(file);
+      const serialized = serializeFileForPdf(file, getFileDownloadUrl);
       if (serialized.eventId) {
         const eventTitle = eventTitleById.get(serialized.eventId);
         if (eventTitle) serialized.eventTitle = eventTitle;
