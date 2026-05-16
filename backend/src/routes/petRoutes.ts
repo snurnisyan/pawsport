@@ -5,6 +5,7 @@ import {
   CreatePetMultipartRequestSchema,
   CreatePetRequestSchema,
   IdPathParamsSchema,
+  PetDetailResponseSchema,
   PetListResponseSchema,
   PetResponseSchema,
   UpdatePetRequestSchema
@@ -41,7 +42,7 @@ pets.route("get", "/:id", {
   operationId: "getPet",
   summary: "Get a pet profile",
   request: { params: IdPathParamsSchema },
-  responses: { 200: jsonResponse("Pet profile", PetResponseSchema) },
+  responses: { 200: jsonResponse("Pet profile", PetDetailResponseSchema) },
   handlers: [getPet]
 });
 

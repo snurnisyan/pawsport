@@ -90,10 +90,38 @@ export const createPetHandler = (dependencies: CreatePetHandlerDependencies = {}
 
 export const createPet = createPetHandler();
 
-export const getPet = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const pet = await petService.getPet(requireUserId(req), req.params.id);
-  res.status(200).json({ pet });
-});
+// Pet photos are not sensitive (just pictures) and the same pet detail page is
+// the only place that surfaces the URL, so we sign with the AWS SigV4 maximum
+// to maximise browser cache reuse and minimise re-signing overhead.
+const PET_PHOTO_URL_EXPIRES_SECONDS = 7 * 24 * 60 * 60;
+
+export interface GetPetHandlerDependencies {
+  getPet?: typeof petService.getPet;
+  resolvePetPhotoUrl?: typeof fileService.resolvePetPhotoUrl;
+}
+
+export const getPetHandler = (dependencies: GetPetHandlerDependencies = {}) => {
+  const {
+    getPet: getPetFn = petService.getPet,
+    resolvePetPhotoUrl = fileService.resolvePetPhotoUrl
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const pet = await getPetFn(userId, req.params.id);
+
+    const { photoFileId, ...rest } = pet;
+    const photoUrl = photoFileId
+      ? await resolvePetPhotoUrl(userId, photoFileId, PET_PHOTO_URL_EXPIRES_SECONDS)
+      : null;
+
+    res.status(200).json({
+      pet: photoUrl ? { ...rest, photoUrl } : rest
+    });
+  });
+};
+
+export const getPet = getPetHandler();
 
 export const updatePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
   const pet = await petService.updatePet(requireUserId(req), req.params.id, req.body ?? {});

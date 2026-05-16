@@ -22,7 +22,9 @@ import jwt from "jsonwebtoken";
 import { env } from "../src/config/env";
 import {
   createPetHandler,
-  type CreatePetHandlerDependencies
+  getPetHandler,
+  type CreatePetHandlerDependencies,
+  type GetPetHandlerDependencies
 } from "../src/controllers/petController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
 import { errorHandler } from "../src/middleware/errorHandler";
@@ -331,6 +333,134 @@ test("POST /pets returns 401 when Authorization header is missing", async () => 
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "Cooper", species: "dog" })
     });
+    assert.equal(res.status, 401);
+    const body = (await res.json()) as { error: { code: string } };
+    assert.equal(body.error.code, "UNAUTHORIZED");
+  });
+});
+
+const buildGetApp = (overrides: GetPetHandlerDependencies = {}): express.Express => {
+  const app = express();
+  app.get("/pets/:id", authMiddleware, getPetHandler(overrides));
+  app.use(errorHandler);
+  return app;
+};
+
+const withGetServer = async <T>(
+  overrides: GetPetHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildGetApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+test("GET /pets/:id returns serialized pet without photoUrl when pet has no photo", async () => {
+  let resolveCalled = false;
+
+  await withGetServer(
+    {
+      getPet: async (ownerId, petId) => {
+        assert.equal(ownerId, USER_ID);
+        assert.equal(petId, PET_ID);
+        return fakeSerializedPet();
+      },
+      resolvePetPhotoUrl: async () => {
+        resolveCalled = true;
+        throw new Error("resolvePetPhotoUrl must not be called when pet has no photo");
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
+      assert.equal(body.pet.id, PET_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, undefined);
+    }
+  );
+
+  assert.equal(resolveCalled, false);
+});
+
+test("GET /pets/:id replaces photoFileId with signed photoUrl when pet has a photo", async () => {
+  const signedUrl = "https://s3.example.com/pawsport/users/u/pets/p/files/f/cooper.jpg?X-Amz-Signature=abc";
+  let resolveCall: { ownerId: string; photoFileId: string; expires: number } | undefined;
+
+  await withGetServer(
+    {
+      getPet: async () => fakeSerializedPet({ photoFileId: FILE_ID }),
+      resolvePetPhotoUrl: async (ownerId, photoFileId, expiresInSeconds) => {
+        resolveCall = { ownerId, photoFileId, expires: expiresInSeconds };
+        return signedUrl;
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
+      assert.equal(body.pet.id, PET_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, signedUrl);
+    }
+  );
+
+  assert.equal(resolveCall?.ownerId, USER_ID);
+  assert.equal(resolveCall?.photoFileId, FILE_ID);
+  // 7 days in seconds — the contract this controller commits to.
+  assert.equal(resolveCall?.expires, 7 * 24 * 60 * 60);
+});
+
+test("GET /pets/:id omits photoUrl when the photo file record is missing", async () => {
+  await withGetServer(
+    {
+      getPet: async () => fakeSerializedPet({ photoFileId: FILE_ID }),
+      resolvePetPhotoUrl: async () => null
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
+      assert.equal(body.pet.id, PET_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, undefined);
+    }
+  );
+});
+
+test("GET /pets/:id surfaces service 404 unchanged", async () => {
+  await withGetServer(
+    {
+      getPet: async () => {
+        throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+      },
+      resolvePetPhotoUrl: async () => {
+        throw new Error("resolvePetPhotoUrl must not be called when pet lookup fails");
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, { headers: authHeader() });
+      assert.equal(res.status, 404);
+      const body = (await res.json()) as { error: { code: string } };
+      assert.equal(body.error.code, "PET_NOT_FOUND");
+    }
+  );
+});
+
+test("GET /pets/:id returns 401 when Authorization header is missing", async () => {
+  await withGetServer({}, async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/pets/${PET_ID}`);
     assert.equal(res.status, 401);
     const body = (await res.json()) as { error: { code: string } };
     assert.equal(body.error.code, "UNAUTHORIZED");
