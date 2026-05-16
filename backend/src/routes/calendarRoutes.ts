@@ -7,7 +7,7 @@ const calendar = createDocumentedRouter({ basePath: "/calendar", tags: ["Calenda
 
 calendar.route("get", "/", {
   operationId: "getCalendar",
-  summary: "Get events and reminders for a date range",
+  summary: "Get events for a date range",
   request: { query: CalendarQuerySchema },
   responses: { 200: jsonResponse("Calendar data", CalendarResponseSchema) },
   handlers: [getCalendar]
