@@ -134,10 +134,8 @@ export function ExportTab() {
                   </HStack>
                   <Checkbox.Root
                     checked={checked}
-                    onCheckedChange={(d) =>
-                      setSelected((s) => ({ ...s, [t.id]: Boolean(d.checked) }))
-                    }
                     colorPalette="blue"
+                    pointerEvents="none"
                   >
                     <Checkbox.HiddenInput />
                     <Checkbox.Control />

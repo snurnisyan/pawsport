@@ -12,19 +12,19 @@ import Head from "next/head";
 import { useMemo, useState } from "react";
 import { LuChevronLeft, LuChevronRight, LuFilter } from "react-icons/lu";
 import { CalendarFilters } from "@/components/calendar/CalendarFilters";
-import { MiniMonth } from "@/components/calendar/MiniMonth";
+import { MiniMonth, type TMiniDayEvent } from "@/components/calendar/MiniMonth";
 import { DayDialog } from "@/components/calendar/day/DayDialog";
 import type { TDayEvent, TDayEventType } from "@/components/calendar/day/DayEventCard";
 import { AppWrapper } from "@/components/layout/AppWrapper";
 import { GhostButton } from "@/components/ui/Buttons";
 import { usePetsStore, type TPet } from "@/store/pets";
 
-type TMark = "vaccine" | "treatment" | "visit" | "warning";
+type TMark = "vaccine" | "treatment" | "visit";
 
 const SAMPLE_MARKS: Record<number, Record<number, TMark[]>> = {
-  0: { 12: ["vaccine"], 14: ["warning"] },
-  2: { 14: ["warning"], 22: ["vaccine"] },
-  4: { 5: ["warning"], 15: ["visit"], 29: ["treatment"] },
+  0: { 12: ["vaccine"] },
+  2: { 22: ["vaccine"] },
+  4: { 15: ["visit"], 29: ["treatment"] },
   6: { 18: ["vaccine"] },
   7: { 18: ["treatment"] },
   8: { 2: ["visit", "vaccine", "treatment"], 15: ["vaccine"], 28: ["treatment"] },
@@ -35,7 +35,6 @@ const MARK_TO_EVENT: Record<TMark, { type: TDayEventType; title: string }> = {
   vaccine: { type: "vaccine", title: "Вакцинация (бешенство)" },
   treatment: { type: "treatment", title: "Обработка от паразитов" },
   visit: { type: "visit", title: "Чек-ап" },
-  warning: { type: "operation", title: "Просроченная вакцинация" },
 };
 
 const TIMES = ["09:00", "10:30", "14:00", "16:30"];
@@ -91,6 +90,25 @@ export default function CalendarPage() {
     [pets],
   );
 
+  const miniEventsByMonth = useMemo(() => {
+    const result: Record<number, Record<number, TMiniDayEvent[]>> = {};
+    for (const [monthKey, daysMap] of Object.entries(SAMPLE_MARKS)) {
+      const monthIdx = Number(monthKey);
+      result[monthIdx] = {};
+      for (const [dayKey, marks] of Object.entries(daysMap)) {
+        const dayIdx = Number(dayKey);
+        const events = buildSampleEvents(marks, pets);
+        result[monthIdx][dayIdx] = events.map((event, i) => ({
+          mark: marks[i],
+          title: event.title,
+          petName: event.petName,
+          time: event.time,
+        }));
+      }
+    }
+    return result;
+  }, [pets]);
+
   const dayEvents = selectedDay
     ? buildSampleEvents(
         SAMPLE_MARKS[selectedDay.month]?.[selectedDay.day] ?? [],
@@ -113,42 +131,64 @@ export default function CalendarPage() {
           alignItems="start"
         >
           <Stack gap="20px">
-            <HStack justify="space-between">
-              <HStack gap="8px">
-                <IconButton
-                  aria-label="Предыдущий год"
-                  variant="ghost"
-                  size="sm"
-                  color="fg.muted"
-                  onClick={() => setYear((y) => y - 1)}
+            <Box position="relative">
+              <HStack justify="center">
+                <HStack
+                  gap="8px"
+                  bg="bg.surface"
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  rounded="full"
+                  px="8px"
+                  py="6px"
+                  shadow="card"
                 >
-                  <LuChevronLeft />
-                </IconButton>
-                <Text fontSize="24px" fontWeight={700} minW="80px" textAlign="center">
-                  {year}
-                </Text>
-                <IconButton
-                  aria-label="Следующий год"
-                  variant="ghost"
-                  size="sm"
-                  color="fg.muted"
-                  onClick={() => setYear((y) => y + 1)}
-                >
-                  <LuChevronRight />
-                </IconButton>
+                  <IconButton
+                    aria-label="Предыдущий год"
+                    variant="ghost"
+                    size="sm"
+                    rounded="full"
+                    color="fg.muted"
+                    onClick={() => setYear((y) => y - 1)}
+                  >
+                    <LuChevronLeft />
+                  </IconButton>
+                  <Text
+                    fontSize="20px"
+                    fontWeight={700}
+                    minW="80px"
+                    textAlign="center"
+                  >
+                    {year}
+                  </Text>
+                  <IconButton
+                    aria-label="Следующий год"
+                    variant="ghost"
+                    size="sm"
+                    rounded="full"
+                    color="fg.muted"
+                    onClick={() => setYear((y) => y + 1)}
+                  >
+                    <LuChevronRight />
+                  </IconButton>
+                </HStack>
               </HStack>
               <GhostButton
                 display={["inline-flex", null, null, "none"]}
                 onClick={drawer.onOpen}
                 h="40px"
                 px="16px"
+                position="absolute"
+                top="50%"
+                right="0"
+                transform="translateY(-50%)"
               >
                 <HStack gap="8px">
                   <LuFilter />
                   <Text>Фильтры</Text>
                 </HStack>
               </GhostButton>
-            </HStack>
+            </Box>
 
             <Grid
               templateColumns={["1fr", "1fr 1fr", "repeat(3, 1fr)"]}
@@ -160,7 +200,9 @@ export default function CalendarPage() {
                   year={year}
                   month={m}
                   marks={SAMPLE_MARKS[m] || {}}
+                  eventsByDay={miniEventsByMonth[m] || {}}
                   onDayClick={(day) => setSelectedDay({ year, month: m, day })}
+                  onDayExpand={(day) => setSelectedDay({ year, month: m, day })}
                 />
               ))}
             </Grid>
@@ -179,10 +221,10 @@ export default function CalendarPage() {
           <Drawer.Backdrop />
           <Drawer.Positioner>
             <Drawer.Content bg="bg.surface" maxW="320px">
-              <Drawer.Header>
+              <Drawer.Header px="20px" py="16px" borderBottomWidth="1px" borderColor="border.subtle">
                 <Drawer.Title>Фильтры</Drawer.Title>
               </Drawer.Header>
-              <Drawer.Body>
+              <Drawer.Body px="20px" py="20px">
                 <CalendarFilters />
               </Drawer.Body>
             </Drawer.Content>

@@ -1,7 +1,5 @@
 import {
-  Field,
   Icon,
-  Input,
   Popover,
   Portal,
   Stack,
@@ -10,6 +8,7 @@ import {
 import { LuCalendar } from "react-icons/lu";
 import { Pressable } from "@/components/ui/Pressable";
 import { GhostButton } from "@/components/ui/Buttons";
+import { DateInput } from "@/components/ui/DateInput";
 
 export type TDateRange = {
   from: string;
@@ -39,7 +38,7 @@ export function DateRangeField({ triggerLabel = "Период",
     : `${formatShort(value.from) || "…"} — ${formatShort(value.to) || "…"}`;
 
   return (
-    <Popover.Root positioning={{ placement: "bottom-end" }}>
+    <Popover.Root positioning={{ placement: "bottom-end" }} autoFocus={false}>
       <Popover.Trigger asChild>
         <Pressable
           type="button"
@@ -58,6 +57,7 @@ export function DateRangeField({ triggerLabel = "Период",
           cursor="pointer"
           _hover={{ borderColor: "border.default" }}
         >
+          <Text fontSize="14px">{display}</Text>
           <Icon
             position="absolute"
             left="16px"
@@ -67,7 +67,6 @@ export function DateRangeField({ triggerLabel = "Период",
           >
             <LuCalendar />
           </Icon>
-          <Text fontSize="14px">{display}</Text>
         </Pressable>
       </Popover.Trigger>
       <Portal>
@@ -82,54 +81,16 @@ export function DateRangeField({ triggerLabel = "Период",
             minW="280px"
           >
             <Stack gap="12px">
-              <Field.Root>
-                <Field.Label
-                  fontSize="11px"
-                  fontWeight={700}
-                  color="fg.muted"
-                  textTransform="uppercase"
-                  letterSpacing="0.08em"
-                  mb="6px"
-                >
-                  От
-                </Field.Label>
-                <Input
-                  type="date"
-                  value={value.from}
-                  onChange={(e) => onChange({ from: e.target.value, to: value.to })}
-                  bg="bg.field"
-                  borderColor="border.subtle"
-                  rounded="field"
-                  h="40px"
-                  px="12px"
-                  color="fg.default"
-                  _focusVisible={{ borderColor: "primary.500", boxShadow: "glowSoft" }}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label
-                  fontSize="11px"
-                  fontWeight={700}
-                  color="fg.muted"
-                  textTransform="uppercase"
-                  letterSpacing="0.08em"
-                  mb="6px"
-                >
-                  До
-                </Field.Label>
-                <Input
-                  type="date"
-                  value={value.to}
-                  onChange={(e) => onChange({ from: value.from, to: e.target.value })}
-                  bg="bg.field"
-                  borderColor="border.subtle"
-                  rounded="field"
-                  h="40px"
-                  px="12px"
-                  color="fg.default"
-                  _focusVisible={{ borderColor: "primary.500", boxShadow: "glowSoft" }}
-                />
-              </Field.Root>
+              <DateInput
+                label="От"
+                value={value.from}
+                onChange={(from) => onChange({ from, to: value.to })}
+              />
+              <DateInput
+                label="До"
+                value={value.to}
+                onChange={(to) => onChange({ from: value.from, to })}
+              />
               {hasValue && (
                 <GhostButton h="36px" onClick={() => onChange({ from: "", to: "" })}>
                   Сбросить

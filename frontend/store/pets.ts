@@ -45,7 +45,7 @@ const PETS: TPet[] = [
     ageLabel: "4 года",
     weightKg: 32.5,
     chipNumber: "#982000344211",
-    birthDate: "12 мая 2021",
+    birthDate: "2021-05-12",
     nextEvent: "Следующий визит: июнь 13",
     notes: ["Аллергия на курицу", "Кастрирован"],
     vet: {
