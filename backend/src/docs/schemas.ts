@@ -180,12 +180,6 @@ export const CreatePetMultipartRequestSchema = z
 
 export const UpdatePetRequestSchema = PetMutableSchema.partial().openapi("UpdatePetRequest");
 
-export const PetResponseSchema = z
-  .object({
-    pet: PetSchema
-  })
-  .openapi("PetResponse");
-
 export const PetDetailSchema = PetSchema.omit({ photoFileId: true })
   .extend({
     photoUrl: z.string().url().optional().openapi({
@@ -195,6 +189,12 @@ export const PetDetailSchema = PetSchema.omit({ photoFileId: true })
   })
   .openapi("PetDetail");
 
+export const PetResponseSchema = z
+  .object({
+    pet: PetDetailSchema
+  })
+  .openapi("PetResponse");
+
 export const PetDetailResponseSchema = z
   .object({
     pet: PetDetailSchema
@@ -203,7 +203,7 @@ export const PetDetailResponseSchema = z
 
 export const PetListResponseSchema = z
   .object({
-    items: z.array(PetSchema)
+    items: z.array(PetDetailSchema)
   })
   .openapi("PetListResponse");
 
@@ -316,7 +316,7 @@ export const UploadPetPhotoRequestSchema = z
 
 export const PetPhotoResponseSchema = z
   .object({
-    pet: PetSchema,
+    pet: PetDetailSchema,
     file: FileSchema
   })
   .openapi("PetPhotoResponse");

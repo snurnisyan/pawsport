@@ -23,8 +23,12 @@ import { env } from "../src/config/env";
 import {
   createPetHandler,
   getPetHandler,
+  listPetsHandler,
+  updatePetHandler,
   type CreatePetHandlerDependencies,
-  type GetPetHandlerDependencies
+  type GetPetHandlerDependencies,
+  type ListPetsHandlerDependencies,
+  type UpdatePetHandlerDependencies
 } from "../src/controllers/petController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
 import { errorHandler } from "../src/middleware/errorHandler";
@@ -124,7 +128,41 @@ test("POST /pets (JSON) calls createPet and returns the serialized pet", async (
   assert.equal(createPetCall?.ownerId, USER_ID);
 });
 
+test("POST /pets (JSON) replaces photoFileId with signed photoUrl when present", async () => {
+  const signedUrl = "https://s3.example.com/pawsport/users/u/pets/p/files/f/cooper.jpg?X-Amz-Signature=abc";
+  let resolveCall: { ownerId: string; photoFileId: string; expires: number } | undefined;
+
+  await withServer(
+    {
+      createPet: async () => fakeSerializedPet({ photoFileId: FILE_ID }),
+      resolvePetPhotoUrl: async (ownerId, photoFileId, expiresInSeconds) => {
+        resolveCall = { ownerId, photoFileId, expires: expiresInSeconds };
+        return signedUrl;
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets`, {
+        method: "POST",
+        headers: { ...authHeader(), "content-type": "application/json" },
+        body: JSON.stringify({ name: "Cooper", species: "dog" })
+      });
+      assert.equal(res.status, 201);
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
+      assert.equal(body.pet.id, PET_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, signedUrl);
+    }
+  );
+
+  assert.equal(resolveCall?.ownerId, USER_ID);
+  assert.equal(resolveCall?.photoFileId, FILE_ID);
+  assert.equal(resolveCall?.expires, 7 * 24 * 60 * 60);
+});
+
 test("POST /pets (multipart) parses pet JSON, uploads photo, returns serialized pet", async () => {
+  const signedUrl = "https://s3.example.com/pawsport/users/u/pets/p/files/f/cooper.jpg?X-Amz-Signature=abc";
   const calls: string[] = [];
   let parsedInput: unknown;
   let uploadCall: { ownerId: string; petId: string; file?: { mimetype: string } } | undefined;
@@ -162,6 +200,7 @@ test("POST /pets (multipart) parses pet JSON, uploads photo, returns serialized 
         calls.push("serializePet");
         return fakeSerializedPet({ photoFileId: FILE_ID });
       },
+      resolvePetPhotoUrl: async () => signedUrl,
       deletePet: async () => {
         calls.push("deletePet");
         throw new Error("deletePet must not be called on success");
@@ -178,9 +217,12 @@ test("POST /pets (multipart) parses pet JSON, uploads photo, returns serialized 
         body: form
       });
       assert.equal(res.status, 201);
-      const body = (await res.json()) as { pet: { id: string; photoFileId?: string } };
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
       assert.equal(body.pet.id, PET_ID);
-      assert.equal(body.pet.photoFileId, FILE_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, signedUrl);
     }
   );
 
@@ -339,6 +381,59 @@ test("POST /pets returns 401 when Authorization header is missing", async () => 
   });
 });
 
+const buildListApp = (overrides: ListPetsHandlerDependencies = {}): express.Express => {
+  const app = express();
+  app.get("/pets", authMiddleware, listPetsHandler(overrides));
+  app.use(errorHandler);
+  return app;
+};
+
+const withListServer = async <T>(
+  overrides: ListPetsHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildListApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+test("GET /pets replaces photoFileId with signed photoUrl in list items", async () => {
+  const signedUrl = "https://s3.example.com/pawsport/users/u/pets/p/files/f/cooper.jpg?X-Amz-Signature=abc";
+  let resolveCall: { ownerId: string; photoFileId: string; expires: number } | undefined;
+
+  await withListServer(
+    {
+      listPets: async (ownerId) => {
+        assert.equal(ownerId, USER_ID);
+        return [fakeSerializedPet({ photoFileId: FILE_ID })];
+      },
+      resolvePetPhotoUrl: async (ownerId, photoFileId, expiresInSeconds) => {
+        resolveCall = { ownerId, photoFileId, expires: expiresInSeconds };
+        return signedUrl;
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        items: Array<{ id: string; photoFileId?: string; photoUrl?: string }>;
+      };
+      assert.equal(body.items[0].id, PET_ID);
+      assert.equal(body.items[0].photoFileId, undefined);
+      assert.equal(body.items[0].photoUrl, signedUrl);
+    }
+  );
+
+  assert.equal(resolveCall?.ownerId, USER_ID);
+  assert.equal(resolveCall?.photoFileId, FILE_ID);
+  assert.equal(resolveCall?.expires, 7 * 24 * 60 * 60);
+});
+
 const buildGetApp = (overrides: GetPetHandlerDependencies = {}): express.Express => {
   const app = express();
   app.get("/pets/:id", authMiddleware, getPetHandler(overrides));
@@ -465,6 +560,61 @@ test("GET /pets/:id returns 401 when Authorization header is missing", async () 
     const body = (await res.json()) as { error: { code: string } };
     assert.equal(body.error.code, "UNAUTHORIZED");
   });
+});
+
+const buildUpdateApp = (overrides: UpdatePetHandlerDependencies = {}): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.patch("/pets/:id", authMiddleware, updatePetHandler(overrides));
+  app.use(errorHandler);
+  return app;
+};
+
+const withUpdateServer = async <T>(
+  overrides: UpdatePetHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildUpdateApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+test("PATCH /pets/:id replaces photoFileId with signed photoUrl when pet has a photo", async () => {
+  const signedUrl = "https://s3.example.com/pawsport/users/u/pets/p/files/f/cooper.jpg?X-Amz-Signature=abc";
+  let updateCall: { ownerId: string; petId: string; input: unknown } | undefined;
+
+  await withUpdateServer(
+    {
+      updatePet: async (ownerId, petId, input) => {
+        updateCall = { ownerId, petId, input };
+        return fakeSerializedPet({ photoFileId: FILE_ID });
+      },
+      resolvePetPhotoUrl: async () => signedUrl
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, {
+        method: "PATCH",
+        headers: { ...authHeader(), "content-type": "application/json" },
+        body: JSON.stringify({ name: "Cooper Updated" })
+      });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        pet: { id: string; photoFileId?: string; photoUrl?: string };
+      };
+      assert.equal(body.pet.id, PET_ID);
+      assert.equal(body.pet.photoFileId, undefined);
+      assert.equal(body.pet.photoUrl, signedUrl);
+    }
+  );
+
+  assert.equal(updateCall?.ownerId, USER_ID);
+  assert.equal(updateCall?.petId, PET_ID);
+  assert.deepEqual(updateCall?.input, { name: "Cooper Updated" });
 });
 
 test("POST /pets rejects non-image uploads at the multer fileFilter (before controller runs)", async () => {

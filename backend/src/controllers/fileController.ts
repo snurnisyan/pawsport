@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as fileService from "../services/fileService";
 import { serializePet } from "../services/petService";
+import { serializePetForApi } from "./petResponse";
 
 const requireUserId = (req: AuthenticatedRequest): string => {
   if (!req.user) {
@@ -39,12 +40,33 @@ export const uploadPetFile = asyncHandler(async (req: AuthenticatedRequest, res)
   res.status(201).json({ file });
 });
 
-export const uploadPetPhoto = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const { file, pet } = await fileService.uploadPetPhoto(requireUserId(req), req.params.id, {
-    file: req.file
+export interface UploadPetPhotoHandlerDependencies {
+  uploadPetPhoto?: typeof fileService.uploadPetPhoto;
+  resolvePetPhotoUrl?: typeof fileService.resolvePetPhotoUrl;
+  serializePet?: typeof serializePet;
+}
+
+export const uploadPetPhotoHandler = (dependencies: UploadPetPhotoHandlerDependencies = {}) => {
+  const {
+    uploadPetPhoto: uploadPetPhotoFn = fileService.uploadPetPhoto,
+    resolvePetPhotoUrl = fileService.resolvePetPhotoUrl,
+    serializePet: serializePetFn = serializePet
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const { file, pet } = await uploadPetPhotoFn(userId, req.params.id, {
+      file: req.file
+    });
+    const serializedPet = serializePetFn(pet);
+    res.status(201).json({
+      file,
+      pet: await serializePetForApi(userId, serializedPet, resolvePetPhotoUrl)
+    });
   });
-  res.status(201).json({ file, pet: serializePet(pet) });
-});
+};
+
+export const uploadPetPhoto = uploadPetPhotoHandler();
 
 export const downloadFile = asyncHandler(async (req: AuthenticatedRequest, res) => {
   const file = await fileService.downloadFile(requireUserId(req), req.params.id);
