@@ -114,7 +114,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const email = session?.user.email ?? userEmail;
   const logout = () => {
     clearAuthSession();
-    router.push("/auth");
+    router.push("/auth/login");
   };
 
   return (

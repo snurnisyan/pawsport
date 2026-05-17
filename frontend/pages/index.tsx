@@ -11,7 +11,7 @@ export default function Home() {
   useEffect(() => {
     if (!clientReady) return;
 
-    router.replace(session?.accessToken ? "/pets" : "/auth");
+    router.replace(session?.accessToken ? "/pets" : "/auth/login");
   }, [clientReady, router, session?.accessToken]);
 
   return (
