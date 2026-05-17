@@ -39,6 +39,8 @@ const DEMO_ITEMS: TUpcomingItem[] = [
   },
 ];
 
+const OVERVIEW_EVENT_TYPES: TUpcomingItem["type"][] = ["vaccine", "treatment"];
+
 const formatDate = (date: Date): string =>
   new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
@@ -160,14 +162,18 @@ function LoadingRows() {
 }
 
 export function VaccinesSection({ backendPetId }: TVaccinesSectionProps) {
-  const nextDateFrom = useMemo(() => new Date().toISOString(), [backendPetId]);
+  const nextDateFrom = useMemo(() => new Date().toISOString(), []);
   const nowMs = useMemo(() => Date.parse(nextDateFrom), [nextDateFrom]);
 
   const eventsQuery = useQuery({
     queryKey: backendPetId
-      ? petEventsQueryKey(backendPetId, { nextDateFrom })
+      ? petEventsQueryKey(backendPetId, { nextDateFrom, eventTypes: OVERVIEW_EVENT_TYPES })
       : petEventsQueryKey("demo"),
-    queryFn: () => listPetEvents(backendPetId!, { nextDateFrom }),
+    queryFn: () =>
+      listPetEvents(backendPetId!, {
+        nextDateFrom,
+        eventTypes: OVERVIEW_EVENT_TYPES,
+      }),
     enabled: Boolean(backendPetId),
     staleTime: 30_000,
   });

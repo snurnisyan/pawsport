@@ -1044,6 +1044,7 @@ export interface operations {
                 to?: string;
                 nextDateFrom?: components["schemas"]["DateTime"] & unknown;
                 type?: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
+                eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
             };
             header?: never;
             path: {

@@ -144,3 +144,31 @@ test("GET /pets/:id/events forwards optional type filter", async () => {
 
   assert.deepEqual(receivedQuery, { type: "lab" });
 });
+
+test("GET /pets/:id/events forwards optional eventTypes filters", async () => {
+  let receivedQuery: Record<string, unknown> | undefined;
+
+  await withServer(
+    {
+      listPetEvents: async (_ownerId, _petId, query) => {
+        receivedQuery = query as Record<string, unknown>;
+        return [fakeEvent()];
+      }
+    },
+    async (baseUrl) => {
+      const params = new URLSearchParams([
+        ["eventTypes", "vaccine"],
+        ["eventTypes", "lab"],
+        ["eventTypes", "other"]
+      ]);
+
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}/events?${params.toString()}`, {
+        headers: authHeader()
+      });
+
+      assert.equal(res.status, 200);
+    }
+  );
+
+  assert.deepEqual(receivedQuery, { eventTypes: ["vaccine", "lab", "other"] });
+});
