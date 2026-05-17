@@ -270,9 +270,6 @@ export const EventListQuerySchema = DateRangeQuerySchema.extend({
     description:
       "Filters events by nextDate >= nextDateFrom. This does not change from/to eventDate filtering."
   }),
-  type: z.enum(EVENT_TYPES).optional().openapi({
-    description: "Filters events by event type."
-  }),
   eventTypes: z.array(z.enum(EVENT_TYPES)).optional().openapi({
     description: "Event types to include. Omit or pass an empty list to include all event types."
   })
