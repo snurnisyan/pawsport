@@ -9,6 +9,7 @@ import { EventDialog } from "@/components/pets/events/EventDialog";
 import type { TPet } from "@/store/pets";
 import DogIcon from "@/icons/dog-icon.svg";
 import CatIcon from "@/icons/cat.svg";
+import {TYPE_BG, TYPE_BG_BRIGHT, TYPE_COLOR} from "@/components/pets/events/eventsShared";
 
 const SEX_LABEL: Record<TPet["sex"], string> = {
   male: "Мальчик",
@@ -70,7 +71,7 @@ export function PetCard({ pet }: TPetCardProps) {
           </AspectRatio>
           {pet.status && (
             <Box position="absolute" top="12px" right="12px" zIndex={2}>
-              <StatusBadge tone={pet.status.tone} variant={"bright"}>
+              <StatusBadge styleColors={{ bg: TYPE_BG_BRIGHT[pet.status], color: "white" }}>
                 {pet.status.label}
               </StatusBadge>
             </Box>

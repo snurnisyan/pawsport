@@ -1,18 +1,19 @@
-import { HStack, IconButton, Stack, Text } from "@chakra-ui/react";
-import { LuClock, LuMapPin, LuPenLine } from "react-icons/lu";
+import {Flex, HStack, IconButton, Stack, Text} from "@chakra-ui/react";
+import { LuClock, LuMapPin, LuPenLine, LuTrash } from "react-icons/lu";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { TPetEvent } from "@/lib/petsApi";
-import { RU_MONTH_SHORT, TYPE_LABEL, TYPE_TONE } from "./eventsShared";
+import {RU_MONTH_SHORT, TYPE_BG, TYPE_COLOR, TYPE_LABEL} from "./eventsShared";
 
 type TEventRowProps = {
   event: TPetEvent;
   onEdit: (event: TPetEvent) => void;
+  onDelete: (event: TPetEvent) => void;
 };
 
 const formatTime = (date: Date): string =>
   `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
-export function EventRow({ event, onEdit }: TEventRowProps) {
+export function EventRow({ event, onEdit, onDelete }: TEventRowProps) {
   const d = new Date(event.eventDate);
   const time = formatTime(d);
   return (
@@ -44,38 +45,54 @@ export function EventRow({ event, onEdit }: TEventRowProps) {
       <Stack flex={1} gap="4px">
         <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap="8px">
           <Text fontWeight={600}>{event.title}</Text>
-          <StatusBadge tone={TYPE_TONE[event.type]}>
-            {TYPE_LABEL[event.type]}
+          <StatusBadge styleColors={{ bg: TYPE_BG[event.type], color: TYPE_COLOR[event.type] }}>
+            <Text whiteSpace={"normal"} width={["min-content", "min-content", "fit-content"]}>
+              {TYPE_LABEL[event.type]}
+            </Text>
           </StatusBadge>
         </HStack>
-        <HStack gap="16px" fontSize="14px" color="fg.muted" flexWrap="wrap">
-          <HStack gap="4px">
-            <LuClock />
-            <Text>{time}</Text>
-          </HStack>
-          {event.clinicName && (
+        <Flex justifyContent="space-between" alignItems="center" gap={"24px"}>
+          <HStack gap="16px" fontSize="14px" color="fg.muted" flexWrap="wrap">
             <HStack gap="4px">
-              <LuMapPin />
-              <Text>{event.clinicName}</Text>
+              <LuClock />
+              <Text>{time}</Text>
             </HStack>
+            {event.clinicName && (
+              <HStack gap="4px">
+                <LuMapPin />
+                <Text>{event.clinicName}</Text>
+              </HStack>
+            )}
+          </HStack>
+          {event.comment && (
+            <Text fontSize="14px" color="fg.subtle">
+              {event.comment}
+            </Text>
           )}
-        </HStack>
-        {event.comment && (
-          <Text fontSize="14px" color="fg.subtle">
-            {event.comment}
-          </Text>
-        )}
+          <HStack gap="4px" flexShrink={0}>
+            <IconButton
+              aria-label="Редактировать"
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() => onEdit(event)}
+              _hover={{ color: "fg.default", bg: "secondary.700" }}
+            >
+              <LuPenLine />
+            </IconButton>
+            <IconButton
+              aria-label="Удалить"
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() => onDelete(event)}
+              _hover={{ color: "status.danger", bg: "secondary.700" }}
+            >
+              <LuTrash />
+            </IconButton>
+          </HStack>
+        </Flex>
       </Stack>
-      <IconButton
-        aria-label="Редактировать"
-        size="xs"
-        variant="ghost"
-        color="fg.muted"
-        onClick={() => onEdit(event)}
-        _hover={{ color: "fg.default", bg: "secondary.700" }}
-      >
-        <LuPenLine />
-      </IconButton>
     </HStack>
   );
 }

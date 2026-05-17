@@ -1,38 +1,16 @@
 import type { ReactNode } from "react";
 import { Badge } from "@chakra-ui/react";
 
-type TTone = "danger" | "warning" | "success" | "info" | "purple" | "teal";
-
 type TStatusBadgeProps = {
-  tone?: TTone;
-  variant?: "simple" | "bright";
   children: ReactNode;
+  styleColors: { bg: string; color: string };
 };
 
-const STYLES: Record<TTone, { bg: string; color: string }> = {
-  danger: { bg: "rgba(239, 68, 68, 0.15)", color: "#FCA5A5" },
-  warning: { bg: "rgba(245, 158, 11, 0.15)", color: "#FCD34D" },
-  success: { bg: "rgba(16, 185, 129, 0.15)", color: "#6EE7B7" },
-  info: { bg: "rgba(59, 130, 246, 0.15)", color: "#93C5FD" },
-  purple: { bg: "rgba(168, 85, 247, 0.18)", color: "#D8B4FE" },
-  teal: { bg: "rgba(20, 184, 166, 0.18)", color: "#5EEAD4" },
-};
-
-const STYLES_BRIGHT: Record<TTone, { bg: string; color: string }> = {
-  danger: { bg: "rgba(239, 68, 68)", color: "#FFFFFF" },
-  warning: { bg: "rgba(245, 158, 11)", color: "#FFFFFF" },
-  success: { bg: "rgba(16, 185, 129)", color: "#FFFFFF" },
-  info: { bg: "rgba(59, 130, 246)", color: "#FFFFFF" },
-  purple: { bg: "rgba(168, 85, 247)", color: "#FFFFFF" },
-  teal: { bg: "rgba(20, 184, 166)", color: "#FFFFFF" },
-};
-
-export function StatusBadge({ tone = "info", children, variant = "simple" }: TStatusBadgeProps) {
-  const s = variant === "simple" ? STYLES[tone] : STYLES_BRIGHT[tone];
+export function StatusBadge({ styleColors, children }: TStatusBadgeProps) {
   return (
     <Badge
-      bg={s.bg}
-      color={s.color}
+      bg={styleColors.bg}
+      color={styleColors.color}
       px="12px"
       py="4px"
       rounded="full"

@@ -9,9 +9,10 @@ const FADE_HEIGHT = 100;
 type TEventsFeedProps = {
   events: TPetEvent[];
   onEdit: (event: TPetEvent) => void;
+  onDelete: (event: TPetEvent) => void;
 };
 
-export function EventsFeed({ events, onEdit }: TEventsFeedProps) {
+export function EventsFeed({ events, onEdit, onDelete }: TEventsFeedProps) {
   const groups = useMemo(() => buildGroups(events), [events]);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -47,7 +48,12 @@ export function EventsFeed({ events, onEdit }: TEventsFeedProps) {
       >
         {groups.map((g) => (
           <Box key={g.key} ref={g.isCurrent ? currentRef : undefined}>
-            <EventGroupBlock group={g} onEdit={onEdit} highlighted={g.isCurrent} />
+            <EventGroupBlock
+              group={g}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              highlighted={g.isCurrent}
+            />
           </Box>
         ))}
       </Stack>

@@ -6,10 +6,16 @@ import type { TEventGroup } from "./eventsShared";
 type TEventGroupBlockProps = {
   group: TEventGroup;
   onEdit: (event: TPetEvent) => void;
+  onDelete: (event: TPetEvent) => void;
   highlighted?: boolean;
 };
 
-export function EventGroupBlock({ group, onEdit, highlighted }: TEventGroupBlockProps) {
+export function EventGroupBlock({
+  group,
+  onEdit,
+  onDelete,
+  highlighted,
+}: TEventGroupBlockProps) {
   return (
     <Stack gap="12px">
       <Text
@@ -28,7 +34,7 @@ export function EventGroupBlock({ group, onEdit, highlighted }: TEventGroupBlock
       ) : (
         <Stack gap="8px">
           {group.events.map((e) => (
-            <EventRow key={e.id} event={e} onEdit={onEdit} />
+            <EventRow key={e.id} event={e} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </Stack>
       )}

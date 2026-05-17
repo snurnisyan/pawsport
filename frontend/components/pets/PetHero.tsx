@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { PhotoUploadDialog } from "@/components/pets/PhotoUploadDialog";
 import type { TPet } from "@/store/pets";
+import {EVENT_TYPE_META} from "@/lib/eventTypes";
 
 type TPetHeroProps = {
   pet: TPet;
@@ -90,7 +91,7 @@ export function PetHero({ pet }: TPetHeroProps) {
             >
               {pet.name}
             </Text>
-            <StatusBadge tone="info">{pet.breed}</StatusBadge>
+            <StatusBadge styleColors={EVENT_TYPE_META["visit"]}>{pet.breed}</StatusBadge>
           </HStack>
           <HStack gap="16px" color="fg.subtle" fontSize="14px">
             <HStack gap="4px">
