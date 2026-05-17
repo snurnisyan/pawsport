@@ -1,10 +1,7 @@
 import { create } from "zustand";
 import type { components } from "@/types/api";
 
-export type TPetStatus = {
-  tone: "danger" | "warning" | "success";
-  label: string;
-};
+export type TPetExpiredEvent = components["schemas"]["ExpiredEvent"];
 
 export type TPet = {
   id: string;
@@ -17,8 +14,7 @@ export type TPet = {
   imageUrl?: string;
   chipNumber?: string;
   birthDate?: string;
-  status?: TPetStatus;
-  nextEvent?: string;
+  expiredEvents?: TPetExpiredEvent[];
   notes: string[];
   vet?: { name: string; phone: string; email: string };
 };
@@ -49,7 +45,6 @@ const PETS: TPet[] = [
     weightKg: 32.5,
     chipNumber: "#982000344211",
     birthDate: "2021-05-12",
-    nextEvent: "Следующий визит: июнь 13",
     notes: ["Аллергия на курицу", "Кастрирован"],
     vet: {
       name: "Юлия Фёдорова",
@@ -67,8 +62,15 @@ const PETS: TPet[] = [
     weightKg: 6,
     imageUrl:
       "https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=1200&q=80",
-    status: { tone: "danger", label: "Просрочена вакцинация" },
-    nextEvent: "Просрочена вакцинация: март 19",
+    expiredEvents: [
+      {
+        type: "vaccine",
+        subtype: "complex",
+        title: "Комплексная вакцинация",
+        eventDate: "2025-03-19T00:00:00Z",
+        nextDate: "2026-03-19T00:00:00Z",
+      },
+    ],
     notes: [],
   },
   {
@@ -81,8 +83,6 @@ const PETS: TPet[] = [
     weightKg: 7,
     imageUrl:
       "https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?w=1200&q=80",
-    status: { tone: "warning", label: "Скоро вакцинация" },
-    nextEvent: "Следующая вакцинация: май 5",
     notes: [],
   },
 ];
