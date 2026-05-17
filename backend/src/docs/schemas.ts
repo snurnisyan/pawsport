@@ -269,6 +269,9 @@ export const EventListQuerySchema = DateRangeQuerySchema.extend({
   nextDateFrom: DateTimeSchema.optional().openapi({
     description:
       "Filters events by nextDate >= nextDateFrom. This does not change from/to eventDate filtering."
+  }),
+  type: z.enum(EVENT_TYPES).optional().openapi({
+    description: "Filters events by event type."
   })
 });
 

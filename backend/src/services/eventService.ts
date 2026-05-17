@@ -26,10 +26,12 @@ import {
 
 export interface EventListQuery extends DateRangeQuery {
   nextDateFrom?: unknown;
+  type?: unknown;
 }
 
 export interface EventListFilters extends OptionalDateRange {
   nextDateFrom?: Date;
+  type?: EventType;
 }
 
 export interface CreateEventInput {
@@ -227,6 +229,13 @@ const parseType = (value: unknown): EventType => {
     throw new AppError(400, "INVALID_TYPE", `type must be one of: ${EVENT_TYPES.join(", ")}`);
   }
   return value as EventType;
+};
+
+const parseOptionalType = (value: unknown): EventType | undefined => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  return parseType(value);
 };
 
 const parseReminderOffset = (value: unknown): ReminderOffset | undefined => {
@@ -440,8 +449,9 @@ const parseEventListFilters = (query: EventListQuery): EventListFilters => {
     "INVALID_NEXT_DATE_RANGE",
     "nextDateFrom must be a valid ISO date-time string"
   );
+  const type = parseOptionalType(query.type);
 
-  return { ...range, nextDateFrom };
+  return { ...range, nextDateFrom, type };
 };
 
 export const buildEventListFilter = (
@@ -455,6 +465,7 @@ export const buildEventListFilter = (
   if (filters.to) eventDate.$lte = filters.to;
   if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
   if (filters.nextDateFrom) filter.nextDate = { $gte: filters.nextDateFrom };
+  if (filters.type) filter.type = filters.type;
   return filter;
 };
 
