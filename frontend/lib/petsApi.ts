@@ -32,6 +32,15 @@ export type TPetEventListResponse = components["schemas"]["EventListResponse"];
 export type TPetEventsQuery = NonNullable<
   paths["/pets/{id}/events"]["get"]["parameters"]["query"]
 >;
+export type TReminder = components["schemas"]["Reminder"];
+export type TReminderListResponse = components["schemas"]["ReminderListResponse"];
+export type TReminderListQuery = NonNullable<
+  paths["/reminders"]["get"]["parameters"]["query"]
+>;
+export type TMarkRemindersReadRequest =
+  components["schemas"]["MarkRemindersReadRequest"];
+export type TMarkRemindersReadResponse =
+  components["schemas"]["MarkRemindersReadResponse"];
 export type TPetExport = components["schemas"]["Export"];
 export type TCreatePetExportRequest = components["schemas"]["CreateExportRequest"];
 export type TPetExportResponse = components["schemas"]["ExportResponse"];
@@ -49,6 +58,8 @@ export const petFilesQueryKey = (petId: string, filters?: TPetFilesQuery) =>
   ["pets", petId, "files", filters ?? {}] as const;
 export const petEventsQueryKey = (petId: string, filters?: TPetEventsQuery) =>
   ["pets", petId, "events", filters ?? {}] as const;
+export const remindersQueryKey = (filters?: TReminderListQuery) =>
+  ["reminders", filters ?? {}] as const;
 export const petExportMutationKey = (petId: string) => ["pets", petId, "export"] as const;
 export const exportQueryKey = (exportId: string) => ["exports", exportId] as const;
 
@@ -95,6 +106,23 @@ export const listPetEvents = (
   unwrapApiResponse(
     apiClient.GET("/pets/{id}/events", {
       params: { path: { id: petId }, query },
+    })
+  );
+
+export const listActiveReminders = (): Promise<TReminderListResponse> =>
+  unwrapApiResponse(
+    apiClient.GET("/reminders", {
+      params: { query: { activeOnly: "true" } },
+    })
+  );
+
+export const markRemindersRead = (
+  ids: string[]
+): Promise<TMarkRemindersReadResponse> =>
+  unwrapApiResponse(
+    apiClient.POST("/reminders/read", {
+      body: { ids } satisfies TMarkRemindersReadRequest,
+      headers: { "Content-Type": "application/json" },
     })
   );
 

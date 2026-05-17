@@ -55,6 +55,7 @@ test("updateReminder applies dueAt and sendAt updates", async () => {
   assert.ok(captured);
   assert.equal((captured.set.dueAt as Date).toISOString(), "2026-07-01T10:00:00.000Z");
   assert.equal((captured.set.sendAt as Date).toISOString(), "2026-06-24T10:00:00.000Z");
+  assert.deepEqual(captured.unset, ["readAt"]);
   assert.equal(result.dueAt, "2026-07-01T10:00:00.000Z");
   assert.equal(result.sendAt, "2026-06-24T10:00:00.000Z");
 });
@@ -77,6 +78,27 @@ test("updateReminder allows transitioning status to cancelled", async () => {
 
   assert.equal(captured?.set.status, "cancelled");
   assert.equal(result.status, "cancelled");
+});
+
+test("updateReminder resets readAt when offset changes", async () => {
+  let captured: ReminderUpdates | undefined;
+
+  await updateReminder(
+    ownerId,
+    reminderId,
+    { offset: "day" },
+    {
+      findReminderByIdForOwner: async () =>
+        makeReminderRecord({ readAt: new Date("2026-05-17T10:00:00.000Z") }),
+      updateReminderRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeReminderRecord({ offset: "day" });
+      }
+    }
+  );
+
+  assert.equal(captured?.set.offset, "day");
+  assert.deepEqual(captured?.unset, ["readAt"]);
 });
 
 test("updateReminder returns current reminder when body is empty", async () => {

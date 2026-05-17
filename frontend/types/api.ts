@@ -318,6 +318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reminders/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark reminders as read */
+        post: operations["markRemindersRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reminders/{id}": {
         parameters: {
             query?: never;
@@ -695,7 +712,23 @@ export interface components {
             offset: "day" | "week" | "month";
             /** @enum {string} */
             status: "pending" | "sent" | "failed" | "cancelled";
+            /**
+             * Format: date-time
+             * @example 2026-05-17T10:00:00.000Z
+             */
+            readAt: string | null;
             lastError?: string;
+            event?: {
+                id: components["schemas"]["ObjectId"];
+                /** @enum {string} */
+                type: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
+                title: string;
+                eventDate: components["schemas"]["DateTime"];
+            };
+            pet?: {
+                id: components["schemas"]["ObjectId"];
+                name: string;
+            };
             createdAt: components["schemas"]["DateTime"];
             updatedAt: components["schemas"]["DateTime"];
         };
@@ -717,6 +750,15 @@ export interface components {
             sendAt: components["schemas"]["DateTime"];
             /** @enum {string} */
             offset: "day" | "week" | "month";
+        };
+        MarkRemindersReadResponse: {
+            items: {
+                id: components["schemas"]["ObjectId"];
+                readAt: components["schemas"]["DateTime"];
+            }[];
+        };
+        MarkRemindersReadRequest: {
+            ids: components["schemas"]["ObjectId"][];
         };
         UpdateReminderRequest: {
             dueAt?: components["schemas"]["DateTime"];
@@ -1840,7 +1882,9 @@ export interface operations {
     };
     listReminders: {
         parameters: {
-            query?: never;
+            query?: {
+                activeOnly?: "true" | "false";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1896,6 +1940,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReminderResponse"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    markRemindersRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkRemindersReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Reminders marked as read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkRemindersReadResponse"];
                 };
             };
             /** @description Request validation failed */

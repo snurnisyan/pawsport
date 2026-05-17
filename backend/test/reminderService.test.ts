@@ -6,6 +6,7 @@ import { AppError } from "../src/middleware/errorHandler";
 import {
   createReminder,
   listReminders,
+  markRemindersRead,
   serializeReminder
 } from "../src/services/reminderService";
 
@@ -84,6 +85,7 @@ test("createReminder persists normalized input and returns serialized reminder",
   assert.equal(result.sendAt, "2026-05-25T10:00:00.000Z");
   assert.equal(result.offset, "week");
   assert.equal(result.status, "pending");
+  assert.equal(result.readAt, null);
 });
 
 test("createReminder defaults channel to email when omitted", async () => {
@@ -256,8 +258,9 @@ test("createReminder returns 404 when event belongs to another pet", async () =>
 
 test("listReminders filters by owner and returns serialized reminders", async () => {
   const result = await listReminders(ownerId, {
-    listRemindersForOwner: async (id) => {
+    listRemindersForOwner: async (id, filters) => {
       assert.equal(id.toString(), ownerId);
+      assert.equal(filters.activeOnly, false);
       return [
         makeReminderRecord(),
         makeReminderRecord({
@@ -273,6 +276,58 @@ test("listReminders filters by owner and returns serialized reminders", async ()
   assert.equal(result[0].offset, "week");
   assert.equal(result[1].offset, "day");
   assert.equal(result[0].ownerId, ownerId);
+});
+
+test("listReminders passes activeOnly filter for header reminders", async () => {
+  const result = await listReminders(ownerId, { activeOnly: "true" }, {
+    listRemindersForOwner: async (id, filters) => {
+      assert.equal(id.toString(), ownerId);
+      assert.deepEqual(filters, { activeOnly: true });
+      return [
+        makeReminderRecord({
+          status: "sent",
+          readAt: new Date("2026-05-17T10:00:00.000Z"),
+          event: {
+            _id: new Types.ObjectId(eventId),
+            type: "vaccine",
+            title: "Бешенство",
+            eventDate: new Date("2026-06-01T10:00:00.000Z")
+          },
+          pet: {
+            _id: new Types.ObjectId(petId),
+            name: "Мия"
+          }
+        })
+      ];
+    }
+  });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].status, "sent");
+  assert.equal(result[0].readAt, "2026-05-17T10:00:00.000Z");
+  assert.deepEqual(result[0].event, {
+    id: eventId,
+    type: "vaccine",
+    title: "Бешенство",
+    eventDate: "2026-06-01T10:00:00.000Z"
+  });
+  assert.deepEqual(result[0].pet, { id: petId, name: "Мия" });
+});
+
+test("listReminders rejects malformed activeOnly filter", async () => {
+  await assert.rejects(
+    () => listReminders(ownerId, { activeOnly: "yes" }, {
+      listRemindersForOwner: async () => {
+        throw new Error("should not be called");
+      }
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_REMINDER_FILTER");
+      return true;
+    }
+  );
 });
 
 test("listReminders returns empty array when other owner has nothing", async () => {
@@ -294,4 +349,52 @@ test("serializeReminder hides lastError when absent", () => {
 test("serializeReminder includes lastError when present", () => {
   const serialized = serializeReminder(makeReminderRecord({ lastError: "SMTP failed" }));
   assert.equal(serialized.lastError, "SMTP failed");
+});
+
+test("markRemindersRead persists readAt for owned reminders", async () => {
+  const readAt = new Date("2026-05-17T10:00:00.000Z");
+  let captured: Record<string, unknown> | undefined;
+
+  const result = await markRemindersRead(
+    ownerId,
+    { ids: [reminderId] },
+    {
+      now: () => readAt,
+      markRemindersReadRecords: async (ids, owner, value) => {
+        captured = { ids, owner, value };
+        return [{ _id: ids[0], readAt: value }];
+      }
+    }
+  );
+
+  assert.ok(captured);
+  assert.equal(((captured.ids as Types.ObjectId[])[0]).toString(), reminderId);
+  assert.equal((captured.owner as Types.ObjectId).toString(), ownerId);
+  assert.equal((captured.value as Date).toISOString(), "2026-05-17T10:00:00.000Z");
+  assert.deepEqual(result, [{ id: reminderId, readAt: "2026-05-17T10:00:00.000Z" }]);
+});
+
+test("markRemindersRead isolates owners by repository contract", async () => {
+  const result = await markRemindersRead(otherOwnerId, { ids: [reminderId] }, {
+    markRemindersReadRecords: async (_ids, owner, _readAt) => {
+      assert.equal(owner.toString(), otherOwnerId);
+      return [];
+    }
+  });
+
+  assert.deepEqual(result, []);
+});
+
+test("markRemindersRead rejects invalid ids", async () => {
+  for (const input of [{}, { ids: ["not-an-id"] }, { ids: "not-an-array" }]) {
+    await assert.rejects(
+      () => markRemindersRead(ownerId, input),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.statusCode, 400);
+        assert.equal(error.code, "INVALID_REMINDER_ID");
+        return true;
+      }
+    );
+  }
 });

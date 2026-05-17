@@ -341,7 +341,24 @@ export const ReminderSchema = z
     sendAt: DateTimeSchema,
     offset: z.enum(REMINDER_OFFSETS),
     status: z.enum(REMINDER_STATUSES),
+    readAt: z.string().datetime().nullable().openapi({
+      example: "2026-05-17T10:00:00.000Z"
+    }),
     lastError: z.string().optional(),
+    event: z
+      .object({
+        id: ObjectIdSchema,
+        type: z.enum(EVENT_TYPES),
+        title: z.string(),
+        eventDate: DateTimeSchema
+      })
+      .optional(),
+    pet: z
+      .object({
+        id: ObjectIdSchema,
+        name: z.string()
+      })
+      .optional(),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
   })
@@ -380,6 +397,34 @@ export const ReminderListResponseSchema = z
     items: z.array(ReminderSchema)
   })
   .openapi("ReminderListResponse");
+
+export const ReminderListQuerySchema = z
+  .object({
+    activeOnly: z
+      .enum(["true", "false"])
+      .optional()
+      .openapi({
+        description: "When true, returns only active header reminders whose threshold has arrived."
+      })
+  })
+  .openapi("ReminderListQuery");
+
+export const MarkRemindersReadRequestSchema = z
+  .object({
+    ids: z.array(ObjectIdSchema)
+  })
+  .openapi("MarkRemindersReadRequest");
+
+export const MarkRemindersReadResponseSchema = z
+  .object({
+    items: z.array(
+      z.object({
+        id: ObjectIdSchema,
+        readAt: DateTimeSchema
+      })
+    )
+  })
+  .openapi("MarkRemindersReadResponse");
 
 export const CalendarQuerySchema = DateRangeQuerySchema.extend({
   petIds: z.array(ObjectIdSchema).optional().openapi({

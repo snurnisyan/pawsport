@@ -18,6 +18,7 @@ export interface IReminder {
   sendAt: Date;
   offset: ReminderOffset;
   status: ReminderStatus;
+  readAt?: Date;
   lastError?: string;
   processingToken?: string;
   processingStartedAt?: Date;
@@ -75,6 +76,9 @@ const reminderSchema = new Schema<IReminder>(
       default: "pending",
       required: true,
       index: true
+    },
+    readAt: {
+      type: Date
     },
     lastError: {
       type: String
