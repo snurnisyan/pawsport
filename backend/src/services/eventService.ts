@@ -24,6 +24,14 @@ import {
   type OptionalDateRange
 } from "./dateRange";
 
+export interface EventListQuery extends DateRangeQuery {
+  nextDateFrom?: unknown;
+}
+
+export interface EventListFilters extends OptionalDateRange {
+  nextDateFrom?: Date;
+}
+
 export interface CreateEventInput {
   type?: unknown;
   title?: unknown;
@@ -111,7 +119,7 @@ export interface EventServiceDependencies {
   listEventsForOwnerPet?: (
     ownerId: Types.ObjectId,
     petId: Types.ObjectId,
-    range: OptionalDateRange
+    filters: EventListFilters
   ) => Promise<EventRecord[]>;
   findPetByIdForOwner?: (
     petId: Types.ObjectId,
@@ -198,6 +206,20 @@ const optionalDate = (value: unknown, code: string, message: string): Date | und
     return undefined;
   }
   return parseDate(value, code, message);
+};
+
+const optionalDateTime = (value: unknown, code: string, message: string): Date | undefined => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new AppError(400, code, message);
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new AppError(400, code, message);
+  }
+  return date;
 };
 
 const parseType = (value: unknown): EventType => {
@@ -411,6 +433,31 @@ const requireEventId = (eventId: string): Types.ObjectId => {
   return new Types.ObjectId(eventId);
 };
 
+const parseEventListFilters = (query: EventListQuery): EventListFilters => {
+  const range = parseOptionalDateRange(query);
+  const nextDateFrom = optionalDateTime(
+    query.nextDateFrom,
+    "INVALID_NEXT_DATE_RANGE",
+    "nextDateFrom must be a valid ISO date-time string"
+  );
+
+  return { ...range, nextDateFrom };
+};
+
+export const buildEventListFilter = (
+  ownerId: Types.ObjectId,
+  petId: Types.ObjectId,
+  filters: EventListFilters
+): Record<string, unknown> => {
+  const filter: Record<string, unknown> = { ownerId, petId };
+  const eventDate: Record<string, Date> = {};
+  if (filters.from) eventDate.$gte = filters.from;
+  if (filters.to) eventDate.$lte = filters.to;
+  if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
+  if (filters.nextDateFrom) filter.nextDate = { $gte: filters.nextDateFrom };
+  return filter;
+};
+
 const defaultFindEvent: NonNullable<EventServiceDependencies["findEventByIdForOwner"]> = async (
   eventId,
   ownerId
@@ -512,24 +559,19 @@ export const createPetEvent = async (
 export const listPetEvents = async (
   ownerId: string,
   petId: string,
-  queryOrDependencies: DateRangeQuery | EventServiceDependencies = {},
+  queryOrDependencies: EventListQuery | EventServiceDependencies = {},
   maybeDependencies?: EventServiceDependencies
 ): Promise<SerializedEvent[]> => {
   const thirdArgumentIsDependencies = isEventServiceDependencies(queryOrDependencies);
   const query = maybeDependencies
-    ? (queryOrDependencies as DateRangeQuery)
+    ? (queryOrDependencies as EventListQuery)
     : thirdArgumentIsDependencies
       ? {}
-      : (queryOrDependencies as DateRangeQuery);
+      : (queryOrDependencies as EventListQuery);
   const dependencies = maybeDependencies ?? (thirdArgumentIsDependencies ? queryOrDependencies : {});
   const {
-    listEventsForOwnerPet = async (owner, pet, range) => {
-      const filter: Record<string, unknown> = { ownerId: owner, petId: pet };
-      const eventDate: Record<string, Date> = {};
-      if (range.from) eventDate.$gte = range.from;
-      if (range.to) eventDate.$lte = range.to;
-      if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
-
+    listEventsForOwnerPet = async (owner, pet, filters) => {
+      const filter = buildEventListFilter(owner, pet, filters);
       return EventModel.find(filter)
         .sort({ eventDate: -1 })
         .exec() as unknown as EventRecord[];
@@ -539,14 +581,14 @@ export const listPetEvents = async (
 
   const ownerObjectId = requireOwnerId(ownerId);
   const petObjectId = requirePetId(petId);
-  const range = parseOptionalDateRange(query);
+  const filters = parseEventListFilters(query);
 
   const pet = await findPetByIdForOwner(petObjectId, ownerObjectId);
   if (!pet) {
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
 
-  const events = await listEventsForOwnerPet(ownerObjectId, petObjectId, range);
+  const events = await listEventsForOwnerPet(ownerObjectId, petObjectId, filters);
   return events.map(serializeEvent);
 };
 

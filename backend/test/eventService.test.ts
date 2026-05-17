@@ -4,6 +4,7 @@ import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
 import {
+  buildEventListFilter,
   calculateReminderSendAt,
   createPetEvent,
   listPetEvents,
@@ -409,6 +410,80 @@ test("listPetEvents leaves missing date bounds unrestricted", async () => {
   assert.equal(observedRange?.to, undefined);
 });
 
+test("listPetEvents passes nextDateFrom separately from eventDate filters", async () => {
+  let observedFilters: { from?: Date; to?: Date; nextDateFrom?: Date } | undefined;
+
+  await listPetEvents(
+    ownerId,
+    petId,
+    {
+      from: "2026-05-01",
+      to: "2026-05-31",
+      nextDateFrom: "2026-05-17T10:30:00.000Z"
+    },
+    {
+      findPetByIdForOwner: petFound,
+      listEventsForOwnerPet: async (_owner, _pet, filters) => {
+        observedFilters = filters;
+        return [];
+      }
+    }
+  );
+
+  assert.equal(observedFilters?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
+  assert.equal(observedFilters?.to?.toISOString(), "2026-05-31T23:59:59.999Z");
+  assert.equal(observedFilters?.nextDateFrom?.toISOString(), "2026-05-17T10:30:00.000Z");
+});
+
+test("listPetEvents rejects invalid nextDateFrom", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { nextDateFrom: "not-a-date" },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_NEXT_DATE_RANGE");
+      return true;
+    }
+  );
+});
+
+test("buildEventListFilter applies nextDateFrom without repurposing eventDate range", () => {
+  const owner = new Types.ObjectId(ownerId);
+  const pet = new Types.ObjectId(petId);
+  const from = new Date("2026-05-01T00:00:00.000Z");
+  const to = new Date("2026-05-31T23:59:59.999Z");
+  const nextDateFrom = new Date("2026-06-01T00:00:00.000Z");
+
+  const filter = buildEventListFilter(owner, pet, { from, to, nextDateFrom });
+
+  assert.equal(filter.ownerId, owner);
+  assert.equal(filter.petId, pet);
+  assert.deepEqual(filter.eventDate, { $gte: from, $lte: to });
+  assert.deepEqual(filter.nextDate, { $gte: nextDateFrom });
+});
+
+test("buildEventListFilter excludes missing nextDate records when nextDateFrom is present", () => {
+  const nextDateFrom = new Date("2026-06-01T00:00:00.000Z");
+  const filter = buildEventListFilter(
+    new Types.ObjectId(ownerId),
+    new Types.ObjectId(petId),
+    { nextDateFrom }
+  );
+
+  assert.deepEqual(filter.nextDate, { $gte: nextDateFrom });
+});
+
 test("listPetEvents rejects an inverted date range", async () => {
   await assert.rejects(
     () =>
@@ -448,6 +523,39 @@ test("listPetEvents returns 404 when pet does not belong to owner", async () => 
       return true;
     }
   );
+});
+
+test("listPetEvents preserves ownership isolation when nextDateFrom is present", async () => {
+  let observedOwner: string | undefined;
+  let repositoryCalled = false;
+
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        otherOwnerId,
+        petId,
+        { nextDateFrom: "2026-05-17T10:30:00.000Z" },
+        {
+          findPetByIdForOwner: async (_id, owner) => {
+            observedOwner = owner.toString();
+            return null;
+          },
+          listEventsForOwnerPet: async () => {
+            repositoryCalled = true;
+            return [];
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 404);
+      assert.equal(error.code, "PET_NOT_FOUND");
+      return true;
+    }
+  );
+
+  assert.equal(observedOwner, otherOwnerId);
+  assert.equal(repositoryCalled, false);
 });
 
 test("listPetEvents rejects invalid petId with 400", async () => {

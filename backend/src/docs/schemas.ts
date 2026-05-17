@@ -265,6 +265,13 @@ export const DateRangeQuerySchema = z.object({
   to: DateSchema.optional()
 });
 
+export const EventListQuerySchema = DateRangeQuerySchema.extend({
+  nextDateFrom: DateTimeSchema.optional().openapi({
+    description:
+      "Filters events by nextDate >= nextDateFrom. This does not change from/to eventDate filtering."
+  })
+});
+
 export const EventListResponseSchema = z
   .object({
     items: z.array(EventSchema)

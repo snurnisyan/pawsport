@@ -94,3 +94,29 @@ test("GET /pets/:id/events forwards optional from/to filters", async () => {
   assert.equal(receivedPetId, PET_ID);
   assert.deepEqual(receivedQuery, { from: "2026-05-01", to: "2026-05-31" });
 });
+
+test("GET /pets/:id/events forwards optional nextDateFrom filter", async () => {
+  let receivedQuery: Record<string, unknown> | undefined;
+
+  await withServer(
+    {
+      listPetEvents: async (_ownerId, _petId, query) => {
+        receivedQuery = query as Record<string, unknown>;
+        return [fakeEvent()];
+      }
+    },
+    async (baseUrl) => {
+      const params = new URLSearchParams([
+        ["nextDateFrom", "2026-05-17T10:30:00.000Z"]
+      ]);
+
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}/events?${params.toString()}`, {
+        headers: authHeader()
+      });
+
+      assert.equal(res.status, 200);
+    }
+  );
+
+  assert.deepEqual(receivedQuery, { nextDateFrom: "2026-05-17T10:30:00.000Z" });
+});
