@@ -149,6 +149,55 @@ test("buildPetExportReport adds clickable download URLs to file metadata", async
   assert.equal(report.files?.[0]?.eventTitle, "Rabies booster");
 });
 
+test("buildPetExportReport excludes the current pet photo from file metadata", async () => {
+  const documentFileId = new Types.ObjectId("507f1f77bcf86cd799439077");
+
+  const report = await buildPetExportReport(
+    {
+      exportId,
+      ownerId,
+      petId,
+      pet: makePet(),
+      sections: ["files"],
+      generatedAt: now
+    },
+    {
+      listFileMetadataForPet: async () => [
+        {
+          _id: photoFileId,
+          ownerId,
+          petId,
+          originalName: "miso.png",
+          mimeType: "image/png",
+          sizeBytes: 42,
+          storageKey: "users/o/p/files/photo/miso.png",
+          uploadedAt: new Date("2026-01-10T00:00:00.000Z"),
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          _id: documentFileId,
+          ownerId,
+          petId,
+          originalName: "vet-report.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 840_000,
+          storageKey: "users/o/p/files/vet-report.pdf",
+          uploadedAt: new Date("2026-01-11T00:00:00.000Z"),
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      getFileDownloadUrl: (key) => `https://download.example/${key}`
+    }
+  );
+
+  assert.deepEqual(
+    report.files?.map((file) => file.originalName),
+    ["vet-report.pdf"]
+  );
+});
+
 test("buildPetExportReport passes selected event types to event listing", async () => {
   let observedEventTypes: unknown;
 
