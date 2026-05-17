@@ -1,7 +1,7 @@
 import { HStack, IconButton, Stack, Text } from "@chakra-ui/react";
 import { LuClock, LuMapPin, LuPenLine } from "react-icons/lu";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import type { TPetEvent } from "@/store/pets";
+import type { TPetEvent } from "@/lib/petsApi";
 import { RU_MONTH_SHORT, TYPE_LABEL, TYPE_TONE } from "./eventsShared";
 
 type TEventRowProps = {
@@ -9,8 +9,12 @@ type TEventRowProps = {
   onEdit: (event: TPetEvent) => void;
 };
 
+const formatTime = (date: Date): string =>
+  `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
 export function EventRow({ event, onEdit }: TEventRowProps) {
-  const d = new Date(event.date);
+  const d = new Date(event.eventDate);
+  const time = formatTime(d);
   return (
     <HStack
       align="flex-start"
@@ -45,16 +49,14 @@ export function EventRow({ event, onEdit }: TEventRowProps) {
           </StatusBadge>
         </HStack>
         <HStack gap="16px" fontSize="14px" color="fg.muted" flexWrap="wrap">
-          {event.time && (
-            <HStack gap="4px">
-              <LuClock />
-              <Text>{event.time}</Text>
-            </HStack>
-          )}
-          {event.place && (
+          <HStack gap="4px">
+            <LuClock />
+            <Text>{time}</Text>
+          </HStack>
+          {event.clinicName && (
             <HStack gap="4px">
               <LuMapPin />
-              <Text>{event.place}</Text>
+              <Text>{event.clinicName}</Text>
             </HStack>
           )}
         </HStack>

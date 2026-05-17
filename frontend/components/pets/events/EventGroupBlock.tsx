@@ -1,5 +1,5 @@
 import { Stack, Text } from "@chakra-ui/react";
-import type { TPetEvent } from "@/store/pets";
+import type { TPetEvent } from "@/lib/petsApi";
 import { EventRow } from "./EventRow";
 import type { TEventGroup } from "./eventsShared";
 

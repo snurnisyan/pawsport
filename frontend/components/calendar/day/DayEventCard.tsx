@@ -21,6 +21,7 @@ import {
   TYPE_OPTIONS,
   type TEventFormData,
   type TPetOption,
+  type TReminderValue,
 } from "@/components/pets/events/EventForm";
 import { EVENT_TYPE_META } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
@@ -38,7 +39,7 @@ export type TDayEvent = {
   place?: string;
   comment?: string;
   nextDate?: string;
-  reminder?: string;
+  reminder?: TReminderValue;
   files?: { name: string }[];
 };
 
@@ -52,7 +53,7 @@ const eventToForm = (event: TDayEvent): TEventFormData => ({
   date: "",
   time: event.time ?? "",
   nextDate: event.nextDate ?? "",
-  reminder: event.reminder ?? "1d",
+  reminder: event.reminder ?? "day",
   clinic: event.place ?? "",
   comment: event.comment ?? "",
   files: [],

@@ -69,7 +69,7 @@ const buildSampleEvents = (marks: TMark[], pets: TPet[]): TDayEvent[] => {
       petDescription: petDescription(pet),
       place: "Ветеринарная клиника",
       nextDate: mark === "vaccine" ? "2027-06-12" : undefined,
-      reminder: "1d",
+      reminder: "day",
       comment:
         mark === "vaccine"
           ? "Вакцинация от бешенства, нужно прийти натощак"

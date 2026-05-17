@@ -5,7 +5,9 @@ import {
   EVENT_TYPE_LABEL,
   EVENT_TYPE_TONE,
 } from "@/lib/eventTypes";
-import type { TPetEvent } from "@/store/pets";
+import type { TPetEvent } from "@/lib/petsApi";
+
+const toDateKey = (iso: string): string => iso.slice(0, 10);
 
 export type TEventsFilters = {
   search: string;
@@ -52,7 +54,7 @@ export function buildGroups(events: TPetEvent[]): TEventGroup[] {
 
   const byKey = new Map<string, TPetEvent[]>();
   for (const e of events) {
-    const d = new Date(e.date);
+    const d = new Date(e.eventDate);
     const key = ymKey(d.getFullYear(), d.getMonth());
     if (!byKey.has(key)) byKey.set(key, []);
     byKey.get(key)!.push(e);
@@ -66,7 +68,7 @@ export function buildGroups(events: TPetEvent[]): TEventGroup[] {
       const year = Number(yStr);
       const month = Number(mStr);
       const list = byKey.get(key)!;
-      list.sort((a, b) => (a.date < b.date ? -1 : 1));
+      list.sort((a, b) => (a.eventDate < b.eventDate ? -1 : 1));
       return {
         key,
         year,
@@ -82,10 +84,11 @@ export function filterEvents(events: TPetEvent[], filters: TEventsFilters): TPet
   const q = filters.search.trim().toLowerCase();
   return events.filter((e) => {
     if (filters.types.length > 0 && !filters.types.includes(e.type)) return false;
-    if (filters.dateRange.from && e.date < filters.dateRange.from) return false;
-    if (filters.dateRange.to && e.date > filters.dateRange.to) return false;
+    const dateKey = toDateKey(e.eventDate);
+    if (filters.dateRange.from && dateKey < filters.dateRange.from) return false;
+    if (filters.dateRange.to && dateKey > filters.dateRange.to) return false;
     if (q) {
-      const hay = `${e.title} ${e.comment ?? ""} ${e.place ?? ""}`.toLowerCase();
+      const hay = `${e.title} ${e.comment ?? ""} ${e.clinicName ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

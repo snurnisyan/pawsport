@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { Box, Stack } from "@chakra-ui/react";
-import type { TPetEvent } from "@/store/pets";
+import type { TPetEvent } from "@/lib/petsApi";
 import { EventGroupBlock } from "./EventGroupBlock";
 import { buildGroups } from "./eventsShared";
 

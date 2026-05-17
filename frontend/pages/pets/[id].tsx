@@ -33,7 +33,6 @@ export default function PetPage() {
   const tab = usePetNavigationStore((s) => s.petTabs[id] ?? "overview");
   const setPetTab = usePetNavigationStore((s) => s.setPetTab);
   const pets = usePetsStore((s) => s.pets);
-  const allEvents = usePetsStore((s) => s.events);
   const petQuery = useQuery({
     queryKey: petQueryKey(id),
     queryFn: () => getPet(id),
@@ -41,10 +40,6 @@ export default function PetPage() {
   });
   const localPet = useMemo(() => pets.find((p) => p.id === id), [pets, id]);
   const pet = petQuery.data?.pet ? toPetViewModel(petQuery.data.pet) : localPet;
-  const events = useMemo(
-    () => allEvents.filter((e) => e.petId === id),
-    [allEvents, id]
-  );
 
   if (!router.isReady || !clientReady) {
     return (
@@ -122,7 +117,7 @@ export default function PetPage() {
             onChange={(value) => setPetTab(id, value as TPetPageTab)}
           />
           {tab === "overview" && <OverviewTab pet={pet} backendPetId={petQuery.data?.pet.id} />}
-          {tab === "events" && <EventsTab events={events} />}
+          {tab === "events" && <EventsTab petId={petQuery.data?.pet.id} />}
           {tab === "files" && <FilesTab petId={petQuery.data?.pet.id} />}
           {tab === "export" && (
             <ExportTab
