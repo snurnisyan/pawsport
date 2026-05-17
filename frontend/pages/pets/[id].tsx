@@ -2,7 +2,7 @@ import { Stack, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AppWrapper } from "@/components/layout/AppWrapper";
 import { PetHero } from "@/components/pets/PetHero";
 import { EventsTab } from "@/components/pets/tabs/EventsTab";
@@ -14,9 +14,10 @@ import { ApiError } from "@/lib/api";
 import { getPet, petQueryKey } from "@/lib/petsApi";
 import { toPetViewModel } from "@/lib/petViewModel";
 import { useAuthSession, useClientReady } from "@/lib/session";
+import { usePetNavigationStore, type TPetPageTab } from "@/store/petNavigation";
 import { usePetsStore } from "@/store/pets";
 
-const TABS = [
+const TABS: { value: TPetPageTab; label: string }[] = [
   { value: "overview", label: "Общая информация" },
   { value: "events", label: "События" },
   { value: "files", label: "Файлы" },
@@ -29,6 +30,8 @@ export default function PetPage() {
   const session = useAuthSession();
   const id =
     router.isReady && typeof router.query.id === "string" ? router.query.id : "";
+  const tab = usePetNavigationStore((s) => s.petTabs[id] ?? "overview");
+  const setPetTab = usePetNavigationStore((s) => s.setPetTab);
   const pets = usePetsStore((s) => s.pets);
   const allEvents = usePetsStore((s) => s.events);
   const petQuery = useQuery({
@@ -42,7 +45,6 @@ export default function PetPage() {
     () => allEvents.filter((e) => e.petId === id),
     [allEvents, id]
   );
-  const [tab, setTab] = useState("overview");
 
   if (!router.isReady || !clientReady) {
     return (
@@ -114,7 +116,11 @@ export default function PetPage() {
       <AppWrapper>
         <Stack gap="24px">
           <PetHero pet={pet} />
-          <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
+          <SegmentedTabs
+            tabs={TABS}
+            value={tab}
+            onChange={(value) => setPetTab(id, value as TPetPageTab)}
+          />
           {tab === "overview" && <OverviewTab pet={pet} backendPetId={petQuery.data?.pet.id} />}
           {tab === "events" && <EventsTab events={events} />}
           {tab === "files" && <FilesTab petId={petQuery.data?.pet.id} />}

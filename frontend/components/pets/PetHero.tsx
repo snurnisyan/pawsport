@@ -21,7 +21,8 @@ type TPetHeroProps = {
 
 export function PetHero({ pet }: TPetHeroProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(pet.imageUrl);
+  const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
+  const photoUrl = photoOverrides[pet.id] ?? pet.imageUrl;
   const sexMeta =
     pet.sex === "male"
       ? { icon: <FaMars />, label: "Мальчик" }
@@ -110,7 +111,12 @@ export function PetHero({ pet }: TPetHeroProps) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         petName={pet.name}
-        onSave={(file) => setPhotoUrl(URL.createObjectURL(file))}
+        onSave={(file) =>
+          setPhotoOverrides((current) => ({
+            ...current,
+            [pet.id]: URL.createObjectURL(file),
+          }))
+        }
       />
     </>
   );
