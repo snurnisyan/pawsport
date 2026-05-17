@@ -144,7 +144,7 @@ export default function CalendarPage() {
                   bg="bg.surface"
                   borderWidth="1px"
                   borderColor="border.subtle"
-                  rounded="full"
+                  rounded="16px"
                   px="8px"
                   py="6px"
                   shadow="card"
@@ -156,6 +156,7 @@ export default function CalendarPage() {
                     rounded="full"
                     color="fg.muted"
                     onClick={() => setYear((y) => y - 1)}
+                    _hover={{ color: "fg.default", bg: "secondary.700" }}
                   >
                     <LuChevronLeft />
                   </IconButton>
@@ -174,6 +175,7 @@ export default function CalendarPage() {
                     rounded="full"
                     color="fg.muted"
                     onClick={() => setYear((y) => y + 1)}
+                    _hover={{ color: "fg.default", bg: "secondary.700" }}
                   >
                     <LuChevronRight />
                   </IconButton>

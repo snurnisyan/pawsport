@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Icon, Image, SimpleGrid, Stack, Text } from "@chakra-ui/react";
-import { LuCamera, LuCat, LuDog, LuEllipsis, LuSearch } from "react-icons/lu";
+import { LuCamera, LuEllipsis, LuSearch } from "react-icons/lu";
 import { FaMars, FaVenus } from "react-icons/fa6";
 import { ChoiceCard } from "@/components/ui/ChoiceCard";
 import { Pressable } from "@/components/ui/Pressable";
 import { TextField } from "@/components/ui/TextField";
+import DogIcon from "@/icons/dog-icon.svg";
+import CatIcon from "@/icons/cat.svg";
 
 export type TPetSpecies = "dog" | "cat" | "other";
 export type TPetSex = "male" | "female";
@@ -117,14 +119,14 @@ export function PetForm({ data, onChange }: TPetFormProps) {
           <SimpleGrid columns={3} gap="12px">
             <ChoiceCard
               fullWidth
-              icon={<LuDog />}
+              icon={<DogIcon />}
               label="Собака"
               selected={data.species === "dog"}
               onSelect={() => onChange({ species: "dog" })}
             />
             <ChoiceCard
               fullWidth
-              icon={<LuCat />}
+              icon={<CatIcon />}
               label="Кошка"
               selected={data.species === "cat"}
               onSelect={() => onChange({ species: "cat" })}
@@ -142,7 +144,6 @@ export function PetForm({ data, onChange }: TPetFormProps) {
         <TextField
           label="Порода (необязательно)"
           placeholder="Бигль"
-          endElement={<LuSearch />}
           value={data.breed}
           onChange={(e) => onChange({ breed: e.target.value })}
         />

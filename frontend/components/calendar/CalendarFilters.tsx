@@ -27,7 +27,7 @@ type TFilterRowProps = {
 
 function FilterRow({ f, checked, showCircle }: TFilterRowProps) {
   return (
-    <Checkbox.Root defaultChecked={checked} colorPalette="blue">
+    <Checkbox.Root defaultChecked={checked} colorPalette="blue" size="sm">
       <Checkbox.HiddenInput />
       <Checkbox.Control />
       <Checkbox.Label>
