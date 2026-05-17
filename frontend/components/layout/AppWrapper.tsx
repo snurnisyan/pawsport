@@ -17,7 +17,7 @@ export function AppWrapper({ children, maxW = "1024px" }: TAppWrapperProps) {
 
   useEffect(() => {
     if (clientReady && !session?.accessToken) {
-      router.replace("/auth");
+      router.replace("/auth/login");
     }
   }, [clientReady, router, session?.accessToken]);
 
