@@ -1000,6 +1000,7 @@ export interface operations {
             query?: {
                 from?: string;
                 to?: string;
+                nextDateFrom?: components["schemas"]["DateTime"] & unknown;
             };
             header?: never;
             path: {

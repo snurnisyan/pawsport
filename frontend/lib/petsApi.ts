@@ -8,7 +8,7 @@ import {
   unwrapVoidApiResponse,
 } from "@/lib/api";
 import { useAuthSession } from "@/lib/session";
-import type { components } from "@/types/api";
+import type { components, paths } from "@/types/api";
 
 export type TPetDetail = components["schemas"]["PetDetail"];
 export type TCreatePetRequest = components["schemas"]["CreatePetRequest"];
@@ -27,6 +27,11 @@ export type TPetResponse = components["schemas"]["PetResponse"];
 export type TPetFile = components["schemas"]["File"];
 export type TPetFileListResponse = components["schemas"]["FileListResponse"];
 export type TPetFileResponse = components["schemas"]["FileResponse"];
+export type TPetEvent = components["schemas"]["Event"];
+export type TPetEventListResponse = components["schemas"]["EventListResponse"];
+export type TPetEventsQuery = NonNullable<
+  paths["/pets/{id}/events"]["get"]["parameters"]["query"]
+>;
 export type TPetExport = components["schemas"]["Export"];
 export type TCreatePetExportRequest = components["schemas"]["CreateExportRequest"];
 export type TPetExportResponse = components["schemas"]["ExportResponse"];
@@ -42,7 +47,8 @@ export const petsQueryKey = ["pets"] as const;
 export const petQueryKey = (id: string) => ["pets", id] as const;
 export const petFilesQueryKey = (petId: string, filters?: TPetFilesQuery) =>
   ["pets", petId, "files", filters ?? {}] as const;
-export const petEventsQueryKey = (petId: string) => ["pets", petId, "events"] as const;
+export const petEventsQueryKey = (petId: string, filters?: TPetEventsQuery) =>
+  ["pets", petId, "events", filters ?? {}] as const;
 export const petExportMutationKey = (petId: string) => ["pets", petId, "export"] as const;
 export const exportQueryKey = (exportId: string) => ["exports", exportId] as const;
 
@@ -78,6 +84,16 @@ export const listPetFiles = (
 ): Promise<TPetFileListResponse> =>
   unwrapApiResponse(
     apiClient.GET("/pets/{id}/files", {
+      params: { path: { id: petId }, query },
+    })
+  );
+
+export const listPetEvents = (
+  petId: string,
+  query?: TPetEventsQuery
+): Promise<TPetEventListResponse> =>
+  unwrapApiResponse(
+    apiClient.GET("/pets/{id}/events", {
       params: { path: { id: petId }, query },
     })
   );

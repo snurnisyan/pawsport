@@ -16,7 +16,7 @@ export function OverviewTab({ pet, backendPetId }: TOverviewTabProps) {
       <GridItem>
         <Stack gap="20px">
           <OverviewSection pet={pet} backendPetId={backendPetId} />
-          <VaccinesSection />
+          <VaccinesSection backendPetId={backendPetId} />
         </Stack>
       </GridItem>
 
