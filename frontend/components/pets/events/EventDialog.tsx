@@ -45,6 +45,12 @@ const toIsoDateTime = (date: string, time?: string): string => {
   return new Date(`${date}T${hhmm}:00`).toISOString();
 };
 
+const todayIsoDate = (): string => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 const fromEvent = (event: TPetEvent): TEventFormData => {
   const { date, time } = splitDateTime(event.eventDate);
   return {
@@ -95,7 +101,7 @@ export function EventDialog({
       setData(
         event
           ? fromEvent(event)
-          : { ...INITIAL_EVENT, ...(initialData ?? {}) },
+          : { ...INITIAL_EVENT, date: todayIsoDate(), ...(initialData ?? {}) },
       );
     }, 0);
 
@@ -103,6 +109,7 @@ export function EventDialog({
   }, [open, event, initialData]);
 
   const targetPetId = event?.petId ?? petId;
+  const existingFileIds = event?.fileIds ?? [];
 
   const invalidateEvents = async () => {
     if (targetPetId) {
@@ -197,6 +204,7 @@ export function EventDialog({
       <EventForm
         data={data}
         onChange={(patch) => setData((d) => ({ ...d, ...patch }))}
+        existingFileIds={existingFileIds}
       />
     </DialogShell>
   );

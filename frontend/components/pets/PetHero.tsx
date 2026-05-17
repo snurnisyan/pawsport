@@ -83,15 +83,16 @@ export function PetHero({ pet }: TPetHeroProps) {
         >
           <HStack gap="12px" flexWrap="wrap">
             <Text
-              fontSize={["30px", null, "48px"]}
+              fontSize={["30px", null, "44px"]}
               fontWeight={700}
               lineHeight={1}
               color="white"
               textShadow="0 2px 12px rgba(0,0,0,0.5)"
+              mb={["4px", "4px", "12px"]}
             >
               {pet.name}
             </Text>
-            <StatusBadge styleColors={EVENT_TYPE_META["visit"]}>{pet.breed}</StatusBadge>
+            {pet.breed && <StatusBadge styleColors={EVENT_TYPE_META["visit"]}>{pet.breed}</StatusBadge>}
           </HStack>
           <HStack gap="16px" color="fg.subtle" fontSize="14px">
             <HStack gap="4px">
