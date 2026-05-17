@@ -464,6 +464,8 @@ export interface components {
             petId: components["schemas"]["ObjectId"];
             /** @enum {string} */
             type: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
+            /** @enum {string} */
+            subtype?: "complex" | "rabies" | "internal" | "external";
             title: string;
             eventDate: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];
@@ -491,6 +493,8 @@ export interface components {
         CreateEventRequest: {
             /** @enum {string} */
             type: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
+            /** @enum {string} */
+            subtype?: "complex" | "rabies" | "internal" | "external";
             title: string;
             eventDate: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];
@@ -508,6 +512,8 @@ export interface components {
         UpdateEventRequest: {
             /** @enum {string} */
             type?: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
+            /** @enum {string} */
+            subtype?: "complex" | "rabies" | "internal" | "external";
             title?: string;
             eventDate?: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];

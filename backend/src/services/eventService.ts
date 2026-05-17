@@ -6,6 +6,9 @@ import {
   EventModel,
   RECURRENCE_FREQUENCIES,
   REMINDER_OFFSETS,
+  TREATMENT_SUBTYPES,
+  VACCINE_SUBTYPES,
+  type EventSubtype,
   type EventType,
   type IEvent,
   type IRecurrence,
@@ -36,6 +39,7 @@ export interface EventListFilters extends OptionalDateRange {
 
 export interface CreateEventInput {
   type?: unknown;
+  subtype?: unknown;
   title?: unknown;
   eventDate?: unknown;
   nextDate?: unknown;
@@ -56,6 +60,7 @@ export interface SerializedEvent {
   ownerId: string;
   petId: string;
   type: EventType;
+  subtype?: EventSubtype;
   title: string;
   eventDate: string;
   nextDate?: string;
@@ -74,6 +79,7 @@ export type EventRecord = Pick<
   | "ownerId"
   | "petId"
   | "type"
+  | "subtype"
   | "title"
   | "eventDate"
   | "nextDate"
@@ -88,6 +94,7 @@ export type EventRecord = Pick<
 
 interface NormalizedCreateEventInput {
   type: EventType;
+  subtype?: EventSubtype;
   title: string;
   eventDate: Date;
   nextDate?: Date;
@@ -231,6 +238,91 @@ const parseType = (value: unknown): EventType => {
   return value as EventType;
 };
 
+const SUBTYPE_OPTIONS_BY_TYPE: Partial<Record<EventType, readonly EventSubtype[]>> = {
+  vaccine: VACCINE_SUBTYPES,
+  treatment: TREATMENT_SUBTYPES
+};
+
+const isSubtypedEventType = (type: EventType): type is "vaccine" | "treatment" =>
+  type === "vaccine" || type === "treatment";
+
+const isValidSubtypeForType = (
+  type: EventType,
+  subtype: unknown
+): subtype is EventSubtype =>
+  typeof subtype === "string" &&
+  (SUBTYPE_OPTIONS_BY_TYPE[type] ?? []).includes(subtype as EventSubtype);
+
+const parseSubtypeForType = (type: EventType, value: unknown): EventSubtype => {
+  const options = SUBTYPE_OPTIONS_BY_TYPE[type] ?? [];
+  const label = options.join(", ");
+
+  if (value === undefined || value === null || value === "") {
+    throw new AppError(400, "INVALID_EVENT_SUBTYPE", `subtype is required for ${type} events`);
+  }
+  if (typeof value !== "string" || !options.includes(value as EventSubtype)) {
+    throw new AppError(400, "INVALID_EVENT_SUBTYPE", `subtype must be one of: ${label}`);
+  }
+  return value as EventSubtype;
+};
+
+const normalizeCreateSubtype = (type: EventType, value: unknown): EventSubtype | undefined => {
+  if (isSubtypedEventType(type)) {
+    return parseSubtypeForType(type, value);
+  }
+  if (value !== undefined) {
+    throw new AppError(
+      400,
+      "INVALID_EVENT_SUBTYPE",
+      "subtype is only supported for vaccine and treatment events"
+    );
+  }
+  return undefined;
+};
+
+const applySubtypeUpdate = (
+  input: CreateEventInput,
+  existing: EventRecord,
+  updates: EventUpdates
+): void => {
+  const finalType = (updates.set.type as EventType | undefined) ?? existing.type;
+  const subtypeWasProvided = hasField(input, "subtype");
+
+  if (subtypeWasProvided) {
+    if (isSubtypedEventType(finalType)) {
+      updates.set.subtype = parseSubtypeForType(finalType, input.subtype);
+      updates.unset = updates.unset.filter((key) => key !== "subtype");
+      return;
+    }
+
+    if (input.subtype === undefined || input.subtype === null || input.subtype === "") {
+      delete updates.set.subtype;
+      if (!updates.unset.includes("subtype")) updates.unset.push("subtype");
+      return;
+    }
+
+    throw new AppError(
+      400,
+      "INVALID_EVENT_SUBTYPE",
+      "subtype is only supported for vaccine and treatment events"
+    );
+  }
+
+  if (!isSubtypedEventType(finalType)) {
+    delete updates.set.subtype;
+    if (!updates.unset.includes("subtype")) updates.unset.push("subtype");
+    return;
+  }
+
+  if (!isValidSubtypeForType(finalType, existing.subtype)) {
+    throw new AppError(
+      400,
+      "INVALID_EVENT_SUBTYPE",
+      `subtype is required for ${finalType} events`
+    );
+  }
+};
+
 const parseOptionalStringList = (
   value: unknown,
   code: string,
@@ -339,8 +431,10 @@ const parseFileIds = (value: unknown): Types.ObjectId[] => {
 };
 
 const normalizeCreateInput = (input: CreateEventInput): NormalizedCreateEventInput => {
+  const type = parseType(input.type);
   return {
-    type: parseType(input.type),
+    type,
+    subtype: normalizeCreateSubtype(type, input.subtype),
     title: requireString(input.title, "INVALID_TITLE", "title is required"),
     eventDate: parseDate(input.eventDate, "INVALID_EVENT_DATE", "eventDate must be a valid ISO date-time string"),
     nextDate: optionalDate(input.nextDate, "INVALID_NEXT_DATE", "nextDate must be a valid ISO date-time string"),
@@ -441,6 +535,7 @@ export const serializeEvent = (event: EventRecord): SerializedEvent => {
   };
 
   if (event.nextDate) result.nextDate = event.nextDate.toISOString();
+  if (event.subtype) result.subtype = event.subtype;
   if (event.clinicName) result.clinicName = event.clinicName;
   if (event.comment) result.comment = event.comment;
   if (event.reminderOffset) result.reminderOffset = event.reminderOffset;
@@ -693,25 +788,33 @@ export const updateEvent = async (
   const updates = normalizeUpdateInput(input);
   const isObjectInput =
     input !== null && typeof input === "object" && !Array.isArray(input);
+  const typeOrSubtypeInUpdate =
+    isObjectInput && (hasField(input, "type") || hasField(input, "subtype"));
   const shouldSyncReminder =
     isObjectInput && (hasField(input, "eventDate") || hasField(input, "reminderOffset"));
   const fileIdsInUpdate = isObjectInput && hasField(input, "fileIds");
+  let existingEvent: EventRecord | null | undefined;
 
-  if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
-    const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
-    if (!existing) {
+  const getExistingEvent = async (): Promise<EventRecord> => {
+    existingEvent ??= await findEventByIdForOwner(eventObjectId, ownerObjectId);
+    if (!existingEvent) {
       throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
     }
-    return serializeEvent(existing);
+    return existingEvent;
+  };
+
+  if (typeOrSubtypeInUpdate) {
+    applySubtypeUpdate(input, await getExistingEvent(), updates);
+  }
+
+  if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
+    return serializeEvent(await getExistingEvent());
   }
 
   if (fileIdsInUpdate) {
     const requestedFileIds = (updates.set.fileIds as Types.ObjectId[] | undefined) ?? [];
     if (requestedFileIds.length > 0) {
-      const existing = await findEventByIdForOwner(eventObjectId, ownerObjectId);
-      if (!existing) {
-        throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-      }
+      const existing = await getExistingEvent();
       await validateFileIdsForPet(ownerObjectId, existing.petId, requestedFileIds);
     }
   }

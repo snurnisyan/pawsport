@@ -28,6 +28,7 @@ const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   ownerId: new Types.ObjectId(ownerId),
   petId: new Types.ObjectId(petId),
   type: "vaccine" as const,
+  subtype: "rabies" as const,
   title: "Rabies booster",
   eventDate: new Date("2026-06-01T10:00:00.000Z"),
   fileIds: [],
@@ -97,6 +98,92 @@ test("updateEvent applies partial set and trims title", async () => {
   assert.deepEqual(captured?.set, { title: "New title" });
   assert.deepEqual(captured?.unset, []);
   assert.equal(result.title, "New title");
+});
+
+test("updateEvent validates subtype against the final event type", async () => {
+  let captured: EventUpdates | undefined;
+
+  const result = await updateEvent(
+    ownerId,
+    eventId,
+    { subtype: "complex" },
+    {
+      findEventByIdForOwner: async () => makeEventRecord({ type: "vaccine", subtype: "rabies" }),
+      updateEventRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeEventRecord({ subtype: "complex" });
+      }
+    }
+  );
+
+  assert.deepEqual(captured?.set, { subtype: "complex" });
+  assert.deepEqual(captured?.unset, []);
+  assert.equal(result.subtype, "complex");
+});
+
+test("updateEvent validates type and subtype as one pair", async () => {
+  let captured: EventUpdates | undefined;
+
+  await updateEvent(
+    ownerId,
+    eventId,
+    { type: "treatment", subtype: "external" },
+    {
+      findEventByIdForOwner: async () => makeEventRecord({ type: "vaccine", subtype: "rabies" }),
+      updateEventRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeEventRecord({ type: "treatment", subtype: "external" });
+      }
+    }
+  );
+
+  assert.deepEqual(captured?.set, { type: "treatment", subtype: "external" });
+  assert.deepEqual(captured?.unset, []);
+});
+
+test("updateEvent clears subtype when type changes away from vaccine or treatment", async () => {
+  let captured: EventUpdates | undefined;
+
+  const result = await updateEvent(
+    ownerId,
+    eventId,
+    { type: "visit" },
+    {
+      findEventByIdForOwner: async () => makeEventRecord({ type: "vaccine", subtype: "rabies" }),
+      updateEventRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeEventRecord({ type: "visit", subtype: undefined });
+      }
+    }
+  );
+
+  assert.deepEqual(captured?.set, { type: "visit" });
+  assert.deepEqual(captured?.unset, ["subtype"]);
+  assert.equal("subtype" in result, false);
+});
+
+test("updateEvent rejects invalid subtype transitions", async () => {
+  const cases: Record<string, unknown>[] = [
+    { subtype: "internal" },
+    { type: "treatment" },
+    { type: "treatment", subtype: "rabies" },
+    { type: "visit", subtype: "complex" },
+    { type: "vaccine", subtype: null },
+    { type: "vaccine", subtype: ["rabies"] }
+  ];
+
+  for (const input of cases) {
+    await assert.rejects(
+      () =>
+        updateEvent(ownerId, eventId, input, {
+          findEventByIdForOwner: async () => makeEventRecord({ type: "vaccine", subtype: "rabies" }),
+          updateEventRecord: async () => {
+            throw new Error("should not be called");
+          }
+        }),
+      assertAppError(400, "INVALID_EVENT_SUBTYPE")
+    );
+  }
 });
 
 test("updateEvent unsets optional fields when null", async () => {

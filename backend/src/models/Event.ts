@@ -1,10 +1,16 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose";
 
 export const EVENT_TYPES = ["vaccine", "treatment", "visit", "operation", "lab", "other"] as const;
+export const VACCINE_SUBTYPES = ["complex", "rabies"] as const;
+export const TREATMENT_SUBTYPES = ["internal", "external"] as const;
+export const EVENT_SUBTYPES = [...VACCINE_SUBTYPES, ...TREATMENT_SUBTYPES] as const;
 export const RECURRENCE_FREQUENCIES = ["none", "daily", "weekly", "monthly", "yearly", "custom"] as const;
 export const REMINDER_OFFSETS = ["day", "week", "month"] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
+export type VaccineSubtype = (typeof VACCINE_SUBTYPES)[number];
+export type TreatmentSubtype = (typeof TREATMENT_SUBTYPES)[number];
+export type EventSubtype = VaccineSubtype | TreatmentSubtype;
 export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
 export type ReminderOffset = (typeof REMINDER_OFFSETS)[number];
 
@@ -18,6 +24,7 @@ export interface IEvent {
   ownerId: Types.ObjectId;
   petId: Types.ObjectId;
   type: EventType;
+  subtype?: EventSubtype;
   title: string;
   eventDate: Date;
   nextDate?: Date;
@@ -66,6 +73,11 @@ const eventSchema = new Schema<IEvent>(
       type: String,
       enum: EVENT_TYPES,
       required: true,
+      index: true
+    },
+    subtype: {
+      type: String,
+      enum: EVENT_SUBTYPES,
       index: true
     },
     title: {

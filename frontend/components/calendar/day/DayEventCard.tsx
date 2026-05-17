@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import {
   LuBell,
@@ -23,7 +23,7 @@ import {
   type TPetOption,
   type TReminderValue,
 } from "@/components/pets/events/EventForm";
-import { EVENT_TYPE_META } from "@/lib/eventTypes";
+import { EVENT_TYPE_META, isEventSubtypeSupported } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 
 export type TDayEventType = TPetEventType;
@@ -49,6 +49,7 @@ const lookupLabel = (options: { value: string; label: string }[], v?: string) =>
 const eventToForm = (event: TDayEvent): TEventFormData => ({
   title: event.title,
   type: event.type,
+  subtype: "",
   petId: event.petId,
   date: "",
   time: event.time ?? "",
@@ -185,7 +186,8 @@ type TEditViewProps = {
 };
 
 function EditView({ data, onChange, onCancel, onSave, pets, saveLabel }: TEditViewProps) {
-  const disabled = !data.title.trim() || !data.type || !data.petId;
+  const subtypeMissing = isEventSubtypeSupported(data.type) && !data.subtype;
+  const disabled = !data.title.trim() || !data.type || !data.petId || subtypeMissing;
   return (
     <Stack gap="20px" px="16px" pb="16px" pt="8px">
       <EventForm data={data} onChange={onChange} pets={pets} />
@@ -221,10 +223,6 @@ export function DayEventCard({ event,
   const [form, setForm] = useState<TEventFormData>(() =>
     event ? eventToForm(event) : INITIAL_EVENT,
   );
-
-  useEffect(() => {
-    if (event && !editMode) setForm(eventToForm(event));
-  }, [event, editMode]);
 
   const meta = event ? EVENT_TYPE_META[event.type] : EVENT_TYPE_META.visit;
   const EventIcon = meta.Icon;

@@ -13,6 +13,7 @@ import {
   type TPetEvent,
   type TUpdateEventRequest,
 } from "@/lib/eventsApi";
+import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 import {
   EventForm,
@@ -49,6 +50,7 @@ const fromEvent = (event: TPetEvent): TEventFormData => {
   return {
     title: event.title,
     type: event.type,
+    subtype: event.subtype ?? "",
     petId: event.petId,
     date,
     time,
@@ -62,6 +64,7 @@ const fromEvent = (event: TPetEvent): TEventFormData => {
 
 const buildPayload = (data: TEventFormData): TCreateEventRequest => ({
   type: data.type as TPetEventType,
+  subtype: isEventSubtypeSupported(data.type) ? data.subtype || undefined : undefined,
   title: data.title.trim(),
   eventDate: toIsoDateTime(data.date, data.time),
   nextDate: data.nextDate ? toIsoDateTime(data.nextDate) : undefined,
@@ -87,13 +90,17 @@ export function EventDialog({
   const [data, setData] = useState<TEventFormData>(INITIAL_EVENT);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return undefined;
+
+    const timer = window.setTimeout(() => {
       setData(
         event
           ? fromEvent(event)
           : { ...INITIAL_EVENT, ...(initialData ?? {}) },
       );
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [open, event, initialData]);
 
   const targetPetId = event?.petId ?? petId;
@@ -151,6 +158,8 @@ export function EventDialog({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const canSubmitToBackend = isEdit ? Boolean(event?.id) : Boolean(petId);
+  const subtypeRequired = isEventSubtypeSupported(data.type);
+  const subtypeMissing = subtypeRequired && !data.subtype;
 
   const handleSave = () => {
     if (!canSubmitToBackend) {
@@ -181,7 +190,7 @@ export function EventDialog({
           onSave={handleSave}
           saveLabel={isEdit ? "Сохранить" : "Добавить"}
           saveDisabled={
-            isPending || !data.title.trim() || !data.type || !data.date
+            isPending || !data.title.trim() || !data.type || !data.date || subtypeMissing
           }
         />
       }
