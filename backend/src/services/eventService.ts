@@ -26,13 +26,11 @@ import {
 
 export interface EventListQuery extends DateRangeQuery {
   nextDateFrom?: unknown;
-  type?: unknown;
   eventTypes?: unknown;
 }
 
 export interface EventListFilters extends OptionalDateRange {
   nextDateFrom?: Date;
-  type?: EventType;
   eventTypes?: EventType[];
 }
 
@@ -231,13 +229,6 @@ const parseType = (value: unknown): EventType => {
     throw new AppError(400, "INVALID_TYPE", `type must be one of: ${EVENT_TYPES.join(", ")}`);
   }
   return value as EventType;
-};
-
-const parseOptionalType = (value: unknown): EventType | undefined => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-  return parseType(value);
 };
 
 const parseOptionalStringList = (
@@ -492,10 +483,9 @@ const parseEventListFilters = (query: EventListQuery): EventListFilters => {
     "INVALID_NEXT_DATE_RANGE",
     "nextDateFrom must be a valid ISO date-time string"
   );
-  const type = parseOptionalType(query.type);
   const eventTypes = parseOptionalEventTypes(query.eventTypes);
 
-  return { ...range, nextDateFrom, type, eventTypes };
+  return { ...range, nextDateFrom, eventTypes };
 };
 
 export const buildEventListFilter = (
@@ -509,11 +499,7 @@ export const buildEventListFilter = (
   if (filters.to) eventDate.$lte = filters.to;
   if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
   if (filters.nextDateFrom) filter.nextDate = { $gte: filters.nextDateFrom };
-  if (filters.eventTypes) {
-    filter.type = { $in: filters.eventTypes };
-  } else if (filters.type) {
-    filter.type = filters.type;
-  }
+  if (filters.eventTypes) filter.type = { $in: filters.eventTypes };
   return filter;
 };
 

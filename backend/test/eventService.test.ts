@@ -410,9 +410,9 @@ test("listPetEvents leaves missing date bounds unrestricted", async () => {
   assert.equal(observedRange?.to, undefined);
 });
 
-test("listPetEvents passes nextDateFrom, type and eventTypes separately from eventDate filters", async () => {
+test("listPetEvents passes nextDateFrom and eventTypes separately from eventDate filters", async () => {
   let observedFilters:
-    | { from?: Date; to?: Date; nextDateFrom?: Date; type?: string; eventTypes?: string[] }
+    | { from?: Date; to?: Date; nextDateFrom?: Date; eventTypes?: string[] }
     | undefined;
 
   await listPetEvents(
@@ -422,7 +422,6 @@ test("listPetEvents passes nextDateFrom, type and eventTypes separately from eve
       from: "2026-05-01",
       to: "2026-05-31",
       nextDateFrom: "2026-05-17T10:30:00.000Z",
-      type: "lab",
       eventTypes: ["vaccine", "treatment"]
     },
     {
@@ -437,7 +436,6 @@ test("listPetEvents passes nextDateFrom, type and eventTypes separately from eve
   assert.equal(observedFilters?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
   assert.equal(observedFilters?.to?.toISOString(), "2026-05-31T23:59:59.999Z");
   assert.equal(observedFilters?.nextDateFrom?.toISOString(), "2026-05-17T10:30:00.000Z");
-  assert.equal(observedFilters?.type, "lab");
   assert.deepEqual(observedFilters?.eventTypes, ["vaccine", "treatment"]);
 });
 
@@ -529,29 +527,6 @@ test("listPetEvents rejects invalid to filter", async () => {
   );
 });
 
-test("listPetEvents rejects invalid type filter", async () => {
-  await assert.rejects(
-    () =>
-      listPetEvents(
-        ownerId,
-        petId,
-        { type: "grooming" },
-        {
-          findPetByIdForOwner: petFound,
-          listEventsForOwnerPet: async () => {
-            throw new Error("should not be called");
-          }
-        }
-      ),
-    (error: unknown) => {
-      assert.ok(error instanceof AppError);
-      assert.equal(error.statusCode, 400);
-      assert.equal(error.code, "INVALID_TYPE");
-      return true;
-    }
-  );
-});
-
 test("listPetEvents rejects invalid eventTypes filter", async () => {
   await assert.rejects(
     () =>
@@ -586,7 +561,6 @@ test("buildEventListFilter applies nextDateFrom without repurposing eventDate ra
     from,
     to,
     nextDateFrom,
-    type: "lab",
     eventTypes: ["vaccine", "treatment"]
   });
 
