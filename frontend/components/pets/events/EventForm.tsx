@@ -4,14 +4,20 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { TimeInput } from "@/components/ui/TimeInput";
-import { EVENT_TYPE_OPTIONS } from "@/lib/eventTypes";
-import type { TPetEventType } from "@/store/pets";
+import {
+  EVENT_TYPE_OPTIONS,
+  getEventSubtypeOptions,
+  isEventSubtypeSupported,
+  isEventSubtypeValidForType,
+} from "@/lib/eventTypes";
+import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
 
 export type TReminderValue = "none" | "day" | "week" | "month";
 
 export type TEventFormData = {
   title: string;
   type: TPetEventType | "";
+  subtype: TPetEventSubtype | "";
   petId: string;
   date: string;
   time: string;
@@ -25,6 +31,7 @@ export type TEventFormData = {
 export const INITIAL_EVENT: TEventFormData = {
   title: "",
   type: "",
+  subtype: "",
   petId: "",
   date: "",
   time: "",
@@ -56,6 +63,9 @@ type TEventFormProps = {
 };
 
 export function EventForm({ data, onChange, pets }: TEventFormProps) {
+  const subtypeOptions = getEventSubtypeOptions(data.type);
+  const showSubtype = isEventSubtypeSupported(data.type);
+
   return (
     <Stack gap="20px">
       <TextField
@@ -80,8 +90,24 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         placeholder="Выберите тип"
         options={TYPE_OPTIONS}
         value={data.type}
-        onChange={(v) => onChange({ type: v as TPetEventType })}
+        onChange={(v) => {
+          const type = v as TPetEventType;
+          onChange({
+            type,
+            subtype: isEventSubtypeValidForType(type, data.subtype) ? data.subtype : "",
+          });
+        }}
       />
+
+      {showSubtype && (
+        <SelectField
+          label="Подтип"
+          placeholder="Выберите подтип"
+          options={subtypeOptions}
+          value={data.subtype}
+          onChange={(v) => onChange({ subtype: v as TPetEventSubtype })}
+        />
+      )}
 
       <Grid templateColumns={["1fr", "1fr 1fr"]} gap="16px">
         <DateInput

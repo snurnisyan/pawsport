@@ -1,6 +1,7 @@
 import {Flex, HStack, IconButton, Stack, Text} from "@chakra-ui/react";
 import { LuClock, LuMapPin, LuPenLine, LuTrash } from "react-icons/lu";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { EVENT_SUBTYPE_LABEL } from "@/lib/eventTypes";
 import type { TPetEvent } from "@/lib/petsApi";
 import {RU_MONTH_SHORT, TYPE_BG, TYPE_COLOR, TYPE_LABEL} from "./eventsShared";
 
@@ -12,6 +13,11 @@ type TEventRowProps = {
 
 const formatTime = (date: Date): string =>
   `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+const eventTypeLabel = (event: TPetEvent): string =>
+  event.subtype
+    ? `${TYPE_LABEL[event.type]} · ${EVENT_SUBTYPE_LABEL[event.subtype]}`
+    : TYPE_LABEL[event.type];
 
 export function EventRow({ event, onEdit, onDelete }: TEventRowProps) {
   const d = new Date(event.eventDate);
@@ -47,7 +53,7 @@ export function EventRow({ event, onEdit, onDelete }: TEventRowProps) {
           <Text fontWeight={600}>{event.title}</Text>
           <StatusBadge styleColors={{ bg: TYPE_BG[event.type], color: TYPE_COLOR[event.type] }}>
             <Text whiteSpace={"normal"} width={["min-content", "min-content", "fit-content"]}>
-              {TYPE_LABEL[event.type]}
+              {eventTypeLabel(event)}
             </Text>
           </StatusBadge>
         </HStack>

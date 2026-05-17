@@ -20,6 +20,7 @@ const fileId = "60a7c1aa9e1d4f12345678cd";
 
 const validInput = {
   type: "vaccine" as const,
+  subtype: "rabies" as const,
   title: "Rabies booster",
   eventDate: "2026-06-01T10:00:00.000Z"
 };
@@ -29,6 +30,7 @@ const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   ownerId: new Types.ObjectId(ownerId),
   petId: new Types.ObjectId(petId),
   type: "vaccine" as const,
+  subtype: "rabies" as const,
   title: "Rabies booster",
   eventDate: new Date("2026-06-01T10:00:00.000Z"),
   fileIds: [],
@@ -52,6 +54,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
     petId,
     {
       type: "vaccine",
+      subtype: "rabies",
       title: "  Rabies booster  ",
       eventDate: "2026-06-01T10:00:00.000Z",
       nextDate: "2027-06-01T10:00:00.000Z",
@@ -98,6 +101,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal((captured.ownerId as Types.ObjectId).toString(), ownerId);
   assert.equal((captured.petId as Types.ObjectId).toString(), petId);
   assert.equal(captured.type, "vaccine");
+  assert.equal(captured.subtype, "rabies");
   assert.equal(captured.title, "Rabies booster");
   assert.equal((captured.eventDate as Date).toISOString(), "2026-06-01T10:00:00.000Z");
   assert.equal((captured.nextDate as Date).toISOString(), "2027-06-01T10:00:00.000Z");
@@ -112,6 +116,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal(result.ownerId, ownerId);
   assert.equal(result.petId, petId);
   assert.equal(result.type, "vaccine");
+  assert.equal(result.subtype, "rabies");
   assert.equal(result.title, "Rabies booster");
   assert.equal(result.eventDate, "2026-06-01T10:00:00.000Z");
   assert.equal(result.nextDate, "2027-06-01T10:00:00.000Z");
@@ -155,6 +160,48 @@ test("createPetEvent accepts lab events", async () => {
 
   assert.equal(capturedType, "lab");
   assert.equal(result.type, "lab");
+});
+
+test("createPetEvent enforces subtype for vaccine and treatment events", async () => {
+  const cases: Array<{ input: Record<string, unknown>; message: RegExp }> = [
+    {
+      input: { ...validInput, subtype: undefined },
+      message: /subtype is required for vaccine events/
+    },
+    {
+      input: { ...validInput, subtype: "" },
+      message: /subtype is required for vaccine events/
+    },
+    {
+      input: { ...validInput, subtype: ["rabies"] },
+      message: /subtype must be one of: complex, rabies/
+    },
+    {
+      input: { ...validInput, type: "treatment", subtype: "rabies" },
+      message: /subtype must be one of: internal, external/
+    },
+    {
+      input: { ...validInput, type: "visit", subtype: "complex" },
+      message: /subtype is only supported/
+    }
+  ];
+
+  for (const { input, message } of cases) {
+    await assert.rejects(
+      () =>
+        createPetEvent(ownerId, petId, input, {
+          findPetByIdForOwner: petFound,
+          createEventRecord: failingCreate
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.statusCode, 400);
+        assert.equal(error.code, "INVALID_EVENT_SUBTYPE");
+        assert.match(error.message, message);
+        return true;
+      }
+    );
+  }
 });
 
 test("createPetEvent rejects fileIds outside the pet/owner scope with 400", async () => {
@@ -675,8 +722,9 @@ test("listPetEvents rejects invalid petId with 400", async () => {
 });
 
 test("serializeEvent hides optional fields when absent", () => {
-  const serialized = serializeEvent(makeEventRecord());
+  const serialized = serializeEvent(makeEventRecord({ subtype: undefined }));
   assert.equal("nextDate" in serialized, false);
+  assert.equal("subtype" in serialized, false);
   assert.equal("clinicName" in serialized, false);
   assert.equal("comment" in serialized, false);
   assert.equal("recurrence" in serialized, false);

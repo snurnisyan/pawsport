@@ -1,7 +1,7 @@
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 
-import { EVENT_TYPES, RECURRENCE_FREQUENCIES, REMINDER_OFFSETS } from "../models/Event";
+import { EVENT_SUBTYPES, EVENT_TYPES, RECURRENCE_FREQUENCIES, REMINDER_OFFSETS } from "../models/Event";
 import { EXPORT_SECTIONS, EXPORT_STATUSES } from "../models/Export";
 import { PET_SEXES } from "../models/Pet";
 import { REMINDER_CHANNELS, REMINDER_STATUSES } from "../models/Reminder";
@@ -220,6 +220,7 @@ export const EventSchema = z
     ownerId: ObjectIdSchema,
     petId: ObjectIdSchema,
     type: z.enum(EVENT_TYPES),
+    subtype: z.enum(EVENT_SUBTYPES).optional(),
     title: z.string(),
     eventDate: DateTimeSchema,
     nextDate: DateTimeSchema.optional(),
@@ -238,6 +239,7 @@ export const EventSchema = z
 
 const EventMutableSchema = EventSchema.pick({
   type: true,
+  subtype: true,
   title: true,
   eventDate: true,
   nextDate: true,

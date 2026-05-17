@@ -6,10 +6,9 @@ import { GhostButton } from "@/components/ui/Buttons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { EventDialog } from "@/components/pets/events/EventDialog";
-import type { TPet } from "@/store/pets";
+import type { TPet, TPetStatus } from "@/store/pets";
 import DogIcon from "@/icons/dog-icon.svg";
 import CatIcon from "@/icons/cat.svg";
-import {TYPE_BG, TYPE_BG_BRIGHT, TYPE_COLOR} from "@/components/pets/events/eventsShared";
 
 const SEX_LABEL: Record<TPet["sex"], string> = {
   male: "Мальчик",
@@ -20,6 +19,12 @@ const SEX_LABEL: Record<TPet["sex"], string> = {
 const RECURRING_LABEL: Record<"vaccine" | "treatment", string> = {
   vaccine: "Вакцинация",
   treatment: "Обработка",
+};
+
+const STATUS_BADGE_BG: Record<TPetStatus["tone"], string> = {
+  danger: "#EF4444",
+  warning: "#F59E0B",
+  success: "#22C55E",
 };
 
 const detectRecurringType = (pet: TPet): "vaccine" | "treatment" | null => {
@@ -71,7 +76,7 @@ export function PetCard({ pet }: TPetCardProps) {
           </AspectRatio>
           {pet.status && (
             <Box position="absolute" top="12px" right="12px" zIndex={2}>
-              <StatusBadge styleColors={{ bg: TYPE_BG_BRIGHT[pet.status], color: "white" }}>
+              <StatusBadge styleColors={{ bg: STATUS_BADGE_BG[pet.status.tone], color: "white" }}>
                 {pet.status.label}
               </StatusBadge>
             </Box>

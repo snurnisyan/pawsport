@@ -24,11 +24,13 @@ export type TPet = {
 };
 
 export type TPetEventType = components["schemas"]["Event"]["type"];
+export type TPetEventSubtype = NonNullable<components["schemas"]["Event"]["subtype"]>;
 
 export type TPetEvent = {
   id: string;
   petId: string;
   type: TPetEventType;
+  subtype?: TPetEventSubtype;
   title: string;
   date: string;
   time?: string;
@@ -100,6 +102,7 @@ const EVENTS: TPetEvent[] = [
     id: "e2",
     petId: "kuper",
     type: "vaccine",
+    subtype: "rabies",
     title: "Вакцинация (бешенство)",
     date: "2024-04-24",
     time: "14:30",
@@ -109,6 +112,7 @@ const EVENTS: TPetEvent[] = [
     id: "e3",
     petId: "kuper",
     type: "treatment",
+    subtype: "internal",
     title: "Обработка от паразитов",
     date: "2024-04-14",
     time: "09:00",

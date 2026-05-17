@@ -8,7 +8,7 @@ import {
   LuSyringe,
 } from "react-icons/lu";
 import type { IconBaseProps } from "react-icons";
-import type { TPetEventType } from "@/store/pets";
+import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
 
 export type TEventTypeMeta = {
   label: string;
@@ -16,6 +16,11 @@ export type TEventTypeMeta = {
   bg: string;
   bgBright: string;
   Icon: ComponentType<IconBaseProps>;
+};
+
+export type TEventSubtypeOption = {
+  value: TPetEventSubtype;
+  label: string;
 };
 
 export const EVENT_TYPE_ORDER = [
@@ -108,3 +113,34 @@ export const EVENT_TYPE_FILTER_OPTIONS = EVENT_TYPE_FILTER_ORDER.map((type) => (
   label: EVENT_TYPE_META[type].label,
   color: EVENT_TYPE_META[type].color,
 }));
+
+export const EVENT_SUBTYPE_OPTIONS = {
+  vaccine: [
+    { value: "complex", label: "Комплексная" },
+    { value: "rabies", label: "Бешенство" },
+  ],
+  treatment: [
+    { value: "internal", label: "Внутренняя" },
+    { value: "external", label: "Наружная" },
+  ],
+} satisfies Partial<Record<TPetEventType, TEventSubtypeOption[]>>;
+
+export const EVENT_SUBTYPE_LABEL = Object.fromEntries(
+  Object.values(EVENT_SUBTYPE_OPTIONS)
+    .flat()
+    .map((option) => [option.value, option.label])
+) as Record<TPetEventSubtype, string>;
+
+export const getEventSubtypeOptions = (
+  type: TPetEventType | ""
+): TEventSubtypeOption[] =>
+  type === "vaccine" || type === "treatment" ? EVENT_SUBTYPE_OPTIONS[type] : [];
+
+export const isEventSubtypeSupported = (type: TPetEventType | ""): boolean =>
+  getEventSubtypeOptions(type).length > 0;
+
+export const isEventSubtypeValidForType = (
+  type: TPetEventType | "",
+  subtype: string
+): subtype is TPetEventSubtype =>
+  getEventSubtypeOptions(type).some((option) => option.value === subtype);
