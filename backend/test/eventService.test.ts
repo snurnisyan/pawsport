@@ -410,9 +410,9 @@ test("listPetEvents leaves missing date bounds unrestricted", async () => {
   assert.equal(observedRange?.to, undefined);
 });
 
-test("listPetEvents passes nextDateFrom and type separately from eventDate filters", async () => {
+test("listPetEvents passes nextDateFrom, type and eventTypes separately from eventDate filters", async () => {
   let observedFilters:
-    | { from?: Date; to?: Date; nextDateFrom?: Date; type?: string }
+    | { from?: Date; to?: Date; nextDateFrom?: Date; type?: string; eventTypes?: string[] }
     | undefined;
 
   await listPetEvents(
@@ -422,7 +422,8 @@ test("listPetEvents passes nextDateFrom and type separately from eventDate filte
       from: "2026-05-01",
       to: "2026-05-31",
       nextDateFrom: "2026-05-17T10:30:00.000Z",
-      type: "lab"
+      type: "lab",
+      eventTypes: ["vaccine", "treatment"]
     },
     {
       findPetByIdForOwner: petFound,
@@ -437,6 +438,26 @@ test("listPetEvents passes nextDateFrom and type separately from eventDate filte
   assert.equal(observedFilters?.to?.toISOString(), "2026-05-31T23:59:59.999Z");
   assert.equal(observedFilters?.nextDateFrom?.toISOString(), "2026-05-17T10:30:00.000Z");
   assert.equal(observedFilters?.type, "lab");
+  assert.deepEqual(observedFilters?.eventTypes, ["vaccine", "treatment"]);
+});
+
+test("listPetEvents accepts comma-separated eventTypes", async () => {
+  let observedEventTypes: string[] | undefined;
+
+  await listPetEvents(
+    ownerId,
+    petId,
+    { eventTypes: "vaccine,lab,other" },
+    {
+      findPetByIdForOwner: petFound,
+      listEventsForOwnerPet: async (_owner, _pet, filters) => {
+        observedEventTypes = filters.eventTypes;
+        return [];
+      }
+    }
+  );
+
+  assert.deepEqual(observedEventTypes, ["vaccine", "lab", "other"]);
 });
 
 test("listPetEvents rejects invalid nextDateFrom", async () => {
@@ -531,6 +552,29 @@ test("listPetEvents rejects invalid type filter", async () => {
   );
 });
 
+test("listPetEvents rejects invalid eventTypes filter", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { eventTypes: ["vaccine", "grooming"] },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_EVENT_TYPES");
+      return true;
+    }
+  );
+});
+
 test("buildEventListFilter applies nextDateFrom without repurposing eventDate range", () => {
   const owner = new Types.ObjectId(ownerId);
   const pet = new Types.ObjectId(petId);
@@ -538,13 +582,19 @@ test("buildEventListFilter applies nextDateFrom without repurposing eventDate ra
   const to = new Date("2026-05-31T23:59:59.999Z");
   const nextDateFrom = new Date("2026-06-01T00:00:00.000Z");
 
-  const filter = buildEventListFilter(owner, pet, { from, to, nextDateFrom, type: "lab" });
+  const filter = buildEventListFilter(owner, pet, {
+    from,
+    to,
+    nextDateFrom,
+    type: "lab",
+    eventTypes: ["vaccine", "treatment"]
+  });
 
   assert.equal(filter.ownerId, owner);
   assert.equal(filter.petId, pet);
   assert.deepEqual(filter.eventDate, { $gte: from, $lte: to });
   assert.deepEqual(filter.nextDate, { $gte: nextDateFrom });
-  assert.equal(filter.type, "lab");
+  assert.deepEqual(filter.type, { $in: ["vaccine", "treatment"] });
 });
 
 test("buildEventListFilter excludes missing nextDate records when nextDateFrom is present", () => {

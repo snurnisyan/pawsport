@@ -27,11 +27,13 @@ import {
 export interface EventListQuery extends DateRangeQuery {
   nextDateFrom?: unknown;
   type?: unknown;
+  eventTypes?: unknown;
 }
 
 export interface EventListFilters extends OptionalDateRange {
   nextDateFrom?: Date;
   type?: EventType;
+  eventTypes?: EventType[];
 }
 
 export interface CreateEventInput {
@@ -236,6 +238,47 @@ const parseOptionalType = (value: unknown): EventType | undefined => {
     return undefined;
   }
   return parseType(value);
+};
+
+const parseOptionalStringList = (
+  value: unknown,
+  code: string,
+  message: string
+): string[] | undefined => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const rawValues = Array.isArray(value) ? value : [value];
+  const values = rawValues.flatMap((item) => {
+    if (typeof item !== "string") {
+      throw new AppError(400, code, message);
+    }
+    return item
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  });
+
+  return values.length > 0 ? values : undefined;
+};
+
+const parseOptionalEventTypes = (value: unknown): EventType[] | undefined => {
+  const rawValues = parseOptionalStringList(
+    value,
+    "INVALID_EVENT_TYPES",
+    "eventTypes must be a list of valid event types"
+  );
+  if (!rawValues) {
+    return undefined;
+  }
+
+  return rawValues.map((raw) => {
+    if (!(EVENT_TYPES as readonly string[]).includes(raw)) {
+      throw new AppError(400, "INVALID_EVENT_TYPES", "eventTypes must be a list of valid event types");
+    }
+    return raw as EventType;
+  });
 };
 
 const parseReminderOffset = (value: unknown): ReminderOffset | undefined => {
@@ -450,8 +493,9 @@ const parseEventListFilters = (query: EventListQuery): EventListFilters => {
     "nextDateFrom must be a valid ISO date-time string"
   );
   const type = parseOptionalType(query.type);
+  const eventTypes = parseOptionalEventTypes(query.eventTypes);
 
-  return { ...range, nextDateFrom, type };
+  return { ...range, nextDateFrom, type, eventTypes };
 };
 
 export const buildEventListFilter = (
@@ -465,7 +509,11 @@ export const buildEventListFilter = (
   if (filters.to) eventDate.$lte = filters.to;
   if (Object.keys(eventDate).length > 0) filter.eventDate = eventDate;
   if (filters.nextDateFrom) filter.nextDate = { $gte: filters.nextDateFrom };
-  if (filters.type) filter.type = filters.type;
+  if (filters.eventTypes) {
+    filter.type = { $in: filters.eventTypes };
+  } else if (filters.type) {
+    filter.type = filters.type;
+  }
   return filter;
 };
 
