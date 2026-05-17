@@ -121,5 +121,6 @@ const eventSchema = new Schema<IEvent>(
 );
 
 eventSchema.index({ ownerId: 1, petId: 1, eventDate: -1 });
+eventSchema.index({ ownerId: 1, petId: 1, type: 1, subtype: 1, nextDate: 1 });
 
 export const EventModel = model<IEvent>("Event", eventSchema);

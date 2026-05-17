@@ -126,6 +126,16 @@ export const VetContactSchema = z
   })
   .openapi("VetContact");
 
+export const ExpiredEventSchema = z
+  .object({
+    type: z.enum(["vaccine", "treatment"]),
+    subtype: z.enum(EVENT_SUBTYPES),
+    title: z.string(),
+    eventDate: DateTimeSchema,
+    nextDate: DateTimeSchema
+  })
+  .openapi("ExpiredEvent");
+
 export const PetSchema = z
   .object({
     id: ObjectIdSchema,
@@ -141,6 +151,10 @@ export const PetSchema = z
     tags: z.array(z.string()),
     notes: z.array(z.string()),
     vetContact: VetContactSchema.optional(),
+    expiredEvents: z.array(ExpiredEventSchema).optional().openapi({
+      description:
+        "Expired vaccine/treatment events for GET /pets. An event is expired when nextDate is before now and there is no future event with the same type and subtype."
+    }),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
   })

@@ -434,6 +434,43 @@ test("GET /pets replaces photoFileId with signed photoUrl in list items", async 
   assert.equal(resolveCall?.expires, 7 * 24 * 60 * 60);
 });
 
+test("GET /pets returns expiredEvents from list items", async () => {
+  await withListServer(
+    {
+      listPets: async () => [
+        fakeSerializedPet({
+          expiredEvents: [
+            {
+              type: "vaccine",
+              subtype: "rabies",
+              title: "Rabies vaccine",
+              eventDate: "2025-05-12T10:00:00.000Z",
+              nextDate: "2026-05-12T10:00:00.000Z"
+            }
+          ]
+        })
+      ]
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        items: Array<{ expiredEvents?: Array<Record<string, unknown>> }>;
+      };
+
+      assert.deepEqual(body.items[0].expiredEvents, [
+        {
+          type: "vaccine",
+          subtype: "rabies",
+          title: "Rabies vaccine",
+          eventDate: "2025-05-12T10:00:00.000Z",
+          nextDate: "2026-05-12T10:00:00.000Z"
+        }
+      ]);
+    }
+  );
+});
+
 const buildGetApp = (overrides: GetPetHandlerDependencies = {}): express.Express => {
   const app = express();
   app.get("/pets/:id", authMiddleware, getPetHandler(overrides));

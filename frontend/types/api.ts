@@ -614,6 +614,15 @@ export interface components {
             /** Format: email */
             email?: string;
         };
+        ExpiredEvent: {
+            /** @enum {string} */
+            type: "vaccine" | "treatment";
+            /** @enum {string} */
+            subtype: "complex" | "rabies" | "internal" | "external";
+            title: string;
+            eventDate: components["schemas"]["DateTime"];
+            nextDate: components["schemas"]["DateTime"];
+        };
         PetDetail: {
             id: components["schemas"]["ObjectId"];
             ownerId: components["schemas"]["ObjectId"];
@@ -633,6 +642,8 @@ export interface components {
             tags: string[];
             notes: string[];
             vetContact?: components["schemas"]["VetContact"];
+            /** @description Expired vaccine/treatment events for GET /pets. An event is expired when nextDate is before now and there is no future event with the same type and subtype. */
+            expiredEvents?: components["schemas"]["ExpiredEvent"][];
             createdAt: components["schemas"]["DateTime"];
             updatedAt: components["schemas"]["DateTime"];
             /**

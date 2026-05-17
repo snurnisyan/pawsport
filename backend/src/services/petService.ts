@@ -1,7 +1,7 @@
 import { Types, isValidObjectId } from "mongoose";
 
 import { AppError } from "../middleware/errorHandler";
-import { EventModel } from "../models/Event";
+import { EventModel, type EventSubtype, type IEvent } from "../models/Event";
 import { PetModel, PET_SEXES, type IPet, type PetSex } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
 import { deleteAllExportsForPet } from "./exportService";
@@ -27,6 +27,14 @@ export interface SerializedVetContact {
   email?: string;
 }
 
+export interface SerializedExpiredEvent {
+  type: "vaccine" | "treatment";
+  subtype: EventSubtype;
+  title: string;
+  eventDate: string;
+  nextDate: string;
+}
+
 export interface SerializedPet {
   id: string;
   ownerId: string;
@@ -41,6 +49,7 @@ export interface SerializedPet {
   tags: string[];
   notes: string[];
   vetContact?: SerializedVetContact;
+  expiredEvents?: SerializedExpiredEvent[];
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +72,17 @@ type PetRecord = Pick<
   | "createdAt"
   | "updatedAt"
 >;
+
+type ExpirableEventRecord = Pick<
+  IEvent,
+  "petId" | "type" | "subtype" | "title" | "eventDate" | "nextDate"
+>;
+
+type ExpirableEventWithNextDate = ExpirableEventRecord & {
+  type: SerializedExpiredEvent["type"];
+  subtype: EventSubtype;
+  nextDate: Date;
+};
 
 interface NormalizedCreatePetInput {
   name: string;
@@ -90,6 +110,11 @@ export interface PetUpdates {
 export interface PetServiceDependencies {
   createPetRecord?: (input: CreatePetPersistInput) => Promise<PetRecord>;
   listPetsForOwner?: (ownerId: Types.ObjectId) => Promise<PetRecord[]>;
+  listExpirableEventsForPets?: (
+    ownerId: Types.ObjectId,
+    petIds: Types.ObjectId[]
+  ) => Promise<ExpirableEventRecord[]>;
+  getNow?: () => Date;
   findPetByIdForOwner?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
   updatePetRecord?: (
     petId: Types.ObjectId,
@@ -108,6 +133,10 @@ export interface PetServiceDependencies {
 }
 
 const MICROCHIP_PATTERN = /^\d{15}$/;
+const EXPIRABLE_EVENT_TYPES = ["vaccine", "treatment"] as const;
+
+const isExpirableEventType = (type: string): type is SerializedExpiredEvent["type"] =>
+  (EXPIRABLE_EVENT_TYPES as readonly string[]).includes(type);
 
 const requireString = (value: unknown, code: string, message: string): string => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -345,6 +374,80 @@ export const serializePet = (pet: PetRecord): SerializedPet => {
   return result;
 };
 
+const serializeExpiredEvent = (event: ExpirableEventWithNextDate): SerializedExpiredEvent => ({
+  type: event.type,
+  subtype: event.subtype,
+  title: event.title,
+  eventDate: event.eventDate.toISOString(),
+  nextDate: event.nextDate.toISOString()
+});
+
+const buildExpiredEventsByPet = (
+  events: ExpirableEventRecord[],
+  now: Date
+): Map<string, SerializedExpiredEvent[]> => {
+  const nowMs = now.getTime();
+  const byPair = new Map<
+    string,
+    {
+      hasFuture: boolean;
+      latestExpired?: ExpirableEventWithNextDate;
+    }
+  >();
+
+  for (const event of events) {
+    if (!isExpirableEventType(event.type) || !event.subtype || !event.nextDate) continue;
+
+    const expirableEvent: ExpirableEventWithNextDate = {
+      petId: event.petId,
+      type: event.type,
+      subtype: event.subtype,
+      title: event.title,
+      eventDate: event.eventDate,
+      nextDate: event.nextDate
+    };
+    const pairKey = `${expirableEvent.petId.toString()}:${expirableEvent.type}:${expirableEvent.subtype}`;
+    const entry = byPair.get(pairKey) ?? { hasFuture: false };
+    const nextDateMs = expirableEvent.nextDate.getTime();
+
+    if (nextDateMs > nowMs) {
+      entry.hasFuture = true;
+    } else if (nextDateMs < nowMs) {
+      const latest = entry.latestExpired;
+      if (
+        !latest ||
+        nextDateMs > latest.nextDate.getTime() ||
+        (nextDateMs === latest.nextDate.getTime() && expirableEvent.eventDate > latest.eventDate)
+      ) {
+        entry.latestExpired = expirableEvent;
+      }
+    }
+
+    byPair.set(pairKey, entry);
+  }
+
+  const byPet = new Map<string, SerializedExpiredEvent[]>();
+  for (const [pairKey, entry] of byPair.entries()) {
+    if (entry.hasFuture || !entry.latestExpired) continue;
+
+    const [petId] = pairKey.split(":");
+    const items = byPet.get(petId) ?? [];
+    items.push(serializeExpiredEvent(entry.latestExpired));
+    byPet.set(petId, items);
+  }
+
+  for (const items of byPet.values()) {
+    items.sort(
+      (a, b) =>
+        a.nextDate.localeCompare(b.nextDate) ||
+        a.type.localeCompare(b.type) ||
+        a.subtype.localeCompare(b.subtype)
+    );
+  }
+
+  return byPet;
+};
+
 const requireOwnerId = (ownerId: string): Types.ObjectId => {
   if (!isValidObjectId(ownerId)) {
     throw new AppError(401, "UNAUTHORIZED", "Invalid access token");
@@ -374,12 +477,32 @@ export const listPets = async (
 ): Promise<SerializedPet[]> => {
   const {
     listPetsForOwner = async (id) =>
-      PetModel.find({ ownerId: id }).sort({ createdAt: -1 }).exec() as unknown as PetRecord[]
+      PetModel.find({ ownerId: id }).sort({ createdAt: -1 }).exec() as unknown as PetRecord[],
+    listExpirableEventsForPets = async (id, petIds) =>
+      EventModel.find({
+        ownerId: id,
+        petId: { $in: petIds },
+        type: { $in: EXPIRABLE_EVENT_TYPES },
+        nextDate: { $exists: true }
+      })
+        .select({ petId: 1, type: 1, subtype: 1, title: 1, eventDate: 1, nextDate: 1 })
+        .sort({ nextDate: -1, eventDate: -1 })
+        .exec() as unknown as ExpirableEventRecord[],
+    getNow = () => new Date()
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const pets = await listPetsForOwner(ownerObjectId);
-  return pets.map(serializePet);
+  const petIds = pets.map((pet) => pet._id);
+  const expiredEventsByPet =
+    petIds.length > 0
+      ? buildExpiredEventsByPet(await listExpirableEventsForPets(ownerObjectId, petIds), getNow())
+      : new Map<string, SerializedExpiredEvent[]>();
+
+  return pets.map((pet) => ({
+    ...serializePet(pet),
+    expiredEvents: expiredEventsByPet.get(pet._id.toString()) ?? []
+  }));
 };
 
 const requirePetObjectId = (petId: string): Types.ObjectId => {
