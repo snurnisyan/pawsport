@@ -53,7 +53,7 @@ const fakeEvent = () => ({
   type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: "2026-05-12T10:00:00.000Z",
-  fileIds: [],
+  files: [],
   createdAt: "2026-05-12T00:00:00.000Z",
   updatedAt: "2026-05-12T00:00:00.000Z"
 });

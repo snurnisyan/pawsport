@@ -214,6 +214,13 @@ export const RecurrenceSchema = z
   })
   .openapi("Recurrence");
 
+export const EventFileSchema = z
+  .object({
+    originalName: z.string(),
+    fileId: ObjectIdSchema
+  })
+  .openapi("EventFile");
+
 export const EventSchema = z
   .object({
     id: ObjectIdSchema,
@@ -231,23 +238,26 @@ export const EventSchema = z
       description:
         "When set, the backend maintains one pending email reminder for this event. Clearing it deletes the pending event reminder; sent reminders are left unchanged."
     }),
-    fileIds: z.array(ObjectIdSchema),
+    files: z.array(EventFileSchema),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
   })
   .openapi("Event");
 
-const EventMutableSchema = EventSchema.pick({
-  type: true,
-  subtype: true,
-  title: true,
-  eventDate: true,
-  nextDate: true,
-  clinicName: true,
-  comment: true,
-  recurrence: true,
-  reminderOffset: true,
-  fileIds: true
+const EventMutableSchema = z.object({
+  type: z.enum(EVENT_TYPES),
+  subtype: z.enum(EVENT_SUBTYPES).optional(),
+  title: z.string(),
+  eventDate: DateTimeSchema,
+  nextDate: DateTimeSchema.optional(),
+  clinicName: z.string().optional(),
+  comment: z.string().optional(),
+  recurrence: RecurrenceSchema.optional(),
+  reminderOffset: z.enum(REMINDER_OFFSETS).optional().openapi({
+    description:
+      "When set, the backend maintains one pending email reminder for this event. Clearing it deletes the pending event reminder; sent reminders are left unchanged."
+  }),
+  fileIds: z.array(ObjectIdSchema)
 });
 
 export const CreateEventRequestSchema = EventMutableSchema.extend({

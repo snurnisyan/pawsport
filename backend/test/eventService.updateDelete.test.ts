@@ -334,6 +334,8 @@ test("updateEvent validates fileIds against the existing event's pet", async () 
         assert.equal(pet.toString(), petId);
         validatedIds = ids;
       },
+      listFilesByIds: async (_owner, ids) =>
+        ids.map((id) => ({ _id: id, originalName: "rabies-certificate.pdf" })),
       updateEventRecord: async () => makeEventRecord({ fileIds: [new Types.ObjectId(fileId)] })
     }
   );
