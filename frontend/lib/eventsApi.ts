@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient, unwrapApiResponse, unwrapVoidApiResponse } from "@/lib/api";
+import {
+  apiClient,
+  authenticatedFetch,
+  normalizeApiError,
+  unwrapApiResponse,
+  unwrapVoidApiResponse,
+} from "@/lib/api";
 import {
   petEventsQueryKey,
   listPetEvents,
@@ -24,15 +30,36 @@ export const getEvent = (id: string): Promise<TPetEventResponse> =>
 
 export const createPetEvent = (
   petId: string,
-  body: TCreateEventRequest
-): Promise<TPetEventResponse> =>
-  unwrapApiResponse(
-    apiClient.POST("/pets/{id}/events", {
-      params: { path: { id: petId } },
-      body,
-      headers: { "Content-Type": "application/json" },
-    })
-  );
+  body: TCreateEventRequest,
+  files: File[] = []
+): Promise<TPetEventResponse> => {
+  if (files.length === 0) {
+    return unwrapApiResponse(
+      apiClient.POST("/pets/{id}/events", {
+        params: { path: { id: petId } },
+        body,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  }
+
+  const formData = new FormData();
+  formData.append("event", JSON.stringify(body));
+  files.forEach((file) => formData.append("files", file));
+
+  return authenticatedFetch(`/pets/${petId}/events`, {
+    method: "POST",
+    body: formData,
+  }).then(async (response) => {
+    const payload = (await response.json().catch(() => undefined)) as unknown;
+
+    if (!response.ok) {
+      throw normalizeApiError(payload, response);
+    }
+
+    return payload as TPetEventResponse;
+  });
+};
 
 export const updateEvent = (
   id: string,

@@ -256,15 +256,25 @@ const EventMutableSchema = z.object({
   reminderOffset: z.enum(REMINDER_OFFSETS).optional().openapi({
     description:
       "When set, the backend maintains one pending email reminder for this event. Clearing it deletes the pending event reminder; sent reminders are left unchanged."
-  }),
-  fileIds: z.array(ObjectIdSchema)
+  })
 });
 
-export const CreateEventRequestSchema = EventMutableSchema.extend({
-  fileIds: z.array(ObjectIdSchema).default([])
-}).openapi("CreateEventRequest");
+export const CreateEventRequestSchema = EventMutableSchema.openapi("CreateEventRequest");
 
-export const UpdateEventRequestSchema = EventMutableSchema.partial().openapi("UpdateEventRequest");
+export const CreateEventMultipartRequestSchema = z
+  .object({
+    event: z.string().openapi({
+      description: "JSON-encoded CreateEventRequest payload (omit fileIds when sending files)."
+    }),
+    files: z.array(z.string().openapi({ format: "binary" })).optional().openapi({
+      description: "Optional PDF/PNG/JPG files to attach to the created event."
+    })
+  })
+  .openapi("CreateEventMultipartRequest");
+
+export const UpdateEventRequestSchema = EventMutableSchema.extend({
+  fileIds: z.array(ObjectIdSchema).optional()
+}).partial().openapi("UpdateEventRequest");
 
 export const EventResponseSchema = z
   .object({
