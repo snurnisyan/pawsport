@@ -6,7 +6,7 @@ import { GhostButton } from "@/components/ui/Buttons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { EventDialog } from "@/components/pets/events/EventDialog";
-import type { TPet, TPetStatus } from "@/store/pets";
+import type { TPet, TPetExpiredEvent } from "@/store/pets";
 import DogIcon from "@/icons/dog-icon.svg";
 import CatIcon from "@/icons/cat.svg";
 
@@ -16,22 +16,26 @@ const SEX_LABEL: Record<TPet["sex"], string> = {
   unknown: "Пол не указан",
 };
 
-const RECURRING_LABEL: Record<"vaccine" | "treatment", string> = {
-  vaccine: "Вакцинация",
-  treatment: "Обработка",
+const EXPIRED_LABEL: Record<TPetExpiredEvent["type"], string> = {
+  vaccine: "Просрочена вакцинация",
+  treatment: "Просрочена обработка",
 };
 
-const STATUS_BADGE_BG: Record<TPetStatus["tone"], string> = {
-  danger: "#EF4444",
-  warning: "#F59E0B",
-  success: "#22C55E",
+const formatShortDate = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+  }).format(date);
 };
 
-const detectRecurringType = (pet: TPet): "vaccine" | "treatment" | null => {
-  const haystack = `${pet.status?.label ?? ""} ${pet.nextEvent ?? ""}`.toLowerCase();
-  if (haystack.includes("вакцин")) return "vaccine";
-  if (haystack.includes("обработ")) return "treatment";
-  return null;
+const toIsoDate = (value: string): string => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
 type TPetCardProps = {
@@ -40,14 +44,21 @@ type TPetCardProps = {
 
 export function PetCard({ pet }: TPetCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const recurringType = detectRecurringType(pet);
-  const showUpdateButton = Boolean(pet.status) && recurringType !== null;
+  const expiredEvent = pet.expiredEvents?.[0];
 
   const handleUpdateClick = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDialogOpen(true);
   };
+
+  const expiredLabel = expiredEvent ? EXPIRED_LABEL[expiredEvent.type] : null;
+  const expiredDateLabel = expiredEvent ? formatShortDate(expiredEvent.nextDate) : "";
+  const nextEventText = expiredLabel
+    ? expiredDateLabel
+      ? `${expiredLabel}: ${expiredDateLabel}`
+      : expiredLabel
+    : null;
 
   return (
     <>
@@ -74,10 +85,10 @@ export function PetCard({ pet }: TPetCardProps) {
           <AspectRatio ratio={4 / 3}>
             <PetImage src={pet.imageUrl} alt={pet.name} />
           </AspectRatio>
-          {pet.status && (
+          {expiredLabel && (
             <Box position="absolute" top="12px" right="12px" zIndex={2}>
-              <StatusBadge styleColors={{ bg: STATUS_BADGE_BG[pet.status.tone], color: "white" }}>
-                {pet.status.label}
+              <StatusBadge styleColors={{ bg: "#EF4444", color: "white" }}>
+                {expiredLabel}
               </StatusBadge>
             </Box>
           )}
@@ -108,7 +119,7 @@ export function PetCard({ pet }: TPetCardProps) {
             </HStack>
           </Stack>
 
-          {pet.nextEvent && (
+          {nextEventText && expiredEvent && (
             <HStack
               gap="8px"
               pt="12px"
@@ -117,43 +128,38 @@ export function PetCard({ pet }: TPetCardProps) {
               justify="space-between"
               align="center"
             >
-              <HStack
-                gap="8px"
-                color={pet.status?.tone === "danger" ? "#FCA5A5" : "fg.muted"}
-                fontSize="14px"
-                minW={0}
-              >
+              <HStack gap="8px" color="#FCA5A5" fontSize="14px" minW={0}>
                 <LuCalendar />
-                <Text truncate>{pet.nextEvent}</Text>
+                <Text truncate>{nextEventText}</Text>
               </HStack>
-              {showUpdateButton && (
-                <Box position="relative" zIndex={2} flexShrink={0}>
-                  <GhostButton
-                    h="32px"
-                    px="10px"
-                    fontSize="13px"
-                    onClick={handleUpdateClick}
-                  >
-                    <HStack gap="6px">
-                      <LuCalendarPlus />
-                      <Text>Добавить</Text>
-                    </HStack>
-                  </GhostButton>
-                </Box>
-              )}
+              <Box position="relative" zIndex={2} flexShrink={0}>
+                <GhostButton
+                  h="32px"
+                  px="10px"
+                  fontSize="13px"
+                  onClick={handleUpdateClick}
+                >
+                  <HStack gap="6px">
+                    <LuCalendarPlus />
+                    <Text>Добавить</Text>
+                  </HStack>
+                </GhostButton>
+              </Box>
             </HStack>
           )}
         </Stack>
       </Box>
 
-      {showUpdateButton && recurringType && (
+      {expiredEvent && (
         <EventDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           initialData={{
             petId: pet.id,
-            type: recurringType,
-            title: RECURRING_LABEL[recurringType],
+            type: expiredEvent.type,
+            subtype: expiredEvent.subtype,
+            date: toIsoDate(expiredEvent.nextDate),
+            title: expiredEvent.title,
           }}
         />
       )}
