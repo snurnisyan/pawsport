@@ -100,6 +100,31 @@ export const normalizeApiError = (error: unknown, response?: Response): ApiError
   });
 };
 
+export const buildApiUrl = (
+  path: string,
+  query?: Record<string, string | undefined>
+): string => {
+  const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL : `${API_BASE_URL}/`;
+  const url = new URL(path.replace(/^\/+/, ""), baseUrl);
+
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+
+  return url.toString();
+};
+
+export const authenticatedFetch = (path: string, init?: RequestInit): Promise<Response> => {
+  const request = new Request(buildApiUrl(path), init);
+  const token = getAccessToken();
+
+  if (!token || !shouldAttachAuth(request.url)) return fetch(request);
+
+  const headers = new Headers(request.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(new Request(request, { headers }));
+};
+
 export const unwrapApiResponse = async <T>(
   request: Promise<{ data?: T; error?: unknown; response: Response }>
 ): Promise<T> => {

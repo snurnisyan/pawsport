@@ -117,7 +117,7 @@ export default function PetPage() {
           <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
           {tab === "overview" && <OverviewTab pet={pet} backendPetId={petQuery.data?.pet.id} />}
           {tab === "events" && <EventsTab events={events} />}
-          {tab === "files" && <FilesTab />}
+          {tab === "files" && <FilesTab petId={petQuery.data?.pet.id} />}
           {tab === "export" && <ExportTab />}
         </Stack>
       </AppWrapper>
