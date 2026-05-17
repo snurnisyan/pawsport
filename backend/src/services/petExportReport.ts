@@ -401,6 +401,11 @@ const serializeFileForPdf = (
   return result;
 };
 
+const isCurrentPetPhotoFile = (
+  file: FileMetadataRecord,
+  photoFileId?: Types.ObjectId
+): boolean => Boolean(photoFileId && file._id.equals(photoFileId));
+
 const serializeReminderForPdf = (reminder: ReminderRecord): PdfReminder => ({
   id: reminder._id.toString(),
   eventId: reminder.eventId.toString(),
@@ -453,14 +458,16 @@ export const buildPetExportReport = async (
     });
   }
   if (input.sections.includes("files")) {
-    report.files = (await listFileMetadataForPet(input.ownerId, input.petId, range)).map((file) => {
-      const serialized = serializeFileForPdf(file, getFileDownloadUrl);
-      if (serialized.eventId) {
-        const eventTitle = eventTitleById.get(serialized.eventId);
-        if (eventTitle) serialized.eventTitle = eventTitle;
-      }
-      return serialized;
-    });
+    report.files = (await listFileMetadataForPet(input.ownerId, input.petId, range))
+      .filter((file) => !isCurrentPetPhotoFile(file, input.pet.photoFileId))
+      .map((file) => {
+        const serialized = serializeFileForPdf(file, getFileDownloadUrl);
+        if (serialized.eventId) {
+          const eventTitle = eventTitleById.get(serialized.eventId);
+          if (eventTitle) serialized.eventTitle = eventTitle;
+        }
+        return serialized;
+      });
   }
   if (input.sections.includes("reminders")) {
     report.reminders = (await listRemindersForPet(input.ownerId, input.petId, range)).map((reminder) => {
