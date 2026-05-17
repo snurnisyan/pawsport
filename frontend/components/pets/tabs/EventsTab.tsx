@@ -48,8 +48,12 @@ export function EventsTab({ petId }: TEventsTabProps) {
     () => ({
       from: filters.dateRange.from || undefined,
       to: filters.dateRange.to || undefined,
+      eventTypes:
+        filters.types.length > 0
+          ? (filters.types as NonNullable<TPetEventsQuery["eventTypes"]>)
+          : undefined,
     }),
-    [filters.dateRange.from, filters.dateRange.to]
+    [filters.dateRange.from, filters.dateRange.to, filters.types]
   );
 
   const eventsQuery = usePetEventsQuery(petId, backendQuery);

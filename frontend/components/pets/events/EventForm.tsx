@@ -70,11 +70,16 @@ export const REMINDER_OPTIONS: { value: TReminderValue; label: string }[] = [
 
 export type TPetOption = { value: string; label: string };
 
+export type TExistingEventFile = {
+  fileId: string;
+  originalName: string;
+};
+
 type TEventFormProps = {
   data: TEventFormData;
   onChange: (patch: Partial<TEventFormData>) => void;
   pets?: TPetOption[];
-  existingFileIds?: string[];
+  existingFiles?: TExistingEventFile[];
 };
 
 const FILE_ACCEPT = "application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg";
@@ -100,12 +105,12 @@ export function EventForm({
   data,
   onChange,
   pets,
-  existingFileIds = [],
+  existingFiles = [],
 }: TEventFormProps) {
-  const handleDownload = async (id: string) => {
+  const handleDownload = async (id: string, fallbackName: string) => {
     try {
       const { blob, filename } = await downloadFile(id);
-      saveBlob(blob, filename ?? id);
+      saveBlob(blob, filename ?? fallbackName);
     } catch (error) {
       toaster.error({
         title: "Не удалось скачать файл",
@@ -119,7 +124,6 @@ export function EventForm({
     onChange({ files: data.files.filter((_, i) => i !== index) });
   };
 
-export function EventForm({ data, onChange, pets }: TEventFormProps) {
   const subtypeOptions = getEventSubtypeOptions(data.type);
   const showSubtype = isEventSubtypeSupported(data.type);
 
@@ -142,27 +146,42 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         />
       )}
 
-      <SelectField
-        label="Тип события"
-        placeholder="Выберите тип"
-        options={TYPE_OPTIONS}
-        value={data.type}
-        onChange={(v) => {
-          const type = v as TPetEventType;
-          onChange({
-            type,
-            subtype: isEventSubtypeValidForType(type, data.subtype) ? data.subtype : "",
-          });
-        }}
-      />
-
-      {showSubtype && (
+      {showSubtype ? (
+        <Grid templateColumns={["1fr", "1fr 1fr"]} gap="16px">
+          <SelectField
+            label="Тип события"
+            placeholder="Выберите тип"
+            options={TYPE_OPTIONS}
+            value={data.type}
+            onChange={(v) => {
+              const type = v as TPetEventType;
+              onChange({
+                type,
+                subtype: isEventSubtypeValidForType(type, data.subtype) ? data.subtype : "",
+              });
+            }}
+          />
+          <SelectField
+            label="Подтип"
+            placeholder="Выберите подтип"
+            options={subtypeOptions}
+            value={data.subtype}
+            onChange={(v) => onChange({ subtype: v as TPetEventSubtype })}
+          />
+        </Grid>
+      ) : (
         <SelectField
-          label="Подтип"
-          placeholder="Выберите подтип"
-          options={subtypeOptions}
-          value={data.subtype}
-          onChange={(v) => onChange({ subtype: v as TPetEventSubtype })}
+          label="Тип события"
+          placeholder="Выберите тип"
+          options={TYPE_OPTIONS}
+          value={data.type}
+          onChange={(v) => {
+            const type = v as TPetEventType;
+            onChange({
+              type,
+              subtype: isEventSubtypeValidForType(type, data.subtype) ? data.subtype : "",
+            });
+          }}
         />
       )}
 
@@ -247,9 +266,9 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         >
           <FileUpload.HiddenInput />
           <Stack gap="8px">
-            {existingFileIds.map((id) => (
+            {existingFiles.map((file) => (
               <HStack
-                key={id}
+                key={file.fileId}
                 bg="bg.field"
                 borderWidth="1px"
                 borderColor="border.subtle"
@@ -257,7 +276,7 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
                 p="12px"
                 gap="12px"
                 cursor="pointer"
-                onClick={() => handleDownload(id)}
+                onClick={() => handleDownload(file.fileId, file.originalName)}
                 _hover={{ borderColor: "primary.500" }}
               >
                 <Box
@@ -274,13 +293,8 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
                   <Icon><LuFile /></Icon>
                 </Box>
                 <Stack gap="0" flex={1} minW={0}>
-                  <Text
-                    fontSize="13px"
-                    fontWeight={500}
-                    fontFamily="mono"
-                    truncate
-                  >
-                    {id}
+                  <Text fontSize="14px" fontWeight={500} truncate>
+                    {file.originalName}
                   </Text>
                   <Text fontSize="12px" color="fg.muted">
                     Прикреплён к событию · Нажмите, чтобы скачать

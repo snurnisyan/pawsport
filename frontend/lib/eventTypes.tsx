@@ -120,8 +120,8 @@ export const EVENT_SUBTYPE_OPTIONS = {
     { value: "rabies", label: "Бешенство" },
   ],
   treatment: [
-    { value: "internal", label: "Внутренняя" },
-    { value: "external", label: "Наружная" },
+    { value: "internal", label: "Внутренние паразиты" },
+    { value: "external", label: "Внешние паразиты" },
   ],
 } satisfies Partial<Record<TPetEventType, TEventSubtypeOption[]>>;
 
