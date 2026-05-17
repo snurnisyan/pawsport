@@ -1,4 +1,5 @@
 import { Box, Checkbox, HStack, Stack, Text } from "@chakra-ui/react";
+import { EVENT_TYPE_FILTER_OPTIONS } from "@/lib/eventTypes";
 
 type TFilter = {
   id: string;
@@ -6,14 +7,11 @@ type TFilter = {
   color: string;
 };
 
-const EVENT_TYPES: TFilter[] = [
-  { id: "visit", label: "Визит", color: "#3B82F6" },
-  { id: "vaccine", label: "Вакцинация", color: "#A855F7" },
-  { id: "treatment", label: "Обработка", color: "#10B981" },
-  { id: "operation", label: "Операция", color: "#F59E0B" },
-  { id: "tests", label: "Анализы и процедуры", color: "#FCD34D" },
-  { id: "other", label: "Другое", color: "#94A3B8" },
-];
+const EVENT_TYPE_FILTERS: TFilter[] = EVENT_TYPE_FILTER_OPTIONS.map(({ value, label, color }) => ({
+  id: value,
+  label,
+  color,
+}));
 
 const PETS: TFilter[] = [
   { id: "kuper", label: "Купер", color: "#3B82F6" },
@@ -56,7 +54,7 @@ export function CalendarFilters() {
           Типы событий
         </Text>
         <Stack gap="8px">
-          {EVENT_TYPES.map((f) => (
+          {EVENT_TYPE_FILTERS.map((f) => (
             <FilterRow key={f.id} f={f} checked showCircle />
           ))}
         </Stack>

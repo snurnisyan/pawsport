@@ -61,6 +61,7 @@ const makeJob = (overrides: Partial<BackgroundJobContext> = {}): BackgroundJobCo
     petId: petId.toString(),
     period: { from: "2026-05-01", to: "2026-05-31" },
     sections: ["profile"],
+    eventTypes: ["vaccine", "lab", "visit"],
     notificationEmail: "owner@example.com"
   },
   attempts: 0,
@@ -93,23 +94,26 @@ test("pet-export handler renders, uploads, marks ready, and sends one email", as
       return record;
     },
     findPet: async () => makePet(),
-    findOwnerEmail: async () => "owner@example.com",
-    buildReport: async (input) => ({
-      exportId: input.exportId.toString(),
-      ownerId: input.ownerId.toString(),
-      petId: input.petId.toString(),
-      generatedAt: input.generatedAt.toISOString(),
-      period: { from: "2026-05-01", to: "2026-05-31" },
-      sections: input.sections,
-      profile: {
-        id: input.pet._id.toString(),
-        name: input.pet.name,
-        species: input.pet.species,
-        sex: input.pet.sex,
-        tags: [],
-        notes: []
-      }
-    }),
+    buildReport: async (input) => {
+      assert.deepEqual(input.eventTypes, ["vaccine", "lab", "visit"]);
+      return {
+        exportId: input.exportId.toString(),
+        ownerId: input.ownerId.toString(),
+        petId: input.petId.toString(),
+        generatedAt: input.generatedAt.toISOString(),
+        period: { from: "2026-05-01", to: "2026-05-31" },
+        sections: input.sections,
+        eventTypes: input.eventTypes,
+        profile: {
+          id: input.pet._id.toString(),
+          name: input.pet.name,
+          species: input.pet.species,
+          sex: input.pet.sex,
+          tags: [],
+          notes: []
+        }
+      };
+    },
     renderTemplate: async (report) => ({
       html: `<html>${report.profile?.name}</html>`,
       assets: [{ path: "assets/logo.svg", content: Buffer.from("<svg />") }]
@@ -150,6 +154,56 @@ test("pet-export handler renders, uploads, marks ready, and sends one email", as
   assert.equal(record.status, "ready");
   assert.equal(record.emailSentAt?.toISOString(), now.toISOString());
   assert.equal(updates.length, 2);
+});
+
+test("pet-export handler skips email when the job payload has no notificationEmail", async () => {
+  let record = makeRecord();
+  let emails = 0;
+
+  const handler = createPetExportJobHandler({
+    findExportById: async () => record,
+    updateExportRecord: async (_id, _owner, update) => {
+      record = { ...record, ...update.set };
+      return record;
+    },
+    findPet: async () => makePet(),
+    buildReport: async (input) => ({
+      exportId: input.exportId.toString(),
+      ownerId: input.ownerId.toString(),
+      petId: input.petId.toString(),
+      generatedAt: input.generatedAt.toISOString(),
+      sections: input.sections
+    }),
+    renderTemplate: async () => ({ html: "<html>Miso</html>" }),
+    renderPdf: async () => Buffer.from("%PDF-rendered"),
+    storage: {
+      putObject: async () => {},
+      getObject: async () => {
+        throw new Error("not used");
+      },
+      deleteObject: async () => {}
+    },
+    sendExportReadyEmail: async () => {
+      emails += 1;
+    },
+    now: () => now
+  });
+
+  await handler(
+    makeJob({
+      payload: {
+        exportId: exportId.toString(),
+        ownerId: ownerId.toString(),
+        petId: petId.toString(),
+        period: { from: "2026-05-01", to: "2026-05-31" },
+        sections: ["profile"]
+      }
+    })
+  );
+
+  assert.equal(record.status, "ready");
+  assert.equal(record.emailSentAt, undefined);
+  assert.equal(emails, 0);
 });
 
 test("pet-export handler retries retryable Gotenberg failures and marks export failed on final attempt", async () => {
@@ -347,7 +401,7 @@ test("pet export template renders compact timeline cards and clickable file link
     events: [
       {
         id: eventId,
-        type: "vaccination",
+        type: "vaccine",
         title: "Rabies booster",
         eventDate: "2024-08-15T00:00:00.000Z",
         clinicName: "City Vet Clinic",

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  ApiError,
   apiClient,
   authenticatedFetch,
   normalizeApiError,
@@ -26,6 +27,9 @@ export type TPetResponse = components["schemas"]["PetResponse"];
 export type TPetFile = components["schemas"]["File"];
 export type TPetFileListResponse = components["schemas"]["FileListResponse"];
 export type TPetFileResponse = components["schemas"]["FileResponse"];
+export type TPetExport = components["schemas"]["Export"];
+export type TCreatePetExportRequest = components["schemas"]["CreateExportRequest"];
+export type TPetExportResponse = components["schemas"]["ExportResponse"];
 export type TPetFilesQuery = {
   from?: string;
   to?: string;
@@ -39,6 +43,8 @@ export const petQueryKey = (id: string) => ["pets", id] as const;
 export const petFilesQueryKey = (petId: string, filters?: TPetFilesQuery) =>
   ["pets", petId, "files", filters ?? {}] as const;
 export const petEventsQueryKey = (petId: string) => ["pets", petId, "events"] as const;
+export const petExportMutationKey = (petId: string) => ["pets", petId, "export"] as const;
+export const exportQueryKey = (exportId: string) => ["exports", exportId] as const;
 
 export const listPets = (): Promise<TPetListResponse> =>
   unwrapApiResponse(apiClient.GET("/pets"));
@@ -121,6 +127,49 @@ export const deleteFile = (fileId: string): Promise<void> =>
   unwrapVoidApiResponse(
     apiClient.DELETE("/files/{id}", { params: { path: { id: fileId } } })
   );
+
+export const createPetExport = (
+  petId: string,
+  body: TCreatePetExportRequest
+): Promise<TPetExportResponse> =>
+  unwrapApiResponse(
+    apiClient.POST("/pets/{id}/export", {
+      params: { path: { id: petId } },
+      body,
+      headers: { "Content-Type": "application/json" },
+    })
+  );
+
+export const getExport = (exportId: string): Promise<TPetExportResponse> =>
+  unwrapApiResponse(
+    apiClient.GET("/exports/{id}", { params: { path: { id: exportId } } })
+  );
+
+export const downloadExport = async (
+  downloadUrl: string
+): Promise<{ blob: Blob; filename?: string } | { downloadUrl: string }> => {
+  let response: Response;
+  try {
+    response = await fetch(downloadUrl, { credentials: "omit" });
+  } catch {
+    return { downloadUrl };
+  }
+
+  if (!response.ok) {
+    throw new ApiError({
+      code: "EXPORT_DOWNLOAD_FAILED",
+      message: "Не удалось скачать PDF. Попробуйте еще раз.",
+      status: response.status,
+    });
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: extractContentDispositionFilename(
+      response.headers.get("Content-Disposition")
+    ),
+  };
+};
 
 const extractContentDispositionFilename = (header: string | null): string | undefined => {
   if (!header) return undefined;

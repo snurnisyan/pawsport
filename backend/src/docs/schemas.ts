@@ -419,6 +419,12 @@ export const CreateExportRequestSchema = z
   .object({
     period: ExportPeriodSchema.optional(),
     sections: z.array(z.enum(EXPORT_SECTIONS)).default(["profile", "events"]),
+    eventTypes: z.array(z.enum(EVENT_TYPES)).optional().openapi({
+      description: "Event types to include when the events section is selected. Omit to include all event types."
+    }),
+    sendEmail: z.boolean().optional().openapi({
+      description: "When true, the generated export is sent to notificationEmail or the authenticated user's email."
+    }),
     notificationEmail: z.string().email().optional()
   })
   .partial()

@@ -446,7 +446,7 @@ export interface components {
             ownerId: components["schemas"]["ObjectId"];
             petId: components["schemas"]["ObjectId"];
             /** @enum {string} */
-            type: "visit" | "vaccination" | "antiparasitic" | "surgery" | "lab" | "other";
+            type: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
             title: string;
             eventDate: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];
@@ -473,7 +473,7 @@ export interface components {
         };
         CreateEventRequest: {
             /** @enum {string} */
-            type: "visit" | "vaccination" | "antiparasitic" | "surgery" | "lab" | "other";
+            type: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
             title: string;
             eventDate: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];
@@ -490,7 +490,7 @@ export interface components {
         };
         UpdateEventRequest: {
             /** @enum {string} */
-            type?: "visit" | "vaccination" | "antiparasitic" | "surgery" | "lab" | "other";
+            type?: "vaccine" | "treatment" | "visit" | "operation" | "lab" | "other";
             title?: string;
             eventDate?: components["schemas"]["DateTime"];
             nextDate?: components["schemas"]["DateTime"];
@@ -546,6 +546,10 @@ export interface components {
              *     ]
              */
             sections: ("profile" | "events" | "files" | "reminders")[];
+            /** @description Event types to include when the events section is selected. Omit to include all event types. */
+            eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
+            /** @description When true, the generated export is sent to notificationEmail or the authenticated user's email. */
+            sendEmail?: boolean;
             /** Format: email */
             notificationEmail?: string;
         };
@@ -954,7 +958,7 @@ export interface operations {
                 from?: string;
                 to?: string;
                 petIds?: components["schemas"]["ObjectId"][];
-                eventTypes?: ("visit" | "vaccination" | "antiparasitic" | "surgery" | "lab" | "other")[];
+                eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
             };
             header?: never;
             path?: never;

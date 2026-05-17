@@ -23,7 +23,7 @@ import {
   type ExportReadyEmailPayload
 } from "../../services/exportEmail";
 import { ExportModel, EXPORT_SECTIONS, type ExportSection, type IExport } from "../../models/Export";
-import { UserModel } from "../../models/User";
+import { EVENT_TYPES, type EventType } from "../../models/Event";
 import { getObjectDownloadUrl, s3Storage, type FileStorage } from "../../storage/s3Storage";
 
 type ExportJobRecord = Pick<
@@ -54,7 +54,6 @@ export interface PetExportHandlerDependencies {
     updates: UpdateExportInput
   ) => Promise<ExportJobRecord | null>;
   findPet?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
-  findOwnerEmail?: (ownerId: Types.ObjectId) => Promise<string | null>;
   buildReport?: typeof buildPetExportReport;
   renderTemplate?: typeof renderPetExportTemplate;
   renderPdf?: typeof renderHtmlToPdf;
@@ -81,6 +80,7 @@ const payloadSchema = z.object({
   petId: objectIdSchema,
   period: periodSchema,
   sections: z.array(z.enum(EXPORT_SECTIONS)).nonempty(),
+  eventTypes: z.array(z.enum(EVENT_TYPES)).optional(),
   notificationEmail: z.string().email().optional()
 });
 
@@ -144,11 +144,6 @@ const defaultUpdateExportRecord: NonNullable<PetExportHandlerDependencies["updat
     { new: true }
   ).exec() as unknown as ExportJobRecord | null;
 
-const defaultFindOwnerEmail = async (ownerId: Types.ObjectId): Promise<string | null> => {
-  const user = await UserModel.findById(ownerId).select({ email: 1 }).exec();
-  return user?.email ?? null;
-};
-
 const markFailed = async (
   updateExportRecord: NonNullable<PetExportHandlerDependencies["updateExportRecord"]>,
   record: ExportJobRecord,
@@ -201,7 +196,6 @@ export const createPetExportJobHandler = (
     findExportById = defaultFindExportById,
     updateExportRecord = defaultUpdateExportRecord,
     findPet = findPetByIdForOwner,
-    findOwnerEmail = defaultFindOwnerEmail,
     buildReport = buildPetExportReport,
     renderTemplate = renderPetExportTemplate,
     renderPdf = renderHtmlToPdf,
@@ -232,7 +226,7 @@ export const createPetExportJobHandler = (
       return;
     }
 
-    const recipient = parsed.data.notificationEmail ?? (await findOwnerEmail(ownerId)) ?? undefined;
+    const recipient = parsed.data.notificationEmail;
     const emailDependencies = {
       sendExportReadyEmail: sendEmail,
       getPublicUrl,
@@ -270,6 +264,7 @@ export const createPetExportJobHandler = (
         pet,
         period: parsePayloadPeriod(parsed.data.period),
         sections: parsed.data.sections as ExportSection[],
+        eventTypes: parsed.data.eventTypes as EventType[] | undefined,
         generatedAt: now()
       });
       ({ html, assets } = await renderTemplate(report));

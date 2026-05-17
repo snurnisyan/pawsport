@@ -22,6 +22,7 @@ import {
   type TEventFormData,
   type TPetOption,
 } from "@/components/pets/events/EventForm";
+import { EVENT_TYPE_META } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 
 export type TDayEventType = TPetEventType;
@@ -39,13 +40,6 @@ export type TDayEvent = {
   nextDate?: string;
   reminder?: string;
   files?: { name: string }[];
-};
-
-const TYPE_META: Record<TDayEventType, { icon: ReactNode; bg: string; color: string }> = {
-  vaccine: { icon: <LuPawPrint />, bg: "rgba(168, 85, 247, 0.18)", color: "#D8B4FE" },
-  treatment: { icon: <LuFileText />, bg: "rgba(20, 184, 166, 0.18)", color: "#5EEAD4" },
-  visit: { icon: <LuPawPrint />, bg: "rgba(59, 130, 246, 0.18)", color: "#93C5FD" },
-  operation: { icon: <LuPenLine />, bg: "rgba(245, 158, 11, 0.18)", color: "#FCD34D" },
 };
 
 const lookupLabel = (options: { value: string; label: string }[], v?: string) =>
@@ -231,7 +225,8 @@ export function DayEventCard({ event,
     if (event && !editMode) setForm(eventToForm(event));
   }, [event, editMode]);
 
-  const meta = event ? TYPE_META[event.type] : TYPE_META.visit;
+  const meta = event ? EVENT_TYPE_META[event.type] : EVENT_TYPE_META.visit;
+  const EventIcon = meta.Icon;
   const headerTime = event?.time ?? "Новое";
   const headerTitle = event ? `${event.title} — ${event.petName}` : "Новое событие";
 
@@ -313,7 +308,7 @@ export function DayEventCard({ event,
               justifyContent="center"
               flexShrink={0}
             >
-              <Icon>{meta.icon}</Icon>
+              <Icon><EventIcon /></Icon>
             </Box>
             <Stack gap="2px" align="flex-start" minW={0}>
               <Text fontSize="12px" fontWeight={700} color={meta.color}>

@@ -54,7 +54,7 @@ const fakeCalendarResult = (): CalendarResult => ({
       id: EVENT_ID,
       ownerId: USER_ID,
       petId: PET_ID,
-      type: "vaccination",
+      type: "vaccine",
       title: "Rabies booster",
       eventDate: "2026-06-10T10:00:00.000Z",
       fileIds: [],
@@ -84,8 +84,9 @@ test("GET /calendar forwards from, to, petIds and eventTypes filters", async () 
         ["to", "2026-06-30"],
         ["petIds", PET_ID],
         ["petIds", OTHER_PET_ID],
-        ["eventTypes", "vaccination"],
-        ["eventTypes", "lab"]
+        ["eventTypes", "vaccine"],
+        ["eventTypes", "lab"],
+        ["eventTypes", "other"]
       ]);
 
       const res = await fetch(`${baseUrl}/calendar?${params.toString()}`, {
@@ -104,6 +105,6 @@ test("GET /calendar forwards from, to, petIds and eventTypes filters", async () 
     from: "2026-06-01",
     to: "2026-06-30",
     petIds: [PET_ID, OTHER_PET_ID],
-    eventTypes: ["vaccination", "lab"]
+    eventTypes: ["vaccine", "lab", "other"]
   });
 });

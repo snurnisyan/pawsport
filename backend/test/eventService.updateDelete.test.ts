@@ -27,7 +27,7 @@ const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   _id: new Types.ObjectId(eventId),
   ownerId: new Types.ObjectId(ownerId),
   petId: new Types.ObjectId(petId),
-  type: "vaccination" as const,
+  type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: new Date("2026-06-01T10:00:00.000Z"),
   fileIds: [],

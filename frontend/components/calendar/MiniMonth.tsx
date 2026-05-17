@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Box, Grid, HStack, IconButton, Popover, Portal, Stack, Text } from "@chakra-ui/react";
 import { LuSquareArrowOutUpRight } from "react-icons/lu";
 import { Pressable } from "@/components/ui/Pressable";
+import { EVENT_TYPE_META } from "@/lib/eventTypes";
+import type { TPetEventType } from "@/store/pets";
 
 const RU_MONTH_FULL = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -9,13 +11,7 @@ const RU_MONTH_FULL = [
 ];
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-type TDayMark = "vaccine" | "treatment" | "visit";
-
-const MARK_COLOR: Record<TDayMark, string> = {
-  vaccine: "#A855F7",
-  treatment: "#10B981",
-  visit: "#3B82F6",
-};
+type TDayMark = TPetEventType;
 
 export type TMiniDayEvent = {
   mark: TDayMark;
@@ -49,7 +45,7 @@ function DayPopup({ events, onExpand }: TDayPopupProps) {
                 w="8px"
                 h="8px"
                 rounded="full"
-                bg={MARK_COLOR[event.mark]}
+                bg={EVENT_TYPE_META[event.mark].color}
                 flexShrink={0}
               />
               <Text fontSize="14px" color="fg.default" truncate>
@@ -112,7 +108,7 @@ function DayCell({ day, isToday, dayMarks, events, onClick, onExpand }: TDayCell
       {dayMarks.length > 0 && (
         <Box position="absolute" bottom="3px" display="flex" gap="2px">
           {dayMarks.slice(0, 3).map((m, idx) => (
-            <Box key={idx} w="6px" h="6px" rounded="full" bg={MARK_COLOR[m]} />
+            <Box key={idx} w="6px" h="6px" rounded="full" bg={EVENT_TYPE_META[m].color} />
           ))}
         </Box>
       )}

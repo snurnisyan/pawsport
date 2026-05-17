@@ -1,6 +1,6 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose";
 
-export const EVENT_TYPES = ["visit", "vaccination", "antiparasitic", "surgery", "lab", "other"] as const;
+export const EVENT_TYPES = ["vaccine", "treatment", "visit", "operation", "lab", "other"] as const;
 export const RECURRENCE_FREQUENCIES = ["none", "daily", "weekly", "monthly", "yearly", "custom"] as const;
 export const REMINDER_OFFSETS = ["day", "week", "month"] as const;
 

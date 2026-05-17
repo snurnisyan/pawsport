@@ -20,18 +20,18 @@
         --brand-soft: #f0e9ff;
         --brand-line: #ddcffc;
         --panel: #fafbfe;
-        --vac-bg: #e7f7ee;
-        --vac-fg: #167a3a;
-        --vet-bg: #e7efff;
-        --vet-fg: #1e40af;
-        --med-bg: #fff2d7;
-        --med-fg: #92500a;
-        --gro-bg: #fde8f1;
-        --gro-fg: #a8266a;
-        --sur-bg: #fde2e2;
-        --sur-fg: #a31818;
-        --oth-bg: #ececf2;
-        --oth-fg: #4b5563;
+        --vac-bg: #f5f3ff;
+        --vac-fg: #c084fc;
+        --vet-bg: #eff6ff;
+        --vet-fg: #60a5fa;
+        --med-bg: #ecfdf5;
+        --med-fg: #34d399;
+        --sur-bg: #fff7ed;
+        --sur-fg: #fb923c;
+        --lab-bg: #fdf2f8;
+        --lab-fg: #ef96d6;
+        --oth-bg: #f1f5f9;
+        --oth-fg: #64748b;
       }
 
       * { box-sizing: border-box; }
@@ -294,8 +294,8 @@
       .vac { background: var(--vac-bg); color: var(--vac-fg); }
       .vet { background: var(--vet-bg); color: var(--vet-fg); }
       .med { background: var(--med-bg); color: var(--med-fg); }
-      .gro { background: var(--gro-bg); color: var(--gro-fg); }
       .sur { background: var(--sur-bg); color: var(--sur-fg); }
+      .lab { background: var(--lab-bg); color: var(--lab-fg); }
       .oth { background: var(--oth-bg); color: var(--oth-fg); }
 
       .tl-event.future .tl-icon { background: #fff; }
@@ -494,10 +494,7 @@
             {{#each events}}
               <article class="tl-event {{stateClass}}">
                 <div class="tl-icon {{typeClass}}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z" />
-                    <path d="M9 12l2 2 4-4" />
-                  </svg>
+                  {{{typeIconSvg}}}
                 </div>
                 <div class="tl-card">
                   <div class="tl-card-head">

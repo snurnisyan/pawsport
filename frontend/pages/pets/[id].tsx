@@ -118,7 +118,13 @@ export default function PetPage() {
           {tab === "overview" && <OverviewTab pet={pet} backendPetId={petQuery.data?.pet.id} />}
           {tab === "events" && <EventsTab events={events} />}
           {tab === "files" && <FilesTab petId={petQuery.data?.pet.id} />}
-          {tab === "export" && <ExportTab />}
+          {tab === "export" && (
+            <ExportTab
+              petId={petQuery.data?.pet.id}
+              petName={pet.name}
+              usesBackend={Boolean(session?.accessToken && petQuery.data?.pet.id)}
+            />
+          )}
         </Stack>
       </AppWrapper>
     </>

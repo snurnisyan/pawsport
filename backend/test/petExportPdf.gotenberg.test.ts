@@ -32,7 +32,7 @@ test(
 
       events.push({
         id: eventId,
-        type: index % 3 === 0 ? "vaccination" : index % 3 === 1 ? "vet_visit" : "medication",
+        type: index % 3 === 0 ? "vaccine" : index % 3 === 1 ? "visit" : "treatment",
         title,
         eventDate: `2025-${month}-${day}T00:00:00.000Z`,
         clinicName: "City Vet Clinic",
