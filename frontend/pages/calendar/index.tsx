@@ -16,7 +16,6 @@ import { MiniMonth, type TMiniDayEvent } from "@/components/calendar/MiniMonth";
 import { DayDialog } from "@/components/calendar/day/DayDialog";
 import type { TDayEvent, TDayEventType } from "@/components/calendar/day/DayEventCard";
 import { AppWrapper } from "@/components/layout/AppWrapper";
-import { GhostButton } from "@/components/ui/Buttons";
 import { usePetsStore, type TPet } from "@/store/pets";
 
 type TMark = "vaccine" | "treatment" | "visit" | "lab";
@@ -137,66 +136,77 @@ export default function CalendarPage() {
           alignItems="start"
         >
           <Stack gap="20px">
-            <Box position="relative">
-              <HStack justify="center">
-                <HStack
-                  gap="8px"
-                  bg="bg.surface"
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  rounded="16px"
-                  px="8px"
-                  py="6px"
-                  shadow="card"
+            <HStack
+              justify={["space-between", null, null, "center"]}
+              align="center"
+              gap="8px"
+            >
+              <Box
+                w="40px"
+                h="40px"
+                flexShrink={0}
+                display={["block", null, null, "none"]}
+              />
+              <HStack
+                gap="8px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                rounded="16px"
+                px="8px"
+                py="6px"
+                shadow="card"
+              >
+                <IconButton
+                  aria-label="Предыдущий год"
+                  variant="ghost"
+                  size="sm"
+                  rounded="full"
+                  color="fg.muted"
+                  onClick={() => setYear((y) => y - 1)}
+                  _hover={{ color: "fg.default", bg: "secondary.700" }}
                 >
-                  <IconButton
-                    aria-label="Предыдущий год"
-                    variant="ghost"
-                    size="sm"
-                    rounded="full"
-                    color="fg.muted"
-                    onClick={() => setYear((y) => y - 1)}
-                    _hover={{ color: "fg.default", bg: "secondary.700" }}
-                  >
-                    <LuChevronLeft />
-                  </IconButton>
-                  <Text
-                    fontSize="20px"
-                    fontWeight={700}
-                    minW="80px"
-                    textAlign="center"
-                  >
-                    {year}
-                  </Text>
-                  <IconButton
-                    aria-label="Следующий год"
-                    variant="ghost"
-                    size="sm"
-                    rounded="full"
-                    color="fg.muted"
-                    onClick={() => setYear((y) => y + 1)}
-                    _hover={{ color: "fg.default", bg: "secondary.700" }}
-                  >
-                    <LuChevronRight />
-                  </IconButton>
-                </HStack>
+                  <LuChevronLeft />
+                </IconButton>
+                <Text
+                  fontSize="20px"
+                  fontWeight={700}
+                  minW="80px"
+                  textAlign="center"
+                >
+                  {year}
+                </Text>
+                <IconButton
+                  aria-label="Следующий год"
+                  variant="ghost"
+                  size="sm"
+                  rounded="full"
+                  color="fg.muted"
+                  onClick={() => setYear((y) => y + 1)}
+                  _hover={{ color: "fg.default", bg: "secondary.700" }}
+                >
+                  <LuChevronRight />
+                </IconButton>
               </HStack>
-              <GhostButton
+              <IconButton
+                aria-label="Фильтры"
                 display={["inline-flex", null, null, "none"]}
                 onClick={drawer.onOpen}
+                variant="ghost"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                rounded="full"
+                w="40px"
                 h="40px"
-                px="16px"
-                position="absolute"
-                top="50%"
-                right="0"
-                transform="translateY(-50%)"
+                flexShrink={0}
+                color="fg.muted"
+                shadow="card"
+                _hover={{ color: "fg.default", bg: "secondary.700" }}
               >
-                <HStack gap="8px">
-                  <LuFilter />
-                  <Text>Фильтры</Text>
-                </HStack>
-              </GhostButton>
-            </Box>
+                <LuFilter />
+              </IconButton>
+            </HStack>
 
             <Grid
               templateColumns={["1fr", "1fr 1fr", "repeat(3, 1fr)"]}

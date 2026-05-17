@@ -50,8 +50,8 @@ export function PetForm({ data, onChange }: TPetFormProps) {
         <Pressable
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          w="120px"
-          h="120px"
+          w={["100px", "100px", "120px"]}
+          h={["100px", "100px", "120px"]}
           rounded="full"
           borderWidth="2px"
           borderStyle={previewUrl ? "solid" : "dashed"}

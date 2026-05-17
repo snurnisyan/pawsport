@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Dialog, HStack, IconButton, Stack, Text } from "@chakra-ui/react";
+import {CloseButton, Dialog, HStack, IconButton, Stack, Text} from "@chakra-ui/react";
 import { LuX } from "react-icons/lu";
 
 type TDialogShellSize = "sm" | "md" | "lg";
@@ -71,19 +71,21 @@ export function DialogShell({ open,
                   </Text>
                 )}
               </Stack>
-              <IconButton
-                aria-label="Закрыть"
-                size="sm"
-                variant="ghost"
+              <Dialog.CloseTrigger
                 color="fg.muted"
-                onClick={() => onOpenChange(false)}
                 _hover={{ color: "fg.default", bg: "secondary.700" }}
+                asChild
               >
-                <LuX />
-              </IconButton>
+                <CloseButton size="sm" />
+              </Dialog.CloseTrigger>
             </HStack>
           </Dialog.Header>
-          <Dialog.Body px="24px" py="20px" overflowY="auto" flex={1}>
+          <Dialog.Body
+            px={["16px", "16px", "24px"]}
+            py="20px"
+            overflowY="auto"
+            flex={1}
+          >
             {children}
           </Dialog.Body>
           {footer && (
