@@ -1,4 +1,5 @@
-import { Box, Icon, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
+import { Box, Icon, Image, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import { LuCamera, LuCat, LuDog, LuEllipsis, LuSearch } from "react-icons/lu";
 import { FaMars, FaVenus } from "react-icons/fa6";
 import { ChoiceCard } from "@/components/ui/ChoiceCard";
@@ -13,6 +14,7 @@ export type TPetFormData = {
   species: TPetSpecies | null;
   breed: string;
   sex: TPetSex | null;
+  photo: File | null;
 };
 
 type TPetFormProps = {
@@ -21,37 +23,75 @@ type TPetFormProps = {
 };
 
 export function PetForm({ data, onChange }: TPetFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!data.photo) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(data.photo);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [data.photo]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    onChange({ photo: file });
+    e.target.value = "";
+  };
+
   return (
     <Stack gap="24px">
       <Stack gap="12px" align="center">
         <Pressable
           type="button"
+          onClick={() => fileInputRef.current?.click()}
           w="120px"
           h="120px"
           rounded="full"
           borderWidth="2px"
-          borderStyle="dashed"
-          borderColor="border.default"
+          borderStyle={previewUrl ? "solid" : "dashed"}
+          borderColor={previewUrl ? "border.subtle" : "border.default"}
           color="fg.muted"
           display="flex"
           alignItems="center"
           justifyContent="center"
           bg="transparent"
           cursor="pointer"
+          overflow="hidden"
           _hover={{ borderColor: "primary.500", color: "primary.400" }}
           transition="all 0.15s"
         >
-          <Icon boxSize="32px">
-            <LuCamera />
-          </Icon>
+          {previewUrl ? (
+            <Image
+              src={previewUrl}
+              alt="Фото питомца"
+              w="full"
+              h="full"
+              objectFit="cover"
+            />
+          ) : (
+            <Icon boxSize="32px">
+              <LuCamera />
+            </Icon>
+          )}
         </Pressable>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
         <Text
           fontSize="12px"
           letterSpacing="0.12em"
           textTransform="uppercase"
           color="fg.muted"
         >
-          Загрузите фото (необязательно)
+          {previewUrl ? "Нажмите, чтобы изменить" : "Загрузите фото (необязательно)"}
         </Text>
       </Stack>
 
