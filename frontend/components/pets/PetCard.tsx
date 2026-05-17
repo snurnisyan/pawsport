@@ -1,12 +1,14 @@
 import { useState, type MouseEvent } from "react";
-import { AspectRatio, Box, HStack, Stack, Text } from "@chakra-ui/react";
-import { LuArrowRight, LuCalendar, LuCalendarPlus } from "react-icons/lu";
+import { AspectRatio, Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import { LuCalendar, LuCalendarPlus } from "react-icons/lu";
 import { ChakraLink } from "@/components/ui/NextLink";
 import { GhostButton } from "@/components/ui/Buttons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { EventDialog } from "@/components/pets/events/EventDialog";
 import type { TPet } from "@/store/pets";
+import DogIcon from "@/icons/dog-icon.svg";
+import CatIcon from "@/icons/cat.svg";
 
 const SEX_LABEL: Record<TPet["sex"], string> = {
   male: "Мальчик",
@@ -76,20 +78,29 @@ export function PetCard({ pet }: TPetCardProps) {
         </Box>
 
         <Stack gap="12px" p="20px" position="relative">
-          <HStack justify="space-between" align="flex-start">
-            <Stack gap="4px">
+          <Stack gap="4px">
+            <HStack justify="space-between" align="center">
               <Text fontSize="20px" fontWeight={700}>
                 {pet.name}
               </Text>
+              {pet.species === "dog" && (
+                <Icon color="fg.accent" flexShrink={0}>
+                  <DogIcon />
+                </Icon>
+              )}
+              {pet.species === "cat" && (
+                <Icon color="fg.accent" flexShrink={0}>
+                  <CatIcon />
+                </Icon>
+              )}
+            </HStack>
+            <HStack justify="space-between" align="center">
               <Text fontSize="14px" color="fg.muted">
                 {pet.ageLabel} · {SEX_LABEL[pet.sex]}
                 {pet.weightKg > 0 ? ` · ${pet.weightKg} кг` : ""}
               </Text>
-            </Stack>
-            <Box color="fg.accent" mt="4px">
-              <LuArrowRight />
-            </Box>
-          </HStack>
+            </HStack>
+          </Stack>
 
           {pet.nextEvent && (
             <HStack
