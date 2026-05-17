@@ -1,9 +1,18 @@
-import { createReminder, deleteReminder, listReminders, updateReminder } from "../controllers/reminderController";
+import {
+  createReminder,
+  deleteReminder,
+  listReminders,
+  markRemindersRead,
+  updateReminder
+} from "../controllers/reminderController";
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
   CreateReminderRequestSchema,
   IdPathParamsSchema,
+  MarkRemindersReadRequestSchema,
+  MarkRemindersReadResponseSchema,
+  ReminderListQuerySchema,
   ReminderListResponseSchema,
   ReminderResponseSchema,
   UpdateReminderRequestSchema
@@ -14,6 +23,7 @@ const reminders = createDocumentedRouter({ basePath: "/reminders", tags: ["Remin
 reminders.route("get", "/", {
   operationId: "listReminders",
   summary: "List reminders",
+  request: { query: ReminderListQuerySchema },
   responses: { 200: jsonResponse("Reminder list", ReminderListResponseSchema) },
   handlers: [listReminders]
 });
@@ -24,6 +34,14 @@ reminders.route("post", "/", {
   request: { body: jsonRequestBody(CreateReminderRequestSchema) },
   responses: { 201: jsonResponse("Reminder created", ReminderResponseSchema) },
   handlers: [createReminder]
+});
+
+reminders.route("post", "/read", {
+  operationId: "markRemindersRead",
+  summary: "Mark reminders as read",
+  request: { body: jsonRequestBody(MarkRemindersReadRequestSchema) },
+  responses: { 200: jsonResponse("Reminders marked as read", MarkRemindersReadResponseSchema) },
+  handlers: [markRemindersRead]
 });
 
 reminders.route("patch", "/:id", {

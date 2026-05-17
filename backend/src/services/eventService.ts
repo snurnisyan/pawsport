@@ -489,6 +489,17 @@ const defaultSyncPendingReminderForEvent: NonNullable<
     return;
   }
 
+  const dueAt = eventDate;
+  const sendAt = calculateReminderSendAt(eventDate, reminderOffset);
+  const existing = await ReminderModel.findOne({ ownerId, eventId, status: "pending" })
+    .select({ dueAt: 1, sendAt: 1, offset: 1 })
+    .exec();
+  const shouldResetReadAt =
+    !existing ||
+    existing.dueAt.getTime() !== dueAt.getTime() ||
+    existing.sendAt.getTime() !== sendAt.getTime() ||
+    existing.offset !== reminderOffset;
+
   await ReminderModel.findOneAndUpdate(
     { ownerId, eventId, status: "pending" },
     {
@@ -497,12 +508,13 @@ const defaultSyncPendingReminderForEvent: NonNullable<
         petId,
         eventId,
         channel: "email",
-        dueAt: eventDate,
-        sendAt: calculateReminderSendAt(eventDate, reminderOffset),
+        dueAt,
+        sendAt,
         offset: reminderOffset,
         status: "pending"
       },
       $unset: {
+        ...(shouldResetReadAt && { readAt: "" }),
         lastError: "",
         processingToken: "",
         processingStartedAt: "",
