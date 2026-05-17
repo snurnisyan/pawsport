@@ -410,8 +410,10 @@ test("listPetEvents leaves missing date bounds unrestricted", async () => {
   assert.equal(observedRange?.to, undefined);
 });
 
-test("listPetEvents passes nextDateFrom separately from eventDate filters", async () => {
-  let observedFilters: { from?: Date; to?: Date; nextDateFrom?: Date } | undefined;
+test("listPetEvents passes nextDateFrom and type separately from eventDate filters", async () => {
+  let observedFilters:
+    | { from?: Date; to?: Date; nextDateFrom?: Date; type?: string }
+    | undefined;
 
   await listPetEvents(
     ownerId,
@@ -419,7 +421,8 @@ test("listPetEvents passes nextDateFrom separately from eventDate filters", asyn
     {
       from: "2026-05-01",
       to: "2026-05-31",
-      nextDateFrom: "2026-05-17T10:30:00.000Z"
+      nextDateFrom: "2026-05-17T10:30:00.000Z",
+      type: "lab"
     },
     {
       findPetByIdForOwner: petFound,
@@ -433,6 +436,7 @@ test("listPetEvents passes nextDateFrom separately from eventDate filters", asyn
   assert.equal(observedFilters?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
   assert.equal(observedFilters?.to?.toISOString(), "2026-05-31T23:59:59.999Z");
   assert.equal(observedFilters?.nextDateFrom?.toISOString(), "2026-05-17T10:30:00.000Z");
+  assert.equal(observedFilters?.type, "lab");
 });
 
 test("listPetEvents rejects invalid nextDateFrom", async () => {
@@ -458,6 +462,75 @@ test("listPetEvents rejects invalid nextDateFrom", async () => {
   );
 });
 
+test("listPetEvents rejects invalid from filter", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { from: "2026/05/01" },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_FROM");
+      return true;
+    }
+  );
+});
+
+test("listPetEvents rejects invalid to filter", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { to: "2026/05/31" },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_TO");
+      return true;
+    }
+  );
+});
+
+test("listPetEvents rejects invalid type filter", async () => {
+  await assert.rejects(
+    () =>
+      listPetEvents(
+        ownerId,
+        petId,
+        { type: "grooming" },
+        {
+          findPetByIdForOwner: petFound,
+          listEventsForOwnerPet: async () => {
+            throw new Error("should not be called");
+          }
+        }
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.equal(error.code, "INVALID_TYPE");
+      return true;
+    }
+  );
+});
+
 test("buildEventListFilter applies nextDateFrom without repurposing eventDate range", () => {
   const owner = new Types.ObjectId(ownerId);
   const pet = new Types.ObjectId(petId);
@@ -465,12 +538,13 @@ test("buildEventListFilter applies nextDateFrom without repurposing eventDate ra
   const to = new Date("2026-05-31T23:59:59.999Z");
   const nextDateFrom = new Date("2026-06-01T00:00:00.000Z");
 
-  const filter = buildEventListFilter(owner, pet, { from, to, nextDateFrom });
+  const filter = buildEventListFilter(owner, pet, { from, to, nextDateFrom, type: "lab" });
 
   assert.equal(filter.ownerId, owner);
   assert.equal(filter.petId, pet);
   assert.deepEqual(filter.eventDate, { $gte: from, $lte: to });
   assert.deepEqual(filter.nextDate, { $gte: nextDateFrom });
+  assert.equal(filter.type, "lab");
 });
 
 test("buildEventListFilter excludes missing nextDate records when nextDateFrom is present", () => {
