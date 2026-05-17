@@ -2,6 +2,7 @@ import { createPetEvent, deleteEvent, getEvent, listPetEvents, updateEvent } fro
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
+  CreateEventMultipartRequestSchema,
   CreateEventRequestSchema,
   EventListQuerySchema,
   EventListResponseSchema,
@@ -9,6 +10,8 @@ import {
   IdPathParamsSchema,
   UpdateEventRequestSchema
 } from "../docs/schemas";
+import { multipartOnly } from "../middleware/multipartOnly";
+import { upload } from "../middleware/uploadMiddleware";
 
 const petEvents = createDocumentedRouter({
   basePath: "/pets/:id/events",
@@ -27,10 +30,19 @@ petEvents.route("get", "/", {
 
 petEvents.route("post", "/", {
   operationId: "createPetEvent",
-  summary: "Create an event for a pet",
-  request: { params: IdPathParamsSchema, body: jsonRequestBody(CreateEventRequestSchema) },
+  summary: "Create an event for a pet (optionally with inline files via multipart/form-data)",
+  request: {
+    params: IdPathParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: CreateEventRequestSchema },
+        "multipart/form-data": { schema: CreateEventMultipartRequestSchema }
+      }
+    }
+  },
   responses: { 201: jsonResponse("Event created", EventResponseSchema) },
-  handlers: [createPetEvent]
+  handlers: [multipartOnly(upload.array("files")), createPetEvent]
 });
 
 const events = createDocumentedRouter({ basePath: "/events", tags: ["Events"], auth: true });

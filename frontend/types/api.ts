@@ -133,7 +133,7 @@ export interface paths {
         /** List events for a pet */
         get: operations["listPetEvents"];
         put?: never;
-        /** Create an event for a pet */
+        /** Create an event for a pet (optionally with inline files via multipart/form-data) */
         post: operations["createPetEvent"];
         delete?: never;
         options?: never;
@@ -510,8 +510,12 @@ export interface components {
              * @enum {string}
              */
             reminderOffset?: "day" | "week" | "month";
-            /** @default [] */
-            fileIds: components["schemas"]["ObjectId"][];
+        };
+        CreateEventMultipartRequest: {
+            /** @description JSON-encoded CreateEventRequest payload (omit fileIds when sending files). */
+            event: string;
+            /** @description Optional PDF/PNG/JPG files to attach to the created event. */
+            files?: string[];
         };
         UpdateEventRequest: {
             /** @enum {string} */
@@ -1113,6 +1117,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateEventRequest"];
+                "multipart/form-data": components["schemas"]["CreateEventMultipartRequest"];
             };
         };
         responses: {

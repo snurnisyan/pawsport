@@ -71,7 +71,6 @@ const buildPayload = (data: TEventFormData): TCreateEventRequest => ({
   clinicName: data.clinic.trim() || undefined,
   comment: data.comment.trim() || undefined,
   reminderOffset: data.reminder === "none" ? undefined : data.reminder,
-  fileIds: [],
 });
 
 const apiErrorMessage = (error: unknown, fallback: string): string =>
@@ -117,7 +116,7 @@ export function EventDialog({
   const createMutation = useMutation({
     mutationFn: (body: TCreateEventRequest) => {
       if (!petId) throw new Error("Не удалось создать событие: нет идентификатора питомца.");
-      return createPetEvent(petId, body);
+      return createPetEvent(petId, body, data.files);
     },
     onSuccess: async () => {
       await invalidateEvents();
