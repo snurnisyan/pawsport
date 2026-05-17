@@ -16,7 +16,9 @@ import {
   createPetEventHandler,
   type CreatePetEventHandlerDependencies,
   listPetEventsHandler,
-  type ListPetEventsHandlerDependencies
+  type ListPetEventsHandlerDependencies,
+  updateEventHandler,
+  type UpdateEventHandlerDependencies
 } from "../src/controllers/eventController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
 import { errorHandler } from "../src/middleware/errorHandler";
@@ -51,6 +53,21 @@ const buildCreateApp = (
   return app;
 };
 
+const buildUpdateApp = (
+  overrides: UpdateEventHandlerDependencies = {}
+): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.patch(
+    "/events/:id",
+    authMiddleware,
+    multipartOnly(upload.array("files")),
+    updateEventHandler(overrides)
+  );
+  app.use(errorHandler);
+  return app;
+};
+
 const withServer = async <T>(
   overrides: ListPetEventsHandlerDependencies,
   fn: (baseUrl: string) => Promise<T>
@@ -79,6 +96,20 @@ const withCreateServer = async <T>(
   }
 };
 
+const withUpdateServer = async <T>(
+  overrides: UpdateEventHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildUpdateApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
 const fakeEvent = () => ({
   id: EVENT_ID,
   ownerId: USER_ID,
@@ -89,6 +120,11 @@ const fakeEvent = () => ({
   files: [],
   createdAt: "2026-05-12T00:00:00.000Z",
   updatedAt: "2026-05-12T00:00:00.000Z"
+});
+
+const fakeEventWithFiles = () => ({
+  ...fakeEvent(),
+  files: [{ fileId: "60a7c1aa9e1d4f12345678aa", originalName: "old.pdf" }]
 });
 
 const authHeader = (): HeadersInit => ({ Authorization: `Bearer ${token}` });
@@ -299,4 +335,123 @@ test("POST /pets/:id/events (multipart) returns 400 when event field is not vali
   );
 
   assert.equal(createCalled, false);
+});
+
+test("PATCH /events/:id (multipart) parses event JSON, uploads files, and appends them", async () => {
+  const existingFileId = "60a7c1aa9e1d4f12345678aa";
+  const newFileIds = [
+    "60a7c1aa9e1d4f12345678cd",
+    "60a7c1aa9e1d4f12345678ce"
+  ];
+  const uploaded: Array<{
+    petId?: string;
+    originalName?: string;
+    eventId?: unknown;
+  }> = [];
+  let receivedUpdate: Record<string, unknown> | undefined;
+
+  await withUpdateServer(
+    {
+      getEvent: async (ownerId, eventId) => {
+        assert.equal(ownerId, USER_ID);
+        assert.equal(eventId, EVENT_ID);
+        return {
+          ...fakeEventWithFiles(),
+          files: [{ fileId: existingFileId, originalName: "old.pdf" }]
+        };
+      },
+      uploadPetFile: async (ownerId, petId, input) => {
+        assert.equal(ownerId, USER_ID);
+        uploaded.push({
+          petId,
+          originalName: input.file?.originalname,
+          eventId: input.eventId
+        });
+        const id = newFileIds[uploaded.length - 1];
+        return {
+          id,
+          ownerId: USER_ID,
+          petId,
+          eventId: EVENT_ID,
+          originalName: input.file?.originalname ?? "file",
+          mimeType: input.file?.mimetype as "application/pdf" | "image/png" | "image/jpeg",
+          sizeBytes: input.file?.size ?? 0,
+          uploadedAt: "2026-05-12T00:00:00.000Z",
+          createdAt: "2026-05-12T00:00:00.000Z",
+          updatedAt: "2026-05-12T00:00:00.000Z"
+        };
+      },
+      updateEvent: async (ownerId, eventId, input) => {
+        assert.equal(ownerId, USER_ID);
+        assert.equal(eventId, EVENT_ID);
+        receivedUpdate = input as Record<string, unknown>;
+        return {
+          ...fakeEvent(),
+          title: "Updated title",
+          files: [
+            { fileId: existingFileId, originalName: "old.pdf" },
+            { fileId: newFileIds[0], originalName: "rabies.pdf" },
+            { fileId: newFileIds[1], originalName: "result.png" }
+          ]
+        };
+      }
+    },
+    async (baseUrl) => {
+      const formData = new FormData();
+      formData.append("event", JSON.stringify({ title: "Updated title" }));
+      formData.append("files", new Blob(["pdf"], { type: "application/pdf" }), "rabies.pdf");
+      formData.append("files", new Blob(["png"], { type: "image/png" }), "result.png");
+
+      const res = await fetch(`${baseUrl}/events/${EVENT_ID}`, {
+        method: "PATCH",
+        headers: authHeader(),
+        body: formData
+      });
+
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { event: { files: Array<{ fileId: string }> } };
+      assert.deepEqual(
+        body.event.files.map((file) => file.fileId),
+        [existingFileId, ...newFileIds]
+      );
+    }
+  );
+
+  assert.deepEqual(uploaded, [
+    { petId: PET_ID, originalName: "rabies.pdf", eventId: EVENT_ID },
+    { petId: PET_ID, originalName: "result.png", eventId: EVENT_ID }
+  ]);
+  assert.deepEqual(receivedUpdate, {
+    title: "Updated title",
+    fileIds: [existingFileId, ...newFileIds]
+  });
+});
+
+test("PATCH /events/:id rejects fileIds in JSON payload", async () => {
+  let updateCalled = false;
+
+  await withUpdateServer(
+    {
+      updateEvent: async () => {
+        updateCalled = true;
+        return fakeEvent();
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/events/${EVENT_ID}`, {
+        method: "PATCH",
+        headers: {
+          ...authHeader(),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ fileIds: ["60a7c1aa9e1d4f12345678cd"] })
+      });
+
+      assert.equal(res.status, 400);
+      const body = (await res.json()) as { error: { code: string } };
+      assert.equal(body.error.code, "FILE_IDS_CONFLICT");
+    }
+  );
+
+  assert.equal(updateCalled, false);
 });
