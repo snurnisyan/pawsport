@@ -258,6 +258,7 @@ export function EventForm({
           Файлы
         </Field.Label>
         <FileUpload.Root
+          w="full"
           accept={FILE_ACCEPT}
           maxFiles={20}
           onFileAccept={({ files }) =>
@@ -265,7 +266,7 @@ export function EventForm({
           }
         >
           <FileUpload.HiddenInput />
-          <Stack gap="8px">
+          <Stack gap="8px" w="full">
             {existingFiles.map((file) => (
               <HStack
                 key={file.fileId}
