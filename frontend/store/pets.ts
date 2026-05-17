@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { components } from "@/types/api";
 
 export type TPetStatus = {
   tone: "danger" | "warning" | "success";
@@ -22,7 +23,7 @@ export type TPet = {
   vet?: { name: string; phone: string; email: string };
 };
 
-export type TPetEventType = "vaccine" | "treatment" | "visit" | "operation";
+export type TPetEventType = components["schemas"]["Event"]["type"];
 
 export type TPetEvent = {
   id: string;
@@ -120,6 +121,14 @@ const EVENTS: TPetEvent[] = [
     title: "Чистка зубов (наркоз)",
     date: "2023-12-18",
     place: "Ветеринарная клиника",
+  },
+  {
+    id: "e5",
+    petId: "kuper",
+    type: "lab",
+    title: "Биохимический анализ крови",
+    date: "2023-11-06",
+    place: "Ветеринарная лаборатория",
   },
 ];
 

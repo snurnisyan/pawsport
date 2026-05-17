@@ -15,7 +15,7 @@ const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   _id: new Types.ObjectId(eventId),
   ownerId: new Types.ObjectId(ownerId),
   petId: new Types.ObjectId(petId),
-  type: "vaccination" as const,
+  type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: new Date("2026-06-10T10:00:00.000Z"),
   fileIds: [],
@@ -53,7 +53,7 @@ test("getCalendar passes petIds and eventTypes filters to the event repository",
 
   await getCalendar(
     ownerId,
-    { from: "2026-06-01", to: "2026-06-30", petIds: [petId, otherPetId], eventTypes: ["vaccination", "visit"] },
+    { from: "2026-06-01", to: "2026-06-30", petIds: [petId, otherPetId], eventTypes: ["vaccine", "lab", "visit"] },
     {
       listEventsInRange: async (params) => {
         eventParams = params as unknown as Record<string, unknown>;
@@ -66,7 +66,7 @@ test("getCalendar passes petIds and eventTypes filters to the event repository",
     petId,
     otherPetId
   ]);
-  assert.deepEqual(eventParams?.eventTypes, ["vaccination", "visit"]);
+  assert.deepEqual(eventParams?.eventTypes, ["vaccine", "lab", "visit"]);
 });
 
 test("getCalendar returns empty result when nothing matches", async () => {
@@ -169,7 +169,7 @@ test("getCalendar accepts comma-separated petIds and eventTypes", async () => {
       from: "2026-06-01",
       to: "2026-06-30",
       petIds: `${petId},${otherPetId}`,
-      eventTypes: "vaccination,lab"
+      eventTypes: "vaccine,lab,other"
     },
     {
       listEventsInRange: async (params) => {
@@ -183,7 +183,7 @@ test("getCalendar accepts comma-separated petIds and eventTypes", async () => {
     petId,
     otherPetId
   ]);
-  assert.deepEqual(eventParams?.eventTypes, ["vaccination", "lab"]);
+  assert.deepEqual(eventParams?.eventTypes, ["vaccine", "lab", "other"]);
 });
 
 test("getCalendar rejects invalid petIds with 400", async () => {

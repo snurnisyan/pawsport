@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 
 import { enqueueJob, type EnqueueJobInput } from "../jobs/backgroundJobService";
 import { AppError } from "../middleware/errorHandler";
+import { EVENT_TYPES, type EventType } from "../models/Event";
 import {
   ExportModel,
   EXPORT_SECTIONS,
@@ -28,7 +29,10 @@ type OwnerExportRecord = Pick<IExport, "_id" | "fileKey">;
 export interface CreatePetExportInput {
   period?: unknown;
   sections?: unknown;
+  eventTypes?: unknown;
+  sendEmail?: unknown;
   notificationEmail?: unknown;
+  fallbackNotificationEmail?: unknown;
 }
 
 export interface SerializedExportPeriod {
@@ -197,6 +201,29 @@ const normalizeSections = (value: unknown): ExportSection[] => {
   return [...seen];
 };
 
+const normalizeEventTypes = (value: unknown): EventType[] | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new AppError(400, "INVALID_EXPORT_EVENT_TYPES", "eventTypes must be an array");
+  }
+
+  const seen = new Set<EventType>();
+  for (const item of value) {
+    if (typeof item !== "string" || !(EVENT_TYPES as readonly string[]).includes(item)) {
+      throw new AppError(
+        400,
+        "INVALID_EXPORT_EVENT_TYPES",
+        `eventTypes must contain only: ${EVENT_TYPES.join(", ")}`
+      );
+    }
+    seen.add(item as EventType);
+  }
+
+  return seen.size > 0 ? [...seen] : undefined;
+};
+
 const normalizeNotificationEmail = (value: unknown): string | undefined => {
   if (value === undefined || value === null || value === "") {
     return undefined;
@@ -207,6 +234,8 @@ const normalizeNotificationEmail = (value: unknown): string | undefined => {
   const trimmed = value.trim().toLowerCase();
   return trimmed.length > 0 ? trimmed : undefined;
 };
+
+const normalizeSendEmail = (value: unknown): boolean => value === true;
 
 const serializePeriod = (period?: IExportPeriod): SerializedExportPeriod | undefined => {
   const reportPeriod = serializePeriodForReport(period);
@@ -261,7 +290,12 @@ export const createPetExport = async (
   const petObjectId = requirePetId(petId);
   const period = normalizePeriod(input.period);
   const sections = normalizeSections(input.sections);
-  const notificationEmail = normalizeNotificationEmail(input.notificationEmail);
+  const eventTypes = normalizeEventTypes(input.eventTypes);
+  const sendEmail = normalizeSendEmail(input.sendEmail);
+  const notificationEmail = sendEmail
+    ? (normalizeNotificationEmail(input.notificationEmail) ??
+      normalizeNotificationEmail(input.fallbackNotificationEmail))
+    : undefined;
 
   const pet = await findPet(petObjectId, ownerObjectId);
   if (!pet) {
@@ -287,7 +321,8 @@ export const createPetExport = async (
       petId: petObjectId.toString(),
       period: serializePeriodForReport(period),
       sections,
-      notificationEmail
+      ...(eventTypes ? { eventTypes } : {}),
+      ...(notificationEmail ? { notificationEmail } : {})
     },
     idempotencyKey: exportId.toString(),
     maxAttempts: 5

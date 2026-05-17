@@ -1,5 +1,11 @@
 import type { TDateRange } from "@/components/ui/DateRangeField";
-import type { TPetEvent, TPetEventType } from "@/store/pets";
+import {
+  EVENT_TYPE_COLOR,
+  EVENT_TYPE_FILTER_OPTIONS,
+  EVENT_TYPE_LABEL,
+  EVENT_TYPE_TONE,
+} from "@/lib/eventTypes";
+import type { TPetEvent } from "@/store/pets";
 
 export type TEventsFilters = {
   search: string;
@@ -13,32 +19,10 @@ export const INITIAL_FILTERS: TEventsFilters = {
   dateRange: { from: "", to: "" },
 };
 
-export const TYPE_TONE: Record<TPetEventType, "info" | "purple" | "teal" | "warning"> = {
-  visit: "info",
-  vaccine: "purple",
-  treatment: "teal",
-  operation: "warning",
-};
-
-export const TYPE_LABEL: Record<TPetEventType, string> = {
-  visit: "Визит",
-  vaccine: "Вакцинация",
-  treatment: "Обработка",
-  operation: "Операция",
-};
-
-export const TYPE_COLOR: Record<TPetEventType, string> = {
-  visit: "#3B82F6",
-  vaccine: "#A855F7",
-  treatment: "#10B981",
-  operation: "#F59E0B",
-};
-
-export const TYPE_OPTIONS = (Object.keys(TYPE_LABEL) as TPetEventType[]).map((t) => ({
-  value: t,
-  label: TYPE_LABEL[t],
-  color: TYPE_COLOR[t],
-}));
+export const TYPE_TONE = EVENT_TYPE_TONE;
+export const TYPE_LABEL = EVENT_TYPE_LABEL;
+export const TYPE_COLOR = EVENT_TYPE_COLOR;
+export const TYPE_OPTIONS = EVENT_TYPE_FILTER_OPTIONS;
 
 export const RU_MONTH_NOM = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",

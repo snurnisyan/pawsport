@@ -93,6 +93,8 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
     {
       period: { from: "2026-05-01", to: "2026-05-31" },
       sections: ["profile", "events", "profile"],
+      eventTypes: ["vaccine", "lab", "visit", "vaccine"],
+      sendEmail: true,
       notificationEmail: "owner@example.com"
     },
     {
@@ -125,12 +127,109 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
     petId,
     period: { from: "2026-05-01", to: "2026-05-31" },
     sections: ["profile", "events"],
+    eventTypes: ["vaccine", "lab", "visit"],
     notificationEmail: "owner@example.com"
   });
 
   assert.equal(petExport.status, "pending");
   assert.equal(petExport.fileKey, undefined);
   assert.equal(petExport.downloadUrl, undefined);
+});
+
+test("createPetExport omits notificationEmail when sendEmail is false", async () => {
+  let enqueuedPayload: Record<string, unknown> | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: false,
+      notificationEmail: "owner@example.com",
+      fallbackNotificationEmail: "fallback@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueuedPayload = input.payload;
+      }
+    }
+  );
+
+  assert.ok(enqueuedPayload);
+  assert.equal("notificationEmail" in enqueuedPayload, false);
+});
+
+test("createPetExport omits notificationEmail when sendEmail is omitted", async () => {
+  let enqueuedPayload: Record<string, unknown> | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      notificationEmail: "owner@example.com",
+      fallbackNotificationEmail: "fallback@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueuedPayload = input.payload;
+      }
+    }
+  );
+
+  assert.ok(enqueuedPayload);
+  assert.equal("notificationEmail" in enqueuedPayload, false);
+});
+
+test("createPetExport defaults to the authenticated user's email when sendEmail is true", async () => {
+  let enqueuedPayload: Record<string, unknown> | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: true,
+      fallbackNotificationEmail: "owner@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueuedPayload = input.payload;
+      }
+    }
+  );
+
+  assert.equal(enqueuedPayload?.notificationEmail, "owner@example.com");
+});
+
+test("createPetExport prefers explicit notificationEmail when sendEmail is true", async () => {
+  let enqueuedPayload: Record<string, unknown> | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: true,
+      notificationEmail: "explicit@example.com",
+      fallbackNotificationEmail: "owner@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueuedPayload = input.payload;
+      }
+    }
+  );
+
+  assert.equal(enqueuedPayload?.notificationEmail, "explicit@example.com");
 });
 
 test("createPetExport hides pets owned by another user before creating an export", async () => {
@@ -165,6 +264,11 @@ test("createPetExport rejects invalid period and invalid sections", async () => 
   await assert.rejects(
     () => createPetExport(ownerId, petId, { sections: ["profile", "payments"] }),
     assertAppError(400, "INVALID_EXPORT_SECTIONS")
+  );
+
+  await assert.rejects(
+    () => createPetExport(ownerId, petId, { eventTypes: ["vaccine", "legacy"] }),
+    assertAppError(400, "INVALID_EXPORT_EVENT_TYPES")
   );
 });
 

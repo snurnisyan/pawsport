@@ -50,7 +50,7 @@ const fakeEvent = () => ({
   id: EVENT_ID,
   ownerId: USER_ID,
   petId: PET_ID,
-  type: "vaccination" as const,
+  type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: "2026-05-12T10:00:00.000Z",
   fileIds: [],

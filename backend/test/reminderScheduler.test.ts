@@ -46,7 +46,7 @@ const makeContext = (
     _id: eventId,
     title: "Vaccination",
     eventDate: new Date("2026-05-20T10:00:00.000Z"),
-    type: "vaccination" as const
+    type: "vaccine" as const
   },
   ...overrides
 });
@@ -104,7 +104,7 @@ test("pollPendingReminders sends due pending reminders and marks them sent", asy
   assert.equal(sentPayload?.to, "owner@example.com");
   assert.equal(sentPayload?.petName, "Miso");
   assert.equal(sentPayload?.eventTitle, "Vaccination");
-  assert.equal(sentPayload?.eventType, "vaccination");
+  assert.equal(sentPayload?.eventType, "vaccine");
   assert.equal(markedSent?.reminder._id.toString(), reminderId.toString());
   assert.equal(markedSent?.lockToken, "lock-token");
 });

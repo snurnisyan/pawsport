@@ -118,7 +118,7 @@ test("buildPetExportReport adds clickable download URLs to file metadata", async
           _id: eventId,
           ownerId,
           petId,
-          type: "vaccination",
+          type: "vaccine",
           title: "Rabies booster",
           eventDate: new Date("2026-01-10T00:00:00.000Z"),
           fileIds: [fileId],
@@ -147,4 +147,29 @@ test("buildPetExportReport adds clickable download URLs to file metadata", async
 
   assert.equal(report.files?.[0]?.downloadUrl, "https://download.example/users/o/p/files/rabies-certificate.pdf");
   assert.equal(report.files?.[0]?.eventTitle, "Rabies booster");
+});
+
+test("buildPetExportReport passes selected event types to event listing", async () => {
+  let observedEventTypes: unknown;
+
+  const report = await buildPetExportReport(
+    {
+      exportId,
+      ownerId,
+      petId,
+      pet: makePet(),
+      sections: ["events"],
+      eventTypes: ["vaccine", "lab", "other"],
+      generatedAt: now
+    },
+    {
+      listEventsForPet: async (_owner, _pet, _range, eventTypes) => {
+        observedEventTypes = eventTypes;
+        return [];
+      }
+    }
+  );
+
+  assert.deepEqual(observedEventTypes, ["vaccine", "lab", "other"]);
+  assert.deepEqual(report.eventTypes, ["vaccine", "lab", "other"]);
 });

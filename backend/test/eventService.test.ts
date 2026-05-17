@@ -18,7 +18,7 @@ const eventId = "60a7c1aa9e1d4f12345678ab";
 const fileId = "60a7c1aa9e1d4f12345678cd";
 
 const validInput = {
-  type: "vaccination" as const,
+  type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: "2026-06-01T10:00:00.000Z"
 };
@@ -27,7 +27,7 @@ const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
   _id: new Types.ObjectId(eventId),
   ownerId: new Types.ObjectId(ownerId),
   petId: new Types.ObjectId(petId),
-  type: "vaccination" as const,
+  type: "vaccine" as const,
   title: "Rabies booster",
   eventDate: new Date("2026-06-01T10:00:00.000Z"),
   fileIds: [],
@@ -50,7 +50,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
     ownerId,
     petId,
     {
-      type: "vaccination",
+      type: "vaccine",
       title: "  Rabies booster  ",
       eventDate: "2026-06-01T10:00:00.000Z",
       nextDate: "2027-06-01T10:00:00.000Z",
@@ -96,7 +96,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.ok(captured);
   assert.equal((captured.ownerId as Types.ObjectId).toString(), ownerId);
   assert.equal((captured.petId as Types.ObjectId).toString(), petId);
-  assert.equal(captured.type, "vaccination");
+  assert.equal(captured.type, "vaccine");
   assert.equal(captured.title, "Rabies booster");
   assert.equal((captured.eventDate as Date).toISOString(), "2026-06-01T10:00:00.000Z");
   assert.equal((captured.nextDate as Date).toISOString(), "2027-06-01T10:00:00.000Z");
@@ -110,7 +110,7 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal(result.id, eventId);
   assert.equal(result.ownerId, ownerId);
   assert.equal(result.petId, petId);
-  assert.equal(result.type, "vaccination");
+  assert.equal(result.type, "vaccine");
   assert.equal(result.title, "Rabies booster");
   assert.equal(result.eventDate, "2026-06-01T10:00:00.000Z");
   assert.equal(result.nextDate, "2027-06-01T10:00:00.000Z");
@@ -126,6 +126,34 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal((reminderSync.eventId as Types.ObjectId).toString(), eventId);
   assert.equal((reminderSync.eventDate as Date).toISOString(), "2026-06-01T10:00:00.000Z");
   assert.equal(reminderSync.reminderOffset, "week");
+});
+
+test("createPetEvent accepts lab events", async () => {
+  let capturedType: unknown;
+
+  const result = await createPetEvent(
+    ownerId,
+    petId,
+    {
+      type: "lab",
+      title: "Blood test",
+      eventDate: "2026-06-02T10:00:00.000Z"
+    },
+    {
+      findPetByIdForOwner: petFound,
+      createEventRecord: async (input) => {
+        capturedType = input.type;
+        return makeEventRecord({
+          type: input.type,
+          title: input.title,
+          eventDate: input.eventDate
+        });
+      }
+    }
+  );
+
+  assert.equal(capturedType, "lab");
+  assert.equal(result.type, "lab");
 });
 
 test("createPetEvent rejects fileIds outside the pet/owner scope with 400", async () => {

@@ -19,7 +19,7 @@ import { AppWrapper } from "@/components/layout/AppWrapper";
 import { GhostButton } from "@/components/ui/Buttons";
 import { usePetsStore, type TPet } from "@/store/pets";
 
-type TMark = "vaccine" | "treatment" | "visit";
+type TMark = "vaccine" | "treatment" | "visit" | "lab";
 
 const SAMPLE_MARKS: Record<number, Record<number, TMark[]>> = {
   0: { 12: ["vaccine"] },
@@ -28,6 +28,7 @@ const SAMPLE_MARKS: Record<number, Record<number, TMark[]>> = {
   6: { 18: ["vaccine"] },
   7: { 18: ["treatment"] },
   8: { 2: ["visit", "vaccine", "treatment"], 15: ["vaccine"], 28: ["treatment"] },
+  9: { 6: ["lab"] },
   10: { 11: ["visit"] },
 };
 
@@ -35,6 +36,7 @@ const MARK_TO_EVENT: Record<TMark, { type: TDayEventType; title: string }> = {
   vaccine: { type: "vaccine", title: "Вакцинация (бешенство)" },
   treatment: { type: "treatment", title: "Обработка от паразитов" },
   visit: { type: "visit", title: "Чек-ап" },
+  lab: { type: "lab", title: "Анализы и обследования" },
 };
 
 const TIMES = ["09:00", "10:30", "14:00", "16:30"];

@@ -3,6 +3,7 @@ import { DateInput } from "@/components/ui/DateInput";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
+import { EVENT_TYPE_OPTIONS } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 
 export type TEventFormData = {
@@ -31,12 +32,10 @@ export const INITIAL_EVENT: TEventFormData = {
   files: [],
 };
 
-export const TYPE_OPTIONS = [
-  { value: "vaccine", label: "Вакцинация" },
-  { value: "treatment", label: "Обработка" },
-  { value: "visit", label: "Визит" },
-  { value: "operation", label: "Операция" },
-];
+export const TYPE_OPTIONS = EVENT_TYPE_OPTIONS satisfies {
+  value: TPetEventType;
+  label: string;
+}[];
 
 export const REMINDER_OPTIONS = [
   { value: "none", label: "Без напоминания" },

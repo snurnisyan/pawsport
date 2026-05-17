@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 
-import { EventModel, type IEvent, type IRecurrence } from "../models/Event";
+import { EventModel, type EventType, type IEvent, type IRecurrence } from "../models/Event";
 import type { ExportSection, IExportPeriod } from "../models/Export";
 import { FileModel, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
@@ -83,6 +83,7 @@ export interface PetExportPdfReport {
   generatedAt: string;
   period?: PdfExportPeriod;
   sections: ExportSection[];
+  eventTypes?: EventType[];
   profile?: PdfProfile;
   events?: PdfEvent[];
   files?: PdfFileMetadata[];
@@ -179,6 +180,7 @@ export interface BuildPetExportReportInput {
   pet: PetRecord;
   period?: NormalizedExportPeriod;
   sections: ExportSection[];
+  eventTypes?: EventType[];
   generatedAt: Date;
 }
 
@@ -186,7 +188,8 @@ export interface BuildPetExportReportDependencies {
   listEventsForPet?: (
     ownerId: Types.ObjectId,
     petId: Types.ObjectId,
-    range: DateRange
+    range: DateRange,
+    eventTypes?: EventType[]
   ) => Promise<EventRecord[]>;
   listFileMetadataForPet?: (
     ownerId: Types.ObjectId,
@@ -248,11 +251,13 @@ export const findPetByIdForOwner = async (
 const defaultListEvents: NonNullable<BuildPetExportReportDependencies["listEventsForPet"]> = async (
   ownerId,
   petId,
-  range
+  range,
+  eventTypes
 ) => {
   const dateQuery = buildDateQuery(range);
   const query: Record<string, unknown> = { ownerId, petId };
   if (dateQuery) query.eventDate = dateQuery;
+  if (eventTypes?.length) query.type = { $in: eventTypes };
   return EventModel.find(query)
     .sort({ eventDate: 1, _id: 1 })
     .exec() as unknown as EventRecord[];
@@ -428,6 +433,7 @@ export const buildPetExportReport = async (
     period: serializePeriodForReport(input.period),
     sections: input.sections
   };
+  if (input.eventTypes?.length) report.eventTypes = input.eventTypes;
 
   const eventTitleById = new Map<string, string>();
   if (input.sections.includes("profile")) {
@@ -440,7 +446,7 @@ export const buildPetExportReport = async (
     );
   }
   if (input.sections.includes("events")) {
-    report.events = (await listEventsForPet(input.ownerId, input.petId, range)).map((event) => {
+    report.events = (await listEventsForPet(input.ownerId, input.petId, range, input.eventTypes)).map((event) => {
       const serialized = serializeEventForPdf(event);
       eventTitleById.set(serialized.id, serialized.title);
       return serialized;
