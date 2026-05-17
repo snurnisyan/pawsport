@@ -106,7 +106,7 @@ export default function PetPage() {
   return (
     <>
       <Head>
-        <title>{pet.name} — PawsPort</title>
+        <title>{pet.name} — Pawsport</title>
       </Head>
       <AppWrapper>
         <Stack gap="24px">

@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
   return (
     <>
       <Head>
-        <title>Сброс пароля — PawsPort</title>
+        <title>Сброс пароля — Pawsport</title>
       </Head>
       <AuthLayout showHeader onBack={() => router.push("/auth/login")}>
         <VStack gap="32px">

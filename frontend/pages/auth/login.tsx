@@ -54,7 +54,7 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>Вход — PawsPort</title>
+        <title>Вход — Pawsport</title>
       </Head>
       <AuthLayout>
         <VStack gap="32px">
@@ -75,7 +75,7 @@ export default function LoginPage() {
               <PawIcon width={30} height={29} />
             </Box>
             <Text fontSize="24px" fontWeight={700}>
-              PawsPort
+              Pawsport
             </Text>
             <Text fontSize="14px" color="fg.muted" textAlign="center">
               Войдите, чтобы продолжить работу с профилями питомцев

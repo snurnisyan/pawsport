@@ -58,7 +58,7 @@ export default function EmailConfirmedPage() {
   return (
     <>
       <Head>
-        <title>Подтверждение email — PawsPort</title>
+        <title>Подтверждение email — Pawsport</title>
       </Head>
       <AuthLayout>
         <VStack gap="32px">
@@ -87,7 +87,7 @@ export default function EmailConfirmedPage() {
                     </Text>
                   </HStack>
                   <Text color="fg.muted">
-                    Теперь можно продолжить настройку PawsPort.
+                    Теперь можно продолжить настройку Pawsport.
                   </Text>
                   <PrimaryButton onClick={() => router.push(successTarget)}>
                     <HStack gap="8px">
