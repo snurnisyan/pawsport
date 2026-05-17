@@ -81,12 +81,9 @@ export function buildGroups(events: TPetEvent[]): TEventGroup[] {
 
 export function filterEvents(events: TPetEvent[], filters: TEventsFilters): TPetEvent[] {
   const q = filters.search.trim().toLowerCase();
+  if (!q) return events;
   return events.filter((e) => {
-    if (filters.types.length > 0 && !filters.types.includes(e.type)) return false;
-    if (q) {
-      const hay = `${e.title} ${e.comment ?? ""} ${e.clinicName ?? ""}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
+    const hay = `${e.title} ${e.comment ?? ""} ${e.clinicName ?? ""}`.toLowerCase();
+    return hay.includes(q);
   });
 }

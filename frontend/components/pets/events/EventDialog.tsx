@@ -109,7 +109,7 @@ export function EventDialog({
   }, [open, event, initialData]);
 
   const targetPetId = event?.petId ?? petId;
-  const existingFileIds = event?.fileIds ?? [];
+  const existingFiles = event?.files ?? [];
 
   const invalidateEvents = async () => {
     if (targetPetId) {
@@ -204,7 +204,7 @@ export function EventDialog({
       <EventForm
         data={data}
         onChange={(patch) => setData((d) => ({ ...d, ...patch }))}
-        existingFileIds={existingFileIds}
+        existingFiles={existingFiles}
       />
     </DialogShell>
   );
