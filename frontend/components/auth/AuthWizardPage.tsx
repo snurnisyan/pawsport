@@ -129,7 +129,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
   return (
     <>
       <Head>
-        <title>PawsPort — Регистрация</title>
+        <title>Pawsport — Регистрация</title>
       </Head>
       <AuthLayout
         showHeader={visibleStep > 1}

@@ -21,6 +21,8 @@ export function SegmentedTabs({ tabs, value, onChange }: TSegmentedTabsProps) {
       rounded="full"
       p="4px"
       overflowX="auto"
+      scrollbarWidth="none"
+      css={{ "&::-webkit-scrollbar": { display: "none" } }}
     >
       <HStack gap="4px" minW="max-content">
         {tabs.map((tab) => {

@@ -58,7 +58,7 @@ export function RegisterStep({
           <PawIcon width={30} height={29} />
         </Box>
         <Text fontSize="24px" fontWeight={700}>
-          PawsPort
+          Pawsport
         </Text>
         <Text fontSize="14px" color="fg.muted" textAlign="center">
           Путь к здоровью вашего питомца начинается здесь

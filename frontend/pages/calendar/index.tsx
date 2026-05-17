@@ -127,7 +127,7 @@ export default function CalendarPage() {
   return (
     <>
       <Head>
-        <title>Календарь — PawsPort</title>
+        <title>Календарь — Pawsport</title>
       </Head>
       <AppWrapper maxW="1440px">
         <Grid

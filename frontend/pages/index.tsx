@@ -25,7 +25,7 @@ export default function Home() {
     >
       <Stack align="center" gap="12px">
         <Spinner color="primary.400" />
-        <Text fontSize="14px">Открываем PawsPort...</Text>
+        <Text fontSize="14px">Открываем Pawsport...</Text>
       </Stack>
     </Box>
   );

@@ -17,7 +17,7 @@ export default function PetsPage() {
   return (
     <>
       <Head>
-        <title>Мои питомцы — PawsPort</title>
+        <title>Мои питомцы — Pawsport</title>
       </Head>
       <AppWrapper maxW="1440px">
         <Stack gap={["24px", "24px", "36px", "48px"]}>

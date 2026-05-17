@@ -98,7 +98,7 @@ export default function PasswordResetPage() {
   return (
     <>
       <Head>
-        <title>Новый пароль — PawsPort</title>
+        <title>Новый пароль — Pawsport</title>
       </Head>
       <AuthLayout>
         <VStack gap="32px">
@@ -157,7 +157,7 @@ export default function PasswordResetPage() {
                       Новый пароль
                     </Text>
                     <Text color="fg.muted">
-                      Введите новый пароль для аккаунта PawsPort.
+                      Введите новый пароль для аккаунта Pawsport.
                     </Text>
                   </Stack>
 
