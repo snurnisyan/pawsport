@@ -25,6 +25,7 @@ import {
   type TReminderListResponse,
 } from "@/lib/petsApi";
 import { clearAuthSession, useAuthSession } from "@/lib/session";
+import { usePetNavigationStore } from "@/store/petNavigation";
 
 type TNavItem = {
   label: string;
@@ -118,14 +119,22 @@ function ReminderErrorBlock({ error }: { error: unknown }) {
   );
 }
 
-function ReminderRow({ reminder }: { reminder: TReminder }) {
+type TReminderRowProps = {
+  reminder: TReminder;
+  onOpenPet: (petId: string) => void;
+};
+
+function ReminderRow({ reminder, onOpenPet }: TReminderRowProps) {
   const meta = reminder.event ? EVENT_TYPE_META[reminder.event.type] : undefined;
   const Icon = meta?.Icon ?? LuBell;
   const isUnread = !reminder.readAt;
   const eventDate = reminder.event?.eventDate ?? reminder.dueAt;
+  const petId = reminder.pet?.id ?? reminder.petId;
 
   return (
-    <Box
+    <Pressable
+      type="button"
+      onClick={() => onOpenPet(petId)}
       display="flex"
       alignItems="center"
       gap="10px"
@@ -135,7 +144,7 @@ function ReminderRow({ reminder }: { reminder: TReminder }) {
       py="8px"
       rounded="md"
       color="fg.default"
-      cursor="default"
+      cursor="pointer"
       textAlign="start"
       borderLeftWidth="2px"
       borderLeftColor={isUnread ? "red.500" : "transparent"}
@@ -171,7 +180,7 @@ function ReminderRow({ reminder }: { reminder: TReminder }) {
       >
         {formatEventDate(eventDate)}
       </Text>
-    </Box>
+    </Pressable>
   );
 }
 
@@ -180,6 +189,7 @@ type TRemindersContentProps = {
   reminders: TReminder[];
   isLoading: boolean;
   error: unknown;
+  onOpenPet: (petId: string) => void;
   showTitle?: boolean;
 };
 
@@ -188,6 +198,7 @@ function RemindersContent({
   reminders,
   isLoading,
   error,
+  onOpenPet,
   showTitle = true,
 }: TRemindersContentProps) {
   if (!authenticated) {
@@ -217,7 +228,11 @@ function RemindersContent({
       ) : (
         <Stack gap="4px">
           {reminders.map((reminder) => (
-            <ReminderRow key={reminder.id} reminder={reminder} />
+            <ReminderRow
+              key={reminder.id}
+              reminder={reminder}
+              onOpenPet={onOpenPet}
+            />
           ))}
         </Stack>
       )}
@@ -270,6 +285,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
+  const setPetTab = usePetNavigationStore((s) => s.setPetTab);
   const [desktopRemindersOpen, setDesktopRemindersOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const email = session?.user.email ?? userEmail;
@@ -338,6 +354,13 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const logout = () => {
     clearAuthSession();
     router.push("/auth/login");
+  };
+
+  const openReminderPetEvents = (petId: string) => {
+    setPetTab(petId, "events");
+    setDesktopRemindersOpen(false);
+    setMobileMenuOpen(false);
+    void router.push(`/pets/${petId}`);
   };
 
   return (
@@ -415,6 +438,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
                     reminders={reminders}
                     isLoading={remindersQuery.isLoading}
                     error={remindersQuery.error}
+                    onOpenPet={openReminderPetEvents}
                   />
                 </Popover.Content>
               </Popover.Positioner>
@@ -498,6 +522,7 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
                       reminders={reminders}
                       isLoading={remindersQuery.isLoading}
                       error={remindersQuery.error}
+                      onOpenPet={openReminderPetEvents}
                       showTitle={false}
                     />
                     <Box h="1px" bg="border.subtle" my="4px" />
