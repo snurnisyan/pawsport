@@ -149,7 +149,7 @@ export default function LoginPage() {
               </PrimaryButton>
               <Text fontSize="14px" color="fg.muted" textAlign="center">
                 Нет аккаунта?{" "}
-                <ChakraLink href="/auth" color="primary.400" fontWeight={600}>
+                <ChakraLink href="/auth/register" color="primary.400" fontWeight={600}>
                   Зарегистрируйтесь
                 </ChakraLink>
               </Text>

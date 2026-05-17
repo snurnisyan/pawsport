@@ -28,7 +28,11 @@ export function RegisterStep({
   onNext,
 }: TRegisterStepProps) {
   const [showPwd, setShowPwd] = useState(false);
-  const canSubmit = Boolean(email.trim() && password && personalDataConsent && !isSubmitting);
+  const passwordError =
+    password.length > 0 && password.length < 8 ? "Минимум 8 символов." : undefined;
+  const canSubmit = Boolean(
+    email.trim() && password.length >= 8 && personalDataConsent && !isSubmitting
+  );
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -93,6 +97,7 @@ export function RegisterStep({
                 </IconButton>
               }
               value={password}
+              errorText={passwordError}
               onChange={(e) => onChange({ password: e.target.value })}
             />
           </Stack>

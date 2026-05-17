@@ -315,7 +315,6 @@ test("confirmPasswordReset rejects invalid password with INVALID_PASSWORD", asyn
   const cases: Array<{ token: unknown; password: unknown; code: string }> = [
     { token: "valid-token", password: undefined, code: "INVALID_PASSWORD" },
     { token: "valid-token", password: "short1", code: "INVALID_PASSWORD" },
-    { token: "valid-token", password: "onlyletters", code: "INVALID_PASSWORD" },
     { token: "", password: "NewPassword1", code: "INVALID_RESET_TOKEN" },
     { token: undefined, password: "NewPassword1", code: "INVALID_RESET_TOKEN" }
   ];

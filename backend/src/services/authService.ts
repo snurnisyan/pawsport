@@ -209,11 +209,11 @@ const validatePasswordStrength = (password: unknown): string => {
     throw new AppError(400, "INVALID_PASSWORD", "Password is required");
   }
 
-  if (password.length < 8 || !/[A-Za-zА-Яа-я]/.test(password) || !/\d/.test(password)) {
+  if (password.length < 8) {
     throw new AppError(
       400,
       "INVALID_PASSWORD",
-      "Password must be at least 8 characters long and contain at least one letter and one digit"
+      "Password must be at least 8 characters long"
     );
   }
 
