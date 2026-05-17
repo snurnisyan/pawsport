@@ -286,9 +286,18 @@ export const CreateEventMultipartRequestSchema = z
   })
   .openapi("CreateEventMultipartRequest");
 
-export const UpdateEventRequestSchema = EventMutableSchema.extend({
-  fileIds: z.array(ObjectIdSchema).optional()
-}).partial().openapi("UpdateEventRequest");
+export const UpdateEventRequestSchema = EventMutableSchema.partial().openapi("UpdateEventRequest");
+
+export const UpdateEventMultipartRequestSchema = z
+  .object({
+    event: z.string().openapi({
+      description: "JSON-encoded UpdateEventRequest payload (omit fileIds when sending files)."
+    }),
+    files: z.array(z.string().openapi({ format: "binary" })).optional().openapi({
+      description: "Optional PDF/PNG/JPG files to add to the event."
+    })
+  })
+  .openapi("UpdateEventMultipartRequest");
 
 export const EventResponseSchema = z
   .object({

@@ -79,11 +79,11 @@ export const createPetEventHandler = (dependencies: CreatePetEventHandlerDepende
       ? parseEventFieldsFromMultipart((req.body as Record<string, unknown> | undefined)?.event)
       : (req.body ?? {});
 
-    if (files.length > 0 && eventInput.fileIds !== undefined && eventInput.fileIds !== null) {
+    if (eventInput.fileIds !== undefined && eventInput.fileIds !== null) {
       throw new AppError(
         400,
         "FILE_IDS_CONFLICT",
-        "Pass either fileIds or inline event files, not both"
+        "Pass event files via multipart/form-data instead of fileIds"
       );
     }
 
@@ -134,14 +134,76 @@ export const getEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
   res.status(200).json({ event });
 });
 
-export const updateEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const event = await eventService.updateEvent(
-    requireUserId(req),
-    req.params.id,
-    req.body ?? {}
-  );
-  res.status(200).json({ event });
-});
+export interface UpdateEventHandlerDependencies {
+  getEvent?: typeof eventService.getEvent;
+  updateEvent?: typeof eventService.updateEvent;
+  uploadPetFile?: typeof fileService.uploadPetFile;
+  deleteFile?: typeof fileService.deleteFile;
+}
+
+export const updateEventHandler = (dependencies: UpdateEventHandlerDependencies = {}) => {
+  const {
+    getEvent: getEventFn = eventService.getEvent,
+    updateEvent: updateEventFn = eventService.updateEvent,
+    uploadPetFile = fileService.uploadPetFile,
+    deleteFile = fileService.deleteFile
+  } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const userId = requireUserId(req);
+    const files = uploadedFilesFromRequest(req);
+    const eventInput = isMultipartRequest(req)
+      ? parseEventFieldsFromMultipart((req.body as Record<string, unknown> | undefined)?.event)
+      : (req.body ?? {});
+
+    if (eventInput.fileIds !== undefined && eventInput.fileIds !== null) {
+      throw new AppError(
+        400,
+        "FILE_IDS_CONFLICT",
+        "Pass event files via multipart/form-data instead of fileIds"
+      );
+    }
+
+    if (files.length === 0) {
+      const event = await updateEventFn(userId, req.params.id, eventInput);
+      res.status(200).json({ event });
+      return;
+    }
+
+    const existingEvent = await getEventFn(userId, req.params.id);
+    const uploadedFileIds: string[] = [];
+
+    try {
+      for (const file of files) {
+        const uploaded = await uploadPetFile(userId, existingEvent.petId, {
+          file,
+          eventId: existingEvent.id
+        });
+        uploadedFileIds.push(uploaded.id);
+      }
+
+      const event = await updateEventFn(userId, req.params.id, {
+        ...eventInput,
+        fileIds: [
+          ...existingEvent.files.map((file) => file.fileId),
+          ...uploadedFileIds
+        ]
+      });
+      res.status(200).json({ event });
+    } catch (error) {
+      for (const fileId of uploadedFileIds) {
+        try {
+          await deleteFile(userId, fileId);
+        } catch {
+          // Best effort: surface the original upload/update failure to the caller.
+        }
+      }
+      throw error;
+    }
+  });
+};
+
+export const updateEvent = updateEventHandler();
 
 export const deleteEvent = asyncHandler(async (req: AuthenticatedRequest, res) => {
   await eventService.deleteEvent(requireUserId(req), req.params.id);

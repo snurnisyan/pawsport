@@ -137,7 +137,7 @@ export function EventDialog({
   const updateMutation = useMutation({
     mutationFn: (body: TUpdateEventRequest) => {
       if (!event?.id) throw new Error("Не удалось обновить событие: нет идентификатора события.");
-      return updateEvent(event.id, body);
+      return updateEvent(event.id, body, data.files);
     },
     onSuccess: async () => {
       await invalidateEvents();

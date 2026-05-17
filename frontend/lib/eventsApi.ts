@@ -63,15 +63,36 @@ export const createPetEvent = (
 
 export const updateEvent = (
   id: string,
-  body: TUpdateEventRequest
-): Promise<TPetEventResponse> =>
-  unwrapApiResponse(
-    apiClient.PATCH("/events/{id}", {
-      params: { path: { id } },
-      body,
-      headers: { "Content-Type": "application/json" },
-    })
-  );
+  body: TUpdateEventRequest,
+  files: File[] = []
+): Promise<TPetEventResponse> => {
+  if (files.length === 0) {
+    return unwrapApiResponse(
+      apiClient.PATCH("/events/{id}", {
+        params: { path: { id } },
+        body,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  }
+
+  const formData = new FormData();
+  formData.append("event", JSON.stringify(body));
+  files.forEach((file) => formData.append("files", file));
+
+  return authenticatedFetch(`/events/${id}`, {
+    method: "PATCH",
+    body: formData,
+  }).then(async (response) => {
+    const payload = (await response.json().catch(() => undefined)) as unknown;
+
+    if (!response.ok) {
+      throw normalizeApiError(payload, response);
+    }
+
+    return payload as TPetEventResponse;
+  });
+};
 
 export const deleteEvent = (id: string): Promise<void> =>
   unwrapVoidApiResponse(

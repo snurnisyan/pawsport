@@ -533,7 +533,12 @@ export interface components {
              * @enum {string}
              */
             reminderOffset?: "day" | "week" | "month";
-            fileIds?: components["schemas"]["ObjectId"][];
+        };
+        UpdateEventMultipartRequest: {
+            /** @description JSON-encoded UpdateEventRequest payload (omit fileIds when sending files). */
+            event: string;
+            /** @description Optional PDF/PNG/JPG files to add to the event. */
+            files?: string[];
         };
         ExportPeriod: {
             /**
@@ -1278,6 +1283,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateEventRequest"];
+                "multipart/form-data": components["schemas"]["UpdateEventMultipartRequest"];
             };
         };
         responses: {

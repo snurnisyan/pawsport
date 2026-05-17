@@ -1,6 +1,6 @@
 import { createPetEvent, deleteEvent, getEvent, listPetEvents, updateEvent } from "../controllers/eventController";
 import { createDocumentedRouter } from "../docs/route";
-import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
+import { jsonResponse } from "../docs/routeContent";
 import {
   CreateEventMultipartRequestSchema,
   CreateEventRequestSchema,
@@ -8,6 +8,7 @@ import {
   EventListResponseSchema,
   EventResponseSchema,
   IdPathParamsSchema,
+  UpdateEventMultipartRequestSchema,
   UpdateEventRequestSchema
 } from "../docs/schemas";
 import { multipartOnly } from "../middleware/multipartOnly";
@@ -58,9 +59,18 @@ events.route("get", "/:id", {
 events.route("patch", "/:id", {
   operationId: "updateEvent",
   summary: "Update an event",
-  request: { params: IdPathParamsSchema, body: jsonRequestBody(UpdateEventRequestSchema) },
+  request: {
+    params: IdPathParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: UpdateEventRequestSchema },
+        "multipart/form-data": { schema: UpdateEventMultipartRequestSchema }
+      }
+    }
+  },
   responses: { 200: jsonResponse("Event updated", EventResponseSchema) },
-  handlers: [updateEvent]
+  handlers: [multipartOnly(upload.array("files")), updateEvent]
 });
 
 events.route("delete", "/:id", {
