@@ -8,6 +8,7 @@ const INITIAL: TPetFormData = {
   species: null,
   breed: "",
   sex: null,
+  photo: null,
 };
 
 type TAddPetDialogProps = {

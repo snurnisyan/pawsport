@@ -22,7 +22,7 @@ const INITIAL: TWizardState = {
   email: "",
   password: "",
   personalDataConsent: false,
-  pet: { name: "", species: null, breed: "", sex: null },
+  pet: { name: "", species: null, breed: "", sex: null, photo: null },
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
