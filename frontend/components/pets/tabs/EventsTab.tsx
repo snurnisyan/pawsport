@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { HStack, Heading, Icon, Stack, Text } from "@chakra-ui/react";
 import { LuCalendarOff, LuPlus, LuSearchX } from "react-icons/lu";
 import { SecondaryButton } from "@/components/ui/Buttons";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { toaster } from "@/components/ui/toaster";
 import { EventDialog } from "@/components/pets/events/EventDialog";
 import { EventsFeed } from "@/components/pets/events/EventsFeed";
 import { EventsFilterBar } from "@/components/pets/events/EventsFilterBar";
@@ -11,20 +14,71 @@ import {
   type TEventsFilters,
 } from "@/components/pets/events/eventsShared";
 import { ApiError } from "@/lib/api";
-import { usePetEventsQuery, type TPetEvent } from "@/lib/eventsApi";
+import {
+  deleteEvent,
+  petEventsQueryKey,
+  usePetEventsQuery,
+  type TPetEvent,
+  type TPetEventsQuery,
+} from "@/lib/eventsApi";
 
 type TEventsTabProps = {
   petId?: string;
 };
 
+const apiErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof ApiError ? error.message : fallback;
+
+const hasActiveFilters = (filters: TEventsFilters): boolean =>
+  Boolean(
+    filters.search.trim() ||
+      filters.types.length > 0 ||
+      filters.dateRange.from ||
+      filters.dateRange.to
+  );
+
 export function EventsTab({ petId }: TEventsTabProps) {
-  const eventsQuery = usePetEventsQuery(petId);
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TPetEvent | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<TPetEvent | null>(null);
   const [filters, setFilters] = useState<TEventsFilters>(INITIAL_FILTERS);
 
-  const events = eventsQuery.data?.items ?? [];
-  const filtered = useMemo(() => filterEvents(events, filters), [events, filters]);
+  const backendQuery = useMemo<TPetEventsQuery>(
+    () => ({
+      from: filters.dateRange.from || undefined,
+      to: filters.dateRange.to || undefined,
+    }),
+    [filters.dateRange.from, filters.dateRange.to]
+  );
+
+  const eventsQuery = usePetEventsQuery(petId, backendQuery);
+
+  const backendEvents = eventsQuery.data?.items ?? [];
+  const filtered = useMemo(
+    () => filterEvents(backendEvents, filters),
+    [backendEvents, filters]
+  );
+  const filtersActive = hasActiveFilters(filters);
+
+  const deleteMutation = useMutation({
+    mutationFn: (event: TPetEvent) => deleteEvent(event.id).then(() => event),
+    onSuccess: async () => {
+      if (petId) {
+        await queryClient.invalidateQueries({
+          queryKey: petEventsQueryKey(petId),
+        });
+      }
+      toaster.create({ type: "success", title: "Событие удалено" });
+      setEventToDelete(null);
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось удалить событие",
+        description: apiErrorMessage(error, "Попробуйте еще раз."),
+      });
+    },
+  });
 
   const openCreate = () => {
     setEditingEvent(null);
@@ -68,6 +122,19 @@ export function EventsTab({ petId }: TEventsTabProps) {
         petId={petId}
       />
 
+      <ConfirmDialog
+        open={Boolean(eventToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setEventToDelete(null);
+        }}
+        title="Удалить событие?"
+        description="Событие будет удалено из карточки питомца."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (eventToDelete) deleteMutation.mutate(eventToDelete);
+        }}
+      />
+
       {eventsQuery.isLoading ? (
         <Text color="fg.muted">Загружаем события...</Text>
       ) : eventsQuery.isError ? (
@@ -79,7 +146,7 @@ export function EventsTab({ petId }: TEventsTabProps) {
             {errorDetail}
           </Text>
         </Stack>
-      ) : events.length === 0 ? (
+      ) : backendEvents.length === 0 && !filtersActive ? (
         <Stack
           align="center"
           gap="12px"
@@ -119,7 +186,11 @@ export function EventsTab({ petId }: TEventsTabProps) {
               </Text>
             </Stack>
           ) : (
-            <EventsFeed events={filtered} onEdit={openEdit} />
+            <EventsFeed
+              events={filtered}
+              onEdit={openEdit}
+              onDelete={(event) => setEventToDelete(event)}
+            />
           )}
         </>
       )}

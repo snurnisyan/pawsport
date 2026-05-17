@@ -1,13 +1,11 @@
 import type { TDateRange } from "@/components/ui/DateRangeField";
 import {
+  EVENT_TYPE_BG, EVENT_TYPE_BG_BRIGHT,
   EVENT_TYPE_COLOR,
   EVENT_TYPE_FILTER_OPTIONS,
   EVENT_TYPE_LABEL,
-  EVENT_TYPE_TONE,
 } from "@/lib/eventTypes";
 import type { TPetEvent } from "@/lib/petsApi";
-
-const toDateKey = (iso: string): string => iso.slice(0, 10);
 
 export type TEventsFilters = {
   search: string;
@@ -21,7 +19,8 @@ export const INITIAL_FILTERS: TEventsFilters = {
   dateRange: { from: "", to: "" },
 };
 
-export const TYPE_TONE = EVENT_TYPE_TONE;
+export const TYPE_BG = EVENT_TYPE_BG;
+export const TYPE_BG_BRIGHT = EVENT_TYPE_BG_BRIGHT;
 export const TYPE_LABEL = EVENT_TYPE_LABEL;
 export const TYPE_COLOR = EVENT_TYPE_COLOR;
 export const TYPE_OPTIONS = EVENT_TYPE_FILTER_OPTIONS;
@@ -84,9 +83,6 @@ export function filterEvents(events: TPetEvent[], filters: TEventsFilters): TPet
   const q = filters.search.trim().toLowerCase();
   return events.filter((e) => {
     if (filters.types.length > 0 && !filters.types.includes(e.type)) return false;
-    const dateKey = toDateKey(e.eventDate);
-    if (filters.dateRange.from && dateKey < filters.dateRange.from) return false;
-    if (filters.dateRange.to && dateKey > filters.dateRange.to) return false;
     if (q) {
       const hay = `${e.title} ${e.comment ?? ""} ${e.clinicName ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;

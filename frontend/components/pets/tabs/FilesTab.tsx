@@ -342,6 +342,7 @@ export function FilesTab({ petId }: TFilesTabProps) {
                     color="fg.muted"
                     disabled={rowBusy || !usesBackend}
                     onClick={() => downloadMutation.mutate(file as TPetFile)}
+                    _hover={{ color: "fg.default", bg: "secondary.700" }}
                   >
                     <LuDownload />
                   </IconButton>
@@ -352,6 +353,7 @@ export function FilesTab({ petId }: TFilesTabProps) {
                     color="fg.muted"
                     disabled={rowBusy || !usesBackend}
                     onClick={() => setFileToDelete(file as TPetFile)}
+                    _hover={{ color: "status.danger", bg: "secondary.700" }}
                   >
                     <LuTrash />
                   </IconButton>
