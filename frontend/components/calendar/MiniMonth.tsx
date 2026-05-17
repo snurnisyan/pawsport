@@ -91,7 +91,7 @@ function DayCell({ day, isToday, dayMarks, events, onClick, onExpand }: TDayCell
       type="button"
       onClick={hasEvents ? undefined : onClick}
       position="relative"
-      aspectRatio={1}
+      aspectRatio={[1, 1, 0.7, 0.7, 1]}
       rounded="md"
       fontSize="12px"
       color={isToday ? "white" : "fg.subtle"}
