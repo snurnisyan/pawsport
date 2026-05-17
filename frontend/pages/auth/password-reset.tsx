@@ -22,7 +22,7 @@ const TOKEN_ERROR_TEXT = "Ссылка для сброса пароля исте
 
 const passwordErrorMessage = (error: unknown): string => {
   if (error instanceof ApiError && error.code === "INVALID_PASSWORD") {
-    return "Пароль должен соответствовать требованиям безопасности.";
+    return "Пароль должен быть не короче 8 символов.";
   }
 
   if (error instanceof ApiError) return error.message;
