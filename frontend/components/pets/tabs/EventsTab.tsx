@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { HStack, Heading, Icon, Stack, Text } from "@chakra-ui/react";
-import { LuCalendarOff, LuPlus } from "react-icons/lu";
+import { LuCalendarOff, LuPlus, LuSearchX } from "react-icons/lu";
 import { SecondaryButton } from "@/components/ui/Buttons";
 import { EventDialog } from "@/components/pets/events/EventDialog";
 import { EventsFeed } from "@/components/pets/events/EventsFeed";
@@ -10,17 +10,20 @@ import {
   filterEvents,
   type TEventsFilters,
 } from "@/components/pets/events/eventsShared";
-import type { TPetEvent } from "@/store/pets";
+import { ApiError } from "@/lib/api";
+import { usePetEventsQuery, type TPetEvent } from "@/lib/eventsApi";
 
 type TEventsTabProps = {
-  events: TPetEvent[];
+  petId?: string;
 };
 
-export function EventsTab({ events }: TEventsTabProps) {
+export function EventsTab({ petId }: TEventsTabProps) {
+  const eventsQuery = usePetEventsQuery(petId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TPetEvent | null>(null);
   const [filters, setFilters] = useState<TEventsFilters>(INITIAL_FILTERS);
 
+  const events = eventsQuery.data?.items ?? [];
   const filtered = useMemo(() => filterEvents(events, filters), [events, filters]);
 
   const openCreate = () => {
@@ -36,6 +39,11 @@ export function EventsTab({ events }: TEventsTabProps) {
     if (!open) setEditingEvent(null);
   };
 
+  const errorDetail =
+    eventsQuery.error instanceof ApiError
+      ? eventsQuery.error.message
+      : "Попробуйте обновить страницу.";
+
   return (
     <Stack gap="24px">
       <HStack justify="space-between" flexWrap="wrap" gap="12px">
@@ -45,7 +53,7 @@ export function EventsTab({ events }: TEventsTabProps) {
             Будущие и прошедшие события по питомцу
           </Text>
         </Stack>
-        <SecondaryButton h="44px" px="20px" onClick={openCreate}>
+        <SecondaryButton h="44px" px="20px" onClick={openCreate} disabled={!petId}>
           <HStack gap="8px">
             <LuPlus />
             <Text>Добавить событие</Text>
@@ -57,9 +65,21 @@ export function EventsTab({ events }: TEventsTabProps) {
         open={dialogOpen}
         onOpenChange={handleOpenChange}
         event={editingEvent ?? undefined}
+        petId={petId}
       />
 
-      {events.length === 0 ? (
+      {eventsQuery.isLoading ? (
+        <Text color="fg.muted">Загружаем события...</Text>
+      ) : eventsQuery.isError ? (
+        <Stack gap="6px">
+          <Text fontWeight={700} color="red.200">
+            Не удалось загрузить события
+          </Text>
+          <Text color="fg.muted" fontSize="14px">
+            {errorDetail}
+          </Text>
+        </Stack>
+      ) : events.length === 0 ? (
         <Stack
           align="center"
           gap="12px"
@@ -80,7 +100,27 @@ export function EventsTab({ events }: TEventsTabProps) {
       ) : (
         <>
           <EventsFilterBar value={filters} onChange={setFilters} />
-          <EventsFeed events={filtered} onEdit={openEdit} />
+          {filtered.length === 0 ? (
+            <Stack
+              align="center"
+              gap="12px"
+              py="64px"
+              bg="bg.surface"
+              borderWidth="1px"
+              borderStyle="dashed"
+              borderColor="border.subtle"
+              rounded="card"
+            >
+              <Icon boxSize="32px" color="fg.muted">
+                <LuSearchX />
+              </Icon>
+              <Text color="fg.muted" fontSize="14px">
+                Ничего не найдено
+              </Text>
+            </Stack>
+          ) : (
+            <EventsFeed events={filtered} onEdit={openEdit} />
+          )}
         </>
       )}
     </Stack>

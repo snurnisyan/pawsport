@@ -3,8 +3,11 @@ import { DateInput } from "@/components/ui/DateInput";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
+import { TimeInput } from "@/components/ui/TimeInput";
 import { EVENT_TYPE_OPTIONS } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
+
+export type TReminderValue = "none" | "day" | "week" | "month";
 
 export type TEventFormData = {
   title: string;
@@ -13,7 +16,7 @@ export type TEventFormData = {
   date: string;
   time: string;
   nextDate: string;
-  reminder: string;
+  reminder: TReminderValue;
   clinic: string;
   comment: string;
   files: File[];
@@ -26,7 +29,7 @@ export const INITIAL_EVENT: TEventFormData = {
   date: "",
   time: "",
   nextDate: "",
-  reminder: "1d",
+  reminder: "day",
   clinic: "",
   comment: "",
   files: [],
@@ -37,12 +40,11 @@ export const TYPE_OPTIONS = EVENT_TYPE_OPTIONS satisfies {
   label: string;
 }[];
 
-export const REMINDER_OPTIONS = [
+export const REMINDER_OPTIONS: { value: TReminderValue; label: string }[] = [
   { value: "none", label: "Без напоминания" },
-  { value: "1h", label: "За 1 час" },
-  { value: "1d", label: "За 1 день" },
-  { value: "3d", label: "За 3 дня" },
-  { value: "1w", label: "За неделю" },
+  { value: "day", label: "За 1 день" },
+  { value: "week", label: "За неделю" },
+  { value: "month", label: "За месяц" },
 ];
 
 export type TPetOption = { value: string; label: string };
@@ -87,11 +89,10 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
           value={data.date}
           onChange={(date) => onChange({ date })}
         />
-        <TextField
+        <TimeInput
           label="Время"
-          type="time"
           value={data.time}
-          onChange={(e) => onChange({ time: e.target.value })}
+          onChange={(time) => onChange({ time })}
         />
       </Grid>
 
@@ -105,7 +106,7 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         label="Напомнить"
         options={REMINDER_OPTIONS}
         value={data.reminder}
-        onChange={(v) => onChange({ reminder: v })}
+        onChange={(v) => onChange({ reminder: v as TReminderValue })}
       />
 
       <TextField
