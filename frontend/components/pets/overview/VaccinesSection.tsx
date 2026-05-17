@@ -1,7 +1,7 @@
 import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { LuSyringe } from "react-icons/lu";
+import { LuBriefcaseMedical } from "react-icons/lu";
 import { Card } from "@/components/ui/Card";
 import { ApiError } from "@/lib/api";
 import { EVENT_TYPE_META } from "@/lib/eventTypes";
@@ -184,7 +184,7 @@ export function VaccinesSection({ backendPetId }: TVaccinesSectionProps) {
 
   return (
     <Card>
-      <SectionCardHeader icon={<LuSyringe />} title="Вакцины и обработки" />
+      <SectionCardHeader icon={<LuBriefcaseMedical />} title="Вакцины и обработки" />
       <Stack gap="12px">
         {backendPetId && eventsQuery.isLoading ? (
           <>
