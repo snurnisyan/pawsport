@@ -1,9 +1,23 @@
-import { Field, Grid, Stack, Textarea } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  FileUpload,
+  Grid,
+  HStack,
+  Icon,
+  IconButton,
+  Stack,
+  Text,
+  Textarea,
+} from "@chakra-ui/react";
+import { LuCloudUpload, LuDownload, LuFile, LuX } from "react-icons/lu";
 import { DateInput } from "@/components/ui/DateInput";
-import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { TimeInput } from "@/components/ui/TimeInput";
+import { toaster } from "@/components/ui/toaster";
+import { ApiError } from "@/lib/api";
+import { downloadFile } from "@/lib/petsApi";
 import {
   EVENT_TYPE_OPTIONS,
   getEventSubtypeOptions,
@@ -60,7 +74,50 @@ type TEventFormProps = {
   data: TEventFormData;
   onChange: (patch: Partial<TEventFormData>) => void;
   pets?: TPetOption[];
+  existingFileIds?: string[];
 };
+
+const FILE_ACCEPT = "application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg";
+
+const formatSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const saveBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+export function EventForm({
+  data,
+  onChange,
+  pets,
+  existingFileIds = [],
+}: TEventFormProps) {
+  const handleDownload = async (id: string) => {
+    try {
+      const { blob, filename } = await downloadFile(id);
+      saveBlob(blob, filename ?? id);
+    } catch (error) {
+      toaster.error({
+        title: "Не удалось скачать файл",
+        description:
+          error instanceof ApiError ? error.message : "Попробуйте еще раз.",
+      });
+    }
+  };
+
+  const removeFileAt = (index: number) => {
+    onChange({ files: data.files.filter((_, i) => i !== index) });
+  };
 
 export function EventForm({ data, onChange, pets }: TEventFormProps) {
   const subtypeOptions = getEventSubtypeOptions(data.type);
@@ -181,13 +238,139 @@ export function EventForm({ data, onChange, pets }: TEventFormProps) {
         >
           Файлы
         </Field.Label>
-        <FileDropZone
-          multiple
-          accept=".pdf,image/*"
-          onFiles={(files) => onChange({ files: [...data.files, ...files] })}
-          subtitle="PDF, PNG, JPG (макс. 20MB)"
-          height="140px"
-        />
+        <FileUpload.Root
+          accept={FILE_ACCEPT}
+          maxFiles={20}
+          onFileAccept={({ files }) =>
+            onChange({ files: [...data.files, ...files] })
+          }
+        >
+          <FileUpload.HiddenInput />
+          <Stack gap="8px">
+            {existingFileIds.map((id) => (
+              <HStack
+                key={id}
+                bg="bg.field"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                rounded="field"
+                p="12px"
+                gap="12px"
+                cursor="pointer"
+                onClick={() => handleDownload(id)}
+                _hover={{ borderColor: "primary.500" }}
+              >
+                <Box
+                  w="36px"
+                  h="36px"
+                  rounded="md"
+                  bg="secondary.700"
+                  color="primary.400"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  flexShrink={0}
+                >
+                  <Icon><LuFile /></Icon>
+                </Box>
+                <Stack gap="0" flex={1} minW={0}>
+                  <Text
+                    fontSize="13px"
+                    fontWeight={500}
+                    fontFamily="mono"
+                    truncate
+                  >
+                    {id}
+                  </Text>
+                  <Text fontSize="12px" color="fg.muted">
+                    Прикреплён к событию · Нажмите, чтобы скачать
+                  </Text>
+                </Stack>
+                <Icon color="fg.muted" flexShrink={0}>
+                  <LuDownload />
+                </Icon>
+              </HStack>
+            ))}
+
+            {data.files.map((file, idx) => (
+              <HStack
+                key={`${file.name}-${idx}`}
+                bg="bg.field"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                rounded="field"
+                p="12px"
+                gap="12px"
+              >
+                <Box
+                  w="36px"
+                  h="36px"
+                  rounded="md"
+                  bg="secondary.700"
+                  color="primary.400"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  flexShrink={0}
+                >
+                  <Icon><LuFile /></Icon>
+                </Box>
+                <Stack gap="0" flex={1} minW={0}>
+                  <Text fontSize="14px" fontWeight={500} truncate>
+                    {file.name}
+                  </Text>
+                  <Text fontSize="12px" color="fg.muted">
+                    {formatSize(file.size)} · Готов к загрузке
+                  </Text>
+                </Stack>
+                <IconButton
+                  aria-label="Убрать файл"
+                  size="sm"
+                  variant="ghost"
+                  color="fg.muted"
+                  onClick={() => removeFileAt(idx)}
+                  _hover={{ color: "fg.default", bg: "secondary.700" }}
+                >
+                  <LuX />
+                </IconButton>
+              </HStack>
+            ))}
+
+            <FileUpload.Dropzone
+              w="full"
+              minH="auto"
+              py="14px"
+              px="16px"
+              rounded="card"
+              borderWidth="2px"
+              borderStyle="dashed"
+              borderColor="border.default"
+              bg="bg.field"
+              color="fg.muted"
+              cursor="pointer"
+              transition="all 0.15s"
+              _hover={{ borderColor: "primary.500", color: "primary.400" }}
+            >
+              <HStack gap="12px" align="center" justify="center">
+                <Icon boxSize="20px" color="primary.400">
+                  <LuCloudUpload />
+                </Icon>
+                <Stack gap="2px" align="flex-start">
+                  <Text fontSize="13px" fontWeight={500}>
+                    Нажмите, чтобы загрузить, или перетащите файлы
+                  </Text>
+                  <Text
+                    fontSize="11px"
+                    textTransform="uppercase"
+                    letterSpacing="0.08em"
+                  >
+                    PDF, PNG, JPG (макс. 20MB)
+                  </Text>
+                </Stack>
+              </HStack>
+            </FileUpload.Dropzone>
+          </Stack>
+        </FileUpload.Root>
       </Field.Root>
     </Stack>
   );
