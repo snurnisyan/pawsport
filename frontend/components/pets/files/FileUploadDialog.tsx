@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Box, HStack, Icon, IconButton, Stack, Text } from "@chakra-ui/react";
 import { LuFile, LuX } from "react-icons/lu";
-import { DialogActions } from "@/components/ui/DialogActions";
+import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 
 type TFileUploadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit?: (files: File[]) => void;
+  onSubmit?: (files: File[]) => void | Promise<void>;
+  isPending?: boolean;
 };
 
 const formatSize = (bytes: number) => {
@@ -17,42 +18,65 @@ const formatSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export function FileUploadDialog({ open, onOpenChange, onSubmit }: TFileUploadDialogProps) {
+export function FileUploadDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  isPending = false,
+}: TFileUploadDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
 
-  useEffect(() => {
-    if (!open) setFiles([]);
-  }, [open]);
-
-  const removeAt = (index: number) =>
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-
-  const handleSave = () => {
-    if (files.length === 0) return;
-    onSubmit?.(files);
+  const close = () => {
+    setFiles([]);
     onOpenChange(false);
+  };
+
+  const removeAt = (index: number) => {
+    if (isPending) return;
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    if (files.length === 0) return;
+    try {
+      await onSubmit?.(files);
+      setFiles([]);
+    } catch {
+      // The parent mutation owns the visible error state and keeps the dialog open.
+    }
   };
 
   return (
     <DialogShell
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (!isPending && !nextOpen) close();
+      }}
       title="Загрузка файлов"
       subtitle="К карточке питомца"
       footer={
-        <DialogActions
-          onCancel={() => onOpenChange(false)}
-          onSave={handleSave}
-          saveDisabled={files.length === 0}
-        />
+        <HStack gap="12px" w="full">
+          <GhostButton flex={1} onClick={close} disabled={isPending}>
+            Закрыть
+          </GhostButton>
+          <PrimaryButton
+            flex={1}
+            onClick={handleSave}
+            disabled={files.length === 0 || isPending}
+          >
+            Сохранить
+          </PrimaryButton>
+        </HStack>
       }
     >
       <Stack gap="16px">
         <FileDropZone
           multiple
-          accept=".pdf,image/*,.doc,.docx"
-          onFiles={(picked) => setFiles((prev) => [...prev, ...picked])}
-          subtitle="PDF, PNG, JPG, DOCX (макс. 20MB)"
+          accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg"
+          onFiles={(picked) => {
+            if (!isPending) setFiles((prev) => [...prev, ...picked]);
+          }}
+          subtitle="PDF, PNG, JPG (макс. 20MB)"
           height="180px"
         />
 
@@ -95,6 +119,7 @@ export function FileUploadDialog({ open, onOpenChange, onSubmit }: TFileUploadDi
                   variant="ghost"
                   color="fg.muted"
                   onClick={() => removeAt(index)}
+                  disabled={isPending}
                   _hover={{ color: "fg.default", bg: "secondary.700" }}
                 >
                   <LuX />

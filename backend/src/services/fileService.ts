@@ -69,7 +69,7 @@ type FileRecord = Pick<
   | "updatedAt"
 >;
 
-type PetRecord = Pick<IPet, "_id">;
+type PetRecord = Pick<IPet, "_id" | "photoFileId">;
 type EventRecord = Pick<IEvent, "_id" | "petId">;
 
 interface CreateFilePersistInput {
@@ -146,7 +146,7 @@ const defaultFindPet: NonNullable<FileServiceDependencies["findPetByIdForOwner"]
   ownerId
 ) =>
   PetModel.findOne({ _id: petId, ownerId })
-    .select({ _id: 1 })
+    .select({ _id: 1, photoFileId: 1 })
     .exec() as Promise<PetRecord | null>;
 
 const defaultFindEvent: NonNullable<FileServiceDependencies["findEventByIdForOwner"]> = async (
@@ -163,6 +163,18 @@ const isAllowedMimeType = (mimeType: string): mimeType is AllowedFileMimeType =>
 const sanitizeOriginalName = (name: string): string => {
   const base = basename(name).replace(/[^\w.\- ]+/g, "_").trim();
   return base.length > 0 ? base.slice(0, 160) : "file";
+};
+
+const looksLikeLatin1DecodedUtf8 = (name: string): boolean =>
+  /(?:[\u00c2\u00c3\u00d0\u00d1]|\u00e2[\u0080-\u00bf])/.test(name);
+
+const normalizeOriginalName = (name: string): string => {
+  if (!looksLikeLatin1DecodedUtf8(name)) {
+    return name;
+  }
+
+  const decoded = Buffer.from(name, "latin1").toString("utf8");
+  return decoded.includes("\ufffd") ? name : decoded;
 };
 
 const buildStorageKey = (
@@ -248,7 +260,8 @@ export const uploadPetFile = async (
   }
 
   const fileObjectId = new Types.ObjectId();
-  const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, file.originalname);
+  const originalName = normalizeOriginalName(file.originalname);
+  const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, originalName);
   const uploadedAt = now();
 
   try {
@@ -266,7 +279,7 @@ export const uploadPetFile = async (
     ownerId: ownerObjectId,
     petId: petObjectId,
     eventId: eventObjectId,
-    originalName: file.originalname,
+    originalName,
     mimeType: file.mimetype,
     sizeBytes: file.size,
     storageKey,
@@ -412,7 +425,8 @@ export const uploadPetPhoto = async (
   const previousPhotoFileId = existingPet.photoFileId;
 
   const fileObjectId = new Types.ObjectId();
-  const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, file.originalname);
+  const originalName = normalizeOriginalName(file.originalname);
+  const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, originalName);
   const uploadedAt = now();
 
   try {
@@ -429,7 +443,7 @@ export const uploadPetPhoto = async (
     _id: fileObjectId,
     ownerId: ownerObjectId,
     petId: petObjectId,
-    originalName: file.originalname,
+    originalName,
     mimeType: file.mimetype,
     sizeBytes: file.size,
     storageKey,
@@ -542,7 +556,10 @@ export const listPetFiles = async (
   }
 
   const files = await listFilesForPet(ownerObjectId, petObjectId, range);
-  return files.map(serializeFile);
+  const visibleFiles = pet.photoFileId
+    ? files.filter((file) => !file._id.equals(pet.photoFileId))
+    : files;
+  return visibleFiles.map(serializeFile);
 };
 
 export const downloadFile = async (

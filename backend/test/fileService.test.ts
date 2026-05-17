@@ -132,6 +132,50 @@ test("uploadPetFile verifies ownership, stores object, creates metadata, and ser
   assert.equal(result.uploadedAt, uploadedAt.toISOString());
 });
 
+test("uploadPetFile decodes latin1-mojibake UTF-8 original names", async () => {
+  const readableName = "2026-04-13 1.22.02\u202fPM.jpg";
+  const mojibakeName = Buffer.from(readableName, "utf8").toString("latin1");
+  let capturedOriginalName: string | undefined;
+  let storedKey: string | undefined;
+
+  const result = await uploadPetFile(
+    ownerId,
+    petId,
+    {
+      file: makeUpload({
+        originalname: mojibakeName,
+        mimetype: "image/jpeg",
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9])
+      })
+    },
+    {
+      storage: makeStorage({
+        putObject: async ({ key }) => {
+          storedKey = key;
+        }
+      }),
+      findPetByIdForOwner: petFound,
+      createFileRecord: async (input) => {
+        capturedOriginalName = input.originalName;
+        return makeFileRecord({
+          _id: input._id,
+          ownerId: input.ownerId,
+          petId: input.petId,
+          originalName: input.originalName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          storageKey: input.storageKey,
+          uploadedAt: input.uploadedAt
+        });
+      }
+    }
+  );
+
+  assert.equal(capturedOriginalName, readableName);
+  assert.equal(result.originalName, readableName);
+  assert.match(storedKey ?? "", /2026-04-13 1\.22\.02_PM\.jpg$/);
+});
+
 test("uploadPetFile rejects missing file with FILE_REQUIRED", async () => {
   await assert.rejects(
     () => uploadPetFile(ownerId, petId, {}, { findPetByIdForOwner: petFound }),
@@ -233,6 +277,25 @@ test("listPetFiles returns files for owner and pet in uploadedAt desc order", as
   assert.equal(result.length, 2);
   assert.equal(result[0].uploadedAt, "2026-05-13T00:00:00.000Z");
   assert.equal(result[1].uploadedAt, "2026-05-12T00:00:00.000Z");
+});
+
+test("listPetFiles excludes the current pet photo file", async () => {
+  const photoFileId = new Types.ObjectId();
+  const photoFile = makeFileRecord({ _id: photoFileId, originalName: "profile.jpg" });
+  const documentFile = makeFileRecord({ _id: new Types.ObjectId(), originalName: "vet report.pdf" });
+
+  const result = await listPetFiles(ownerId, petId, {
+    findPetByIdForOwner: async () => ({
+      _id: new Types.ObjectId(petId),
+      photoFileId
+    }),
+    listFilesForPet: async () => [photoFile, documentFile]
+  });
+
+  assert.deepEqual(
+    result.map((file) => file.originalName),
+    ["vet report.pdf"]
+  );
 });
 
 test("listPetFiles passes an optional from/to uploadedAt range to the repository", async () => {
