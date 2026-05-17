@@ -48,6 +48,28 @@ test("getCalendar returns events in range filtered by owner", async () => {
   assert.equal(result.events[0].id, eventId);
 });
 
+test("getCalendar returns event files with original names", async () => {
+  const fileId = "60a7c1aa9e1d4f12345678cd";
+
+  const result = await getCalendar(
+    ownerId,
+    { from: "2026-06-01", to: "2026-06-30" },
+    {
+      listEventsInRange: async () =>
+        [makeEventRecord({ fileIds: [new Types.ObjectId(fileId)] })],
+      listFilesByIds: async (owner, ids) => {
+        assert.equal(owner.toString(), ownerId);
+        assert.deepEqual(ids.map((id) => id.toString()), [fileId]);
+        return [{ _id: new Types.ObjectId(fileId), originalName: "rabies-certificate.pdf" }];
+      }
+    }
+  );
+
+  assert.deepEqual(result.events[0].files, [
+    { fileId, originalName: "rabies-certificate.pdf" }
+  ]);
+});
+
 test("getCalendar passes petIds and eventTypes filters to the event repository", async () => {
   let eventParams: Record<string, unknown> | undefined;
 

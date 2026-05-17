@@ -3,8 +3,9 @@ import { Types, isValidObjectId } from "mongoose";
 import { AppError } from "../middleware/errorHandler";
 import { EVENT_TYPES, EventModel, type EventType } from "../models/Event";
 import {
-  serializeEvent,
+  serializeEventsWithFiles,
   type EventRecord,
+  type EventServiceDependencies,
   type SerializedEvent
 } from "./eventService";
 
@@ -27,6 +28,7 @@ export interface CalendarServiceDependencies {
     petIds?: Types.ObjectId[];
     eventTypes?: EventType[];
   }) => Promise<EventRecord[]>;
+  listFilesByIds?: EventServiceDependencies["listFilesByIds"];
   now?: () => Date;
 }
 
@@ -145,6 +147,7 @@ export const getCalendar = async (
       if (eventTypes) filter.type = { $in: eventTypes };
       return EventModel.find(filter).sort({ eventDate: 1 }).exec() as unknown as EventRecord[];
     },
+    listFilesByIds,
     now = () => new Date()
   } = dependencies;
 
@@ -170,6 +173,6 @@ export const getCalendar = async (
   const events = await listEventsInRange({ ownerId: ownerObjectId, from, to, petIds, eventTypes });
 
   return {
-    events: events.map(serializeEvent)
+    events: await serializeEventsWithFiles(ownerObjectId, events, listFilesByIds)
   };
 };

@@ -458,6 +458,10 @@ export interface components {
             frequency: "none" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
             interval?: number;
         };
+        EventFile: {
+            originalName: string;
+            fileId: components["schemas"]["ObjectId"];
+        };
         Event: {
             id: components["schemas"]["ObjectId"];
             ownerId: components["schemas"]["ObjectId"];
@@ -477,7 +481,7 @@ export interface components {
              * @enum {string}
              */
             reminderOffset?: "day" | "week" | "month";
-            fileIds: components["schemas"]["ObjectId"][];
+            files: components["schemas"]["EventFile"][];
             createdAt: components["schemas"]["DateTime"];
             updatedAt: components["schemas"]["DateTime"];
         };

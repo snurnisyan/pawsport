@@ -57,7 +57,7 @@ const fakeCalendarResult = (): CalendarResult => ({
       type: "vaccine",
       title: "Rabies booster",
       eventDate: "2026-06-10T10:00:00.000Z",
-      fileIds: [],
+      files: [],
       createdAt: "2026-05-12T00:00:00.000Z",
       updatedAt: "2026-05-12T00:00:00.000Z"
     }

@@ -89,6 +89,11 @@ test("createPetEvent persists normalized input and returns serialized event", as
       },
       syncPendingReminderForEvent: async (input) => {
         reminderSync = input as unknown as Record<string, unknown>;
+      },
+      listFilesByIds: async (owner, ids) => {
+        assert.equal(owner.toString(), ownerId);
+        assert.deepEqual(ids.map((id) => id.toString()), [fileId]);
+        return [{ _id: new Types.ObjectId(fileId), originalName: "rabies-certificate.pdf" }];
       }
     }
   );
@@ -124,7 +129,9 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal(result.comment, "Annual shot");
   assert.deepEqual(result.recurrence, { frequency: "yearly", interval: 1 });
   assert.equal(result.reminderOffset, "week");
-  assert.deepEqual(result.fileIds, [fileId]);
+  assert.deepEqual(result.files, [
+    { fileId, originalName: "rabies-certificate.pdf" }
+  ]);
 
   assert.ok(reminderSync);
   assert.equal((reminderSync.ownerId as Types.ObjectId).toString(), ownerId);
@@ -729,7 +736,7 @@ test("serializeEvent hides optional fields when absent", () => {
   assert.equal("comment" in serialized, false);
   assert.equal("recurrence" in serialized, false);
   assert.equal("reminderOffset" in serialized, false);
-  assert.deepEqual(serialized.fileIds, []);
+  assert.deepEqual(serialized.files, []);
 });
 
 test("serializeEvent includes recurrence without interval when interval is omitted", () => {

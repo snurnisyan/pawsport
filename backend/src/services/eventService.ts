@@ -15,6 +15,7 @@ import {
   type RecurrenceFrequency,
   type ReminderOffset
 } from "../models/Event";
+import { FileModel, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
 import {
@@ -55,6 +56,11 @@ export interface SerializedRecurrence {
   interval?: number;
 }
 
+export interface SerializedEventFile {
+  originalName: string;
+  fileId: string;
+}
+
 export interface SerializedEvent {
   id: string;
   ownerId: string;
@@ -68,7 +74,7 @@ export interface SerializedEvent {
   comment?: string;
   recurrence?: SerializedRecurrence;
   reminderOffset?: ReminderOffset;
-  fileIds: string[];
+  files: SerializedEventFile[];
   createdAt: string;
   updatedAt: string;
 }
@@ -157,6 +163,10 @@ export interface EventServiceDependencies {
     petId: Types.ObjectId,
     fileIds: Types.ObjectId[]
   ) => Promise<void>;
+  listFilesByIds?: (
+    ownerId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<Pick<IStoredFile, "_id" | "originalName">[]>;
   detachFilesFromEvent?: (
     ownerId: Types.ObjectId,
     eventId: Types.ObjectId
@@ -177,6 +187,7 @@ const isEventServiceDependencies = (
     typeof candidate.syncPendingReminderForEvent === "function" ||
     typeof candidate.deleteRemindersForEvent === "function" ||
     typeof candidate.validateFileIdsForPet === "function" ||
+    typeof candidate.listFilesByIds === "function" ||
     typeof candidate.detachFilesFromEvent === "function"
   );
 };
@@ -521,7 +532,10 @@ const normalizeUpdateInput = (input: CreateEventInput): EventUpdates => {
   return { set, unset };
 };
 
-export const serializeEvent = (event: EventRecord): SerializedEvent => {
+export const serializeEvent = (
+  event: EventRecord,
+  filesById: Map<string, Pick<IStoredFile, "_id" | "originalName">> = new Map()
+): SerializedEvent => {
   const result: SerializedEvent = {
     id: event._id.toString(),
     ownerId: event.ownerId.toString(),
@@ -529,7 +543,11 @@ export const serializeEvent = (event: EventRecord): SerializedEvent => {
     type: event.type,
     title: event.title,
     eventDate: event.eventDate.toISOString(),
-    fileIds: (event.fileIds ?? []).map((id) => id.toString()),
+    files: (event.fileIds ?? []).flatMap((id) => {
+      const fileId = id.toString();
+      const file = filesById.get(fileId);
+      return file ? [{ originalName: file.originalName, fileId }] : [];
+    }),
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString()
   };
@@ -548,6 +566,47 @@ export const serializeEvent = (event: EventRecord): SerializedEvent => {
   }
 
   return result;
+};
+
+const uniqueFileIdsForEvents = (events: EventRecord[]): Types.ObjectId[] =>
+  Array.from(
+    new Map(
+      events
+        .flatMap((event) => event.fileIds ?? [])
+        .map((id) => [id.toString(), id] as const)
+    ).values()
+  );
+
+const defaultListFilesByIds: NonNullable<EventServiceDependencies["listFilesByIds"]> = async (
+  ownerId,
+  fileIds
+) =>
+  FileModel.find({ _id: { $in: fileIds }, ownerId })
+    .select({ _id: 1, originalName: 1 })
+    .exec() as unknown as Pick<IStoredFile, "_id" | "originalName">[];
+
+export const serializeEventsWithFiles = async (
+  ownerId: Types.ObjectId,
+  events: EventRecord[],
+  listFilesByIds: NonNullable<EventServiceDependencies["listFilesByIds"]> = defaultListFilesByIds
+): Promise<SerializedEvent[]> => {
+  const fileIds = uniqueFileIdsForEvents(events);
+  if (fileIds.length === 0) {
+    return events.map((event) => serializeEvent(event));
+  }
+
+  const files = await listFilesByIds(ownerId, fileIds);
+  const filesById = new Map(files.map((file) => [file._id.toString(), file]));
+  return events.map((event) => serializeEvent(event, filesById));
+};
+
+const serializeEventWithFiles = async (
+  ownerId: Types.ObjectId,
+  event: EventRecord,
+  listFilesByIds: NonNullable<EventServiceDependencies["listFilesByIds"]>
+): Promise<SerializedEvent> => {
+  const [serialized] = await serializeEventsWithFiles(ownerId, [event], listFilesByIds);
+  return serialized;
 };
 
 const requireOwnerId = (ownerId: string): Types.ObjectId => {
@@ -675,7 +734,8 @@ export const createPetEvent = async (
     createEventRecord = async (payload) => EventModel.create(payload) as unknown as EventRecord,
     findPetByIdForOwner = defaultFindPet,
     syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
-    validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids)
+    validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids),
+    listFilesByIds = defaultListFilesByIds
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -705,7 +765,7 @@ export const createPetEvent = async (
     });
   }
 
-  return serializeEvent(event);
+  return serializeEventWithFiles(ownerObjectId, event, listFilesByIds);
 };
 
 export const listPetEvents = async (
@@ -728,7 +788,8 @@ export const listPetEvents = async (
         .sort({ eventDate: -1 })
         .exec() as unknown as EventRecord[];
     },
-    findPetByIdForOwner = defaultFindPet
+    findPetByIdForOwner = defaultFindPet,
+    listFilesByIds = defaultListFilesByIds
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
@@ -741,7 +802,7 @@ export const listPetEvents = async (
   }
 
   const events = await listEventsForOwnerPet(ownerObjectId, petObjectId, filters);
-  return events.map(serializeEvent);
+  return serializeEventsWithFiles(ownerObjectId, events, listFilesByIds);
 };
 
 export const getEvent = async (
@@ -749,7 +810,10 @@ export const getEvent = async (
   eventId: string,
   dependencies: EventServiceDependencies = {}
 ): Promise<SerializedEvent> => {
-  const { findEventByIdForOwner = defaultFindEvent } = dependencies;
+  const {
+    findEventByIdForOwner = defaultFindEvent,
+    listFilesByIds = defaultListFilesByIds
+  } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const eventObjectId = requireEventId(eventId);
@@ -758,7 +822,7 @@ export const getEvent = async (
   if (!event) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
-  return serializeEvent(event);
+  return serializeEventWithFiles(ownerObjectId, event, listFilesByIds);
 };
 
 export const updateEvent = async (
@@ -771,6 +835,7 @@ export const updateEvent = async (
     findEventByIdForOwner = defaultFindEvent,
     syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
     validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids),
+    listFilesByIds = defaultListFilesByIds,
     updateEventRecord = async (id, owner, updates) => {
       const op: Record<string, unknown> = {};
       if (Object.keys(updates.set).length > 0) op.$set = updates.set;
@@ -808,7 +873,7 @@ export const updateEvent = async (
   }
 
   if (Object.keys(updates.set).length === 0 && updates.unset.length === 0) {
-    return serializeEvent(await getExistingEvent());
+    return serializeEventWithFiles(ownerObjectId, await getExistingEvent(), listFilesByIds);
   }
 
   if (fileIdsInUpdate) {
@@ -834,7 +899,7 @@ export const updateEvent = async (
     });
   }
 
-  return serializeEvent(updated);
+  return serializeEventWithFiles(ownerObjectId, updated, listFilesByIds);
 };
 
 export const deleteEvent = async (
