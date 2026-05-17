@@ -77,7 +77,7 @@ const DATA_TYPES: TDataType[] = EVENT_TYPE_OPTIONS.map((option) => {
 });
 
 const INITIAL_SELECTED = DATA_TYPES.reduce<Record<TExportEventType, boolean>>((acc, item) => {
-  acc[item.id] = item.id === "vaccine" || item.id === "visit";
+  acc[item.id] = true;
   return acc;
 }, {} as Record<TExportEventType, boolean>);
 
