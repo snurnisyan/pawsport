@@ -7,6 +7,7 @@ import { createPet, listPets, serializePet } from "../src/services/petService";
 
 const ownerId = "507f1f77bcf86cd799439011";
 const petId = "60a7c1aa9e1d4f1234567890";
+const otherPetId = "60a7c1aa9e1d4f1234567891";
 
 const makePetRecord = (overrides: Record<string, unknown> = {}) => ({
   _id: new Types.ObjectId(petId),
@@ -20,6 +21,28 @@ const makePetRecord = (overrides: Record<string, unknown> = {}) => ({
   updatedAt: new Date("2026-05-12T00:00:00.000Z"),
   ...overrides
 });
+
+const makeEventRecord = (overrides: Record<string, unknown> = {}) => ({
+  petId: new Types.ObjectId(petId),
+  type: "vaccine" as const,
+  subtype: "rabies" as const,
+  title: "Rabies vaccine",
+  eventDate: new Date("2025-05-01T10:00:00.000Z"),
+  nextDate: new Date("2026-05-01T10:00:00.000Z"),
+  ...overrides
+});
+
+const makeEventLikeDocument = (overrides: Record<string, unknown> = {}) => {
+  const values = makeEventRecord(overrides);
+  return Object.create(null, {
+    petId: { get: () => values.petId },
+    type: { get: () => values.type },
+    subtype: { get: () => values.subtype },
+    title: { get: () => values.title },
+    eventDate: { get: () => values.eventDate },
+    nextDate: { get: () => values.nextDate }
+  });
+};
 
 test("createPet persists normalized input and returns serialized pet", async () => {
   let captured: Record<string, unknown> | undefined;
@@ -150,12 +173,160 @@ test("listPets returns serialized pets for owner", async () => {
     listPetsForOwner: async (id) => {
       assert.equal(id.toString(), ownerId);
       return [makePetRecord(), makePetRecord({ _id: new Types.ObjectId(), name: "Бублик", species: "cat" })];
-    }
+    },
+    listExpirableEventsForPets: async () => []
   });
 
   assert.equal(result.length, 2);
   assert.equal(result[0].name, "Купер");
   assert.equal(result[1].name, "Бублик");
+  assert.deepEqual(result[0].expiredEvents, []);
+});
+
+test("listPets includes latest expired vaccine and treatment events per subtype", async () => {
+  const now = new Date("2026-05-17T00:00:00.000Z");
+  let observedPetIds: string[] | undefined;
+
+  const result = await listPets(ownerId, {
+    getNow: () => now,
+    listPetsForOwner: async () => [
+      makePetRecord(),
+      makePetRecord({
+        _id: new Types.ObjectId(otherPetId),
+        name: "Бублик",
+        species: "cat"
+      })
+    ],
+    listExpirableEventsForPets: async (id, petIds) => {
+      assert.equal(id.toString(), ownerId);
+      observedPetIds = petIds.map((item) => item.toString());
+      return [
+        makeEventRecord({
+          subtype: "complex",
+          title: "Old complex vaccine",
+          eventDate: new Date("2024-04-01T10:00:00.000Z"),
+          nextDate: new Date("2025-04-01T10:00:00.000Z")
+        }),
+        makeEventRecord({
+          subtype: "complex",
+          title: "Latest complex vaccine",
+          eventDate: new Date("2025-05-01T10:00:00.000Z"),
+          nextDate: new Date("2026-05-01T10:00:00.000Z")
+        }),
+        makeEventRecord({
+          type: "treatment",
+          subtype: "internal",
+          title: "Internal treatment",
+          eventDate: new Date("2026-02-10T10:00:00.000Z"),
+          nextDate: new Date("2026-05-10T10:00:00.000Z")
+        }),
+        makeEventRecord({
+          type: "visit",
+          subtype: undefined,
+          title: "Past visit",
+          eventDate: new Date("2026-01-01T10:00:00.000Z"),
+          nextDate: new Date("2026-02-01T10:00:00.000Z")
+        }),
+        makeEventRecord({
+          petId: new Types.ObjectId(otherPetId),
+          subtype: "rabies",
+          title: "Other pet rabies",
+          eventDate: new Date("2025-05-15T10:00:00.000Z"),
+          nextDate: new Date("2026-05-15T10:00:00.000Z")
+        })
+      ];
+    }
+  });
+
+  assert.deepEqual(observedPetIds, [petId, otherPetId]);
+  assert.deepEqual(result[0].expiredEvents, [
+    {
+      type: "vaccine",
+      subtype: "complex",
+      title: "Latest complex vaccine",
+      eventDate: "2025-05-01T10:00:00.000Z",
+      nextDate: "2026-05-01T10:00:00.000Z"
+    },
+    {
+      type: "treatment",
+      subtype: "internal",
+      title: "Internal treatment",
+      eventDate: "2026-02-10T10:00:00.000Z",
+      nextDate: "2026-05-10T10:00:00.000Z"
+    }
+  ]);
+  assert.deepEqual(result[1].expiredEvents, [
+    {
+      type: "vaccine",
+      subtype: "rabies",
+      title: "Other pet rabies",
+      eventDate: "2025-05-15T10:00:00.000Z",
+      nextDate: "2026-05-15T10:00:00.000Z"
+    }
+  ]);
+});
+
+test("listPets does not mark a subtype expired when a future event exists for the same pair", async () => {
+  const result = await listPets(ownerId, {
+    getNow: () => new Date("2026-05-17T00:00:00.000Z"),
+    listPetsForOwner: async () => [makePetRecord()],
+    listExpirableEventsForPets: async () => [
+      makeEventRecord({
+        subtype: "rabies",
+        title: "Expired rabies vaccine",
+        nextDate: new Date("2026-05-01T10:00:00.000Z")
+      }),
+      makeEventRecord({
+        subtype: "rabies",
+        title: "Future rabies vaccine",
+        nextDate: new Date("2026-06-01T10:00:00.000Z")
+      }),
+      makeEventRecord({
+        subtype: "complex",
+        title: "Expired complex vaccine",
+        nextDate: new Date("2026-05-01T10:00:00.000Z")
+      }),
+      makeEventRecord({
+        type: "treatment",
+        subtype: "external",
+        title: "Due right now",
+        nextDate: new Date("2026-05-17T00:00:00.000Z")
+      })
+    ]
+  });
+
+  assert.deepEqual(result[0].expiredEvents, [
+    {
+      type: "vaccine",
+      subtype: "complex",
+      title: "Expired complex vaccine",
+      eventDate: "2025-05-01T10:00:00.000Z",
+      nextDate: "2026-05-01T10:00:00.000Z"
+    }
+  ]);
+});
+
+test("listPets reads event fields from document getters without relying on object spread", async () => {
+  const result = await listPets(ownerId, {
+    getNow: () => new Date("2026-05-17T00:00:00.000Z"),
+    listPetsForOwner: async () => [makePetRecord()],
+    listExpirableEventsForPets: async () => [
+      makeEventLikeDocument({
+        title: "Getter-backed rabies vaccine",
+        nextDate: new Date("2026-05-01T10:00:00.000Z")
+      })
+    ]
+  });
+
+  assert.deepEqual(result[0].expiredEvents, [
+    {
+      type: "vaccine",
+      subtype: "rabies",
+      title: "Getter-backed rabies vaccine",
+      eventDate: "2025-05-01T10:00:00.000Z",
+      nextDate: "2026-05-01T10:00:00.000Z"
+    }
+  ]);
 });
 
 test("serializePet hides optional fields when absent", () => {
