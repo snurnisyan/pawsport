@@ -17,6 +17,7 @@ out/
 build/
 dist/
 *.tsbuildinfo
+frontend/next-env.d.ts
 
 # Testing / coverage
 coverage/
