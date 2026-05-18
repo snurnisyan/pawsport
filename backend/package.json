@@ -10,6 +10,8 @@
     "test": "NODE_ENV=test node --import tsx --test test/*.test.ts",
     "test:gotenberg": "docker compose -f ../docker-compose.dev.yml up -d gotenberg && GOTENBERG_INTEGRATION=1 GOTENBERG_URL=http://localhost:3001 NODE_ENV=test node --import tsx --test test/petExportPdf.gotenberg.test.ts",
     "openapi": "NODE_ENV=test tsx scripts/dump-openapi.ts",
+    "cleanup:legacy-exports": "tsx scripts/cleanup-legacy-exports.ts",
+    "cleanup:orphan-export-objects": "tsx scripts/cleanup-orphan-export-objects.ts",
     "gen:jwt-secret": "tsx scripts/generate-jwt-secret.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.ts\"",

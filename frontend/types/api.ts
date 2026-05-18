@@ -558,6 +558,7 @@ export interface components {
             downloadUrl?: string;
             /** @enum {string} */
             status: "pending" | "ready" | "failed";
+            expiresAt?: components["schemas"]["DateTime"] & unknown;
             createdAt: components["schemas"]["DateTime"];
             updatedAt: components["schemas"]["DateTime"];
         };
@@ -575,10 +576,8 @@ export interface components {
             sections: ("profile" | "events" | "files" | "reminders")[];
             /** @description Event types to include when the events section is selected. Omit to include all event types. */
             eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
-            /** @description When true, the generated export is sent to notificationEmail or the authenticated user's email. */
+            /** @description When true, the generated export is sent to the authenticated user's verified email. */
             sendEmail?: boolean;
-            /** Format: email */
-            notificationEmail?: string;
         };
         File: {
             id: components["schemas"]["ObjectId"];
@@ -1331,6 +1330,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Cached export ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportResponse"];
+                };
+            };
             /** @description Export queued */
             202: {
                 headers: {

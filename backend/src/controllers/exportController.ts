@@ -22,11 +22,9 @@ export const createPetExportHandler = (dependencies: CreatePetExportHandlerDepen
       period: req.body?.period,
       sections: req.body?.sections,
       eventTypes: req.body?.eventTypes,
-      sendEmail: req.body?.sendEmail,
-      notificationEmail: req.body?.notificationEmail,
-      fallbackNotificationEmail: req.user?.email
+      sendEmail: req.body?.sendEmail
     });
-    res.status(202).json({ export: petExport });
+    res.status(petExport.status === "ready" ? 200 : 202).json({ export: petExport });
   });
 };
 

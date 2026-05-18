@@ -17,9 +17,12 @@ export interface IExport {
   petId: Types.ObjectId;
   period?: IExportPeriod;
   sections: ExportSection[];
+  artifactId?: Types.ObjectId;
+  dataHash?: string;
   fileKey?: string;
-  fileToken?: string;
   status: ExportStatus;
+  expiresAt?: Date;
+  cacheHit?: boolean;
   emailSentAt?: Date;
   lastError?: string;
   createdAt: Date;
@@ -57,10 +60,17 @@ const exportSchema = new Schema<IExport>(
       type: [{ type: String, enum: EXPORT_SECTIONS }],
       default: ["profile", "events"]
     },
-    fileKey: {
-      type: String
+    artifactId: {
+      type: Schema.Types.ObjectId,
+      ref: "ExportArtifact",
+      index: true
     },
-    fileToken: {
+    dataHash: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    fileKey: {
       type: String
     },
     status: {
@@ -69,6 +79,13 @@ const exportSchema = new Schema<IExport>(
       default: "pending",
       required: true,
       index: true
+    },
+    expiresAt: {
+      type: Date,
+      index: true
+    },
+    cacheHit: {
+      type: Boolean
     },
     emailSentAt: {
       type: Date
@@ -82,5 +99,7 @@ const exportSchema = new Schema<IExport>(
     collection: "exports"
   }
 );
+
+exportSchema.index({ ownerId: 1, petId: 1, dataHash: 1 });
 
 export const ExportModel = model<IExport>("Export", exportSchema);

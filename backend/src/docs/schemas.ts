@@ -495,6 +495,9 @@ export const ExportSchema = z
       description: "Temporary download URL for the generated PDF report."
     }),
     status: z.enum(EXPORT_STATUSES),
+    expiresAt: DateTimeSchema.optional().openapi({
+      description: "Artifact retention deadline. Ready cached PDFs are retained until this timestamp."
+    }),
     createdAt: DateTimeSchema,
     updatedAt: DateTimeSchema
   })
@@ -508,9 +511,8 @@ export const CreateExportRequestSchema = z
       description: "Event types to include when the events section is selected. Omit to include all event types."
     }),
     sendEmail: z.boolean().optional().openapi({
-      description: "When true, the generated export is sent to notificationEmail or the authenticated user's email."
-    }),
-    notificationEmail: z.string().email().optional()
+      description: "When true, the generated export is sent to the authenticated user's verified email."
+    })
   })
   .partial()
   .openapi("CreateExportRequest");
