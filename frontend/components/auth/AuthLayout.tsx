@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Box, Flex, HStack, IconButton } from "@chakra-ui/react";
 import { LuArrowLeft } from "react-icons/lu";
+import { Footer } from "@/components/layout/Footer";
 import { Logo } from "@/components/ui/Logo";
 
 type TAuthLayoutProps = {
@@ -61,6 +62,7 @@ export function AuthLayout({ children,
           {children}
         </Box>
       </Flex>
+      <Footer />
     </Flex>
   );
 }
