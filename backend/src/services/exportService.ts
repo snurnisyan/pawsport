@@ -69,12 +69,21 @@ export interface SerializedExport {
   petId: string;
   period?: SerializedExportPeriod;
   sections: ExportSection[];
+  eventTypes?: EventType[];
   fileKey?: string;
   downloadUrl?: string;
   status: IExport["status"];
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SerializedListedExport extends SerializedExport {
+  isCurrent: boolean;
+}
+
+export interface SerializedExportList {
+  exports: SerializedListedExport[];
 }
 
 type ExportRecord = Pick<
@@ -84,6 +93,7 @@ type ExportRecord = Pick<
   | "petId"
   | "period"
   | "sections"
+  | "eventTypes"
   | "artifactId"
   | "dataHash"
   | "fileKey"
@@ -100,6 +110,7 @@ interface CreateExportPersistInput {
   petId: Types.ObjectId;
   period?: NormalizedExportPeriod;
   sections: ExportSection[];
+  eventTypes?: EventType[];
   artifactId?: Types.ObjectId;
   dataHash?: string;
   fileKey?: string;
@@ -158,6 +169,26 @@ export interface GetPetExportDependencies {
   getPublicUrl?: (key: string) => string;
   now?: () => Date;
   retentionDays?: number;
+}
+
+export interface ListOwnerExportsDependencies {
+  listExportsByOwner?: (ownerId: Types.ObjectId) => Promise<ExportRecord[]>;
+  findPetByIdForOwner?: (
+    petId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<PetRecord | null>;
+  buildFingerprint?: (
+    input: {
+      ownerId: Types.ObjectId;
+      petId: Types.ObjectId;
+      pet: PetRecord;
+      period?: NormalizedExportPeriod;
+      sections: ExportSection[];
+      eventTypes?: EventType[];
+    }
+  ) => Promise<PetExportFingerprintResult>;
+  getPublicUrl?: (key: string) => string;
+  now?: () => Date;
 }
 
 export interface DeleteOwnerExportsDependencies {
@@ -366,6 +397,7 @@ export const serializeExport = (
 
   const period = serializePeriod(record.period);
   if (period) result.period = period;
+  if (record.eventTypes?.length) result.eventTypes = record.eventTypes;
   if (record.expiresAt) result.expiresAt = record.expiresAt.toISOString();
   if (record.fileKey) {
     result.fileKey = record.fileKey;
@@ -532,6 +564,7 @@ export const createPetExport = async (
     petId: petObjectId,
     period,
     sections,
+    eventTypes,
     artifactId: artifact._id,
     dataHash: fingerprint.dataHash,
     fileKey: readyCacheHit ? artifact.fileKey : undefined,
@@ -648,6 +681,66 @@ export const getPetExport = async (
   }
 
   return serializeExport(petExport, getPublicUrl);
+};
+
+const isReadyExportDownloadable = (record: ExportRecord, now: Date): boolean =>
+  record.status === "ready" &&
+  Boolean(record.fileKey) &&
+  record.expiresAt !== undefined &&
+  record.expiresAt.getTime() > now.getTime();
+
+export const listOwnerExports = async (
+  ownerId: string,
+  dependencies: ListOwnerExportsDependencies = {}
+): Promise<SerializedExportList> => {
+  const {
+    listExportsByOwner = async (owner) =>
+      ExportModel.find({ ownerId: owner })
+        .sort({ updatedAt: -1, _id: -1 })
+        .exec() as unknown as ExportRecord[],
+    findPetByIdForOwner: findPet = findPetByIdForOwner,
+    buildFingerprint = (payload) => buildPetExportFingerprint(payload),
+    getPublicUrl = getObjectDownloadUrl,
+    now = () => new Date()
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const checkedAt = now();
+  const records = await listExportsByOwner(ownerObjectId);
+  const pets = new Map<string, PetRecord | null>();
+
+  const exports: SerializedListedExport[] = [];
+  for (const record of records) {
+    const petKey = record.petId.toString();
+    let pet = pets.get(petKey);
+    if (!pets.has(petKey)) {
+      pet = await findPet(record.petId, ownerObjectId);
+      pets.set(petKey, pet);
+    }
+
+    let isCurrent = false;
+    if (pet && record.dataHash) {
+      const fingerprint = await buildFingerprint({
+        ownerId: ownerObjectId,
+        petId: record.petId,
+        pet,
+        period: record.period,
+        sections: record.sections,
+        eventTypes: record.eventTypes
+      });
+      isCurrent = fingerprint.dataHash === record.dataHash;
+    }
+
+    const serialized = serializeExport(
+      isReadyExportDownloadable(record, checkedAt)
+        ? record
+        : { ...record, fileKey: undefined },
+      getPublicUrl
+    );
+    exports.push({ ...serialized, isCurrent });
+  }
+
+  return { exports };
 };
 
 const cleanupExportStorage = async (

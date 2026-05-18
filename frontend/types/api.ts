@@ -177,6 +177,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List current user's exports */
+        get: operations["listOwnerExports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/{id}": {
         parameters: {
             query?: never;
@@ -549,6 +566,8 @@ export interface components {
             petId: components["schemas"]["ObjectId"];
             period?: components["schemas"]["ExportPeriod"];
             sections: ("profile" | "events" | "files" | "reminders")[];
+            /** @description Event types included in the generated export. Omit means all event types. */
+            eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
             /** @description Non-guessable S3 key for the generated PDF report. */
             fileKey?: string;
             /**
@@ -578,6 +597,13 @@ export interface components {
             eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
             /** @description When true, the generated export is sent to the authenticated user's verified email. */
             sendEmail?: boolean;
+        };
+        ListedExport: components["schemas"]["Export"] & {
+            /** @description Whether this export's stored data hash matches the current data for its filters. */
+            isCurrent: boolean;
+        };
+        ExportListResponse: {
+            exports: components["schemas"]["ListedExport"][];
         };
         File: {
             id: components["schemas"]["ObjectId"];
@@ -1368,6 +1394,44 @@ export interface operations {
             };
             /** @description Resource was not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listOwnerExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportListResponse"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -4,7 +4,12 @@ import test from "node:test";
 import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
-import { createPetExport, deleteAllExportsForOwner, getPetExport } from "../src/services/exportService";
+import {
+  createPetExport,
+  deleteAllExportsForOwner,
+  getPetExport,
+  listOwnerExports
+} from "../src/services/exportService";
 import type { FileStorage } from "../src/storage/s3Storage";
 
 const ownerId = "507f1f77bcf86cd799439011";
@@ -61,6 +66,7 @@ const makeExportRecord = (input: {
   petId: Types.ObjectId;
   period?: { from?: Date; to?: Date };
   sections: ("profile" | "events" | "files" | "reminders")[];
+  eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
   artifactId?: Types.ObjectId;
   dataHash?: string;
   status: "pending" | "ready" | "failed";
@@ -110,6 +116,7 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
         petId: Types.ObjectId;
         period?: { from?: Date; to?: Date };
         sections: ("profile" | "events" | "files" | "reminders")[];
+        eventTypes?: ("vaccine" | "treatment" | "visit" | "operation" | "lab" | "other")[];
         artifactId?: Types.ObjectId;
         dataHash?: string;
         expiresAt?: Date;
@@ -171,6 +178,7 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
   assert.equal(persisted.period?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
   assert.equal(persisted.period?.to?.toISOString(), "2026-05-31T00:00:00.000Z");
   assert.deepEqual(persisted.sections, ["profile", "events"]);
+  assert.deepEqual(persisted.eventTypes, ["vaccine", "lab", "visit"]);
 
   assert.ok(artifactInput);
   assert.equal(artifactInput.dataHash, dataHash);
@@ -562,6 +570,7 @@ test("getPetExport returns pending, failed, and ready owned exports with the sha
     assert.equal(result.petId, petId);
     assert.equal(result.status, record.status);
     assert.deepEqual(result.sections, record.sections);
+    assert.deepEqual(result.eventTypes, record.eventTypes);
     assert.equal(result.createdAt, now.toISOString());
     assert.equal(result.updatedAt, now.toISOString());
 
@@ -573,6 +582,83 @@ test("getPetExport returns pending, failed, and ready owned exports with the sha
       assert.equal(result.downloadUrl, undefined);
     }
   }
+});
+
+test("listOwnerExports returns export filters, download links, and current data flags", async () => {
+  const currentRecord = makeExportRecord({
+    _id: oid(exportId),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    period: { from: new Date("2026-05-01T00:00:00.000Z") },
+    sections: ["profile", "events"],
+    eventTypes: ["vaccine", "lab"],
+    artifactId: oid(artifactId),
+    dataHash,
+    status: "ready",
+    fileKey: artifactKey,
+    expiresAt
+  });
+  const staleRecord = makeExportRecord({
+    _id: oid("507f1f77bcf86cd799439066"),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    sections: ["profile"],
+    dataHash: "b".repeat(64),
+    status: "ready",
+    fileKey: "users/o/p/exports/stale.pdf",
+    expiresAt
+  });
+  const expiredRecord = makeExportRecord({
+    _id: oid("507f1f77bcf86cd799439077"),
+    ownerId: oid(ownerId),
+    petId: oid(petId),
+    sections: ["files"],
+    dataHash,
+    status: "ready",
+    fileKey: "users/o/p/exports/expired.pdf",
+    expiresAt: new Date("2026-05-13T10:00:00.000Z")
+  });
+
+  const result = await listOwnerExports(ownerId, {
+    listExportsByOwner: async (owner) => {
+      assert.equal(owner.toString(), ownerId);
+      return [currentRecord, staleRecord, expiredRecord];
+    },
+    findPetByIdForOwner: async (pet, owner) => {
+      assert.equal(pet.toString(), petId);
+      assert.equal(owner.toString(), ownerId);
+      return makePet();
+    },
+    buildFingerprint: async (input) => {
+      if (input.sections[0] === "profile" && input.sections[1] === "events") {
+        assert.deepEqual(input.eventTypes, ["vaccine", "lab"]);
+      }
+      return makeFingerprint();
+    },
+    getPublicUrl: (key) => `https://download.example/${key}`,
+    now: () => now
+  });
+
+  assert.equal(result.exports.length, 3);
+  assert.deepEqual(result.exports[0], {
+    id: exportId,
+    ownerId,
+    petId,
+    period: { from: "2026-05-01" },
+    sections: ["profile", "events"],
+    eventTypes: ["vaccine", "lab"],
+    fileKey: artifactKey,
+    downloadUrl: `https://download.example/${artifactKey}`,
+    status: "ready",
+    expiresAt: expiresAt.toISOString(),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    isCurrent: true
+  });
+  assert.equal(result.exports[1].isCurrent, false);
+  assert.equal(result.exports[1].downloadUrl, "https://download.example/users/o/p/exports/stale.pdf");
+  assert.equal(result.exports[2].isCurrent, true);
+  assert.equal(result.exports[2].downloadUrl, undefined);
 });
 
 test("getPetExport returns 400 for malformed export id", async () => {

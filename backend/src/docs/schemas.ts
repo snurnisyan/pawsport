@@ -488,6 +488,9 @@ export const ExportSchema = z
     petId: ObjectIdSchema,
     period: ExportPeriodSchema.optional(),
     sections: z.array(z.enum(EXPORT_SECTIONS)),
+    eventTypes: z.array(z.enum(EVENT_TYPES)).optional().openapi({
+      description: "Event types included in the generated export. Omit means all event types."
+    }),
     fileKey: z.string().optional().openapi({
       description: "Non-guessable S3 key for the generated PDF report."
     }),
@@ -522,6 +525,18 @@ export const ExportResponseSchema = z
     export: ExportSchema
   })
   .openapi("ExportResponse");
+
+export const ListedExportSchema = ExportSchema.extend({
+  isCurrent: z.boolean().openapi({
+    description: "Whether this export's stored data hash matches the current data for its filters."
+  })
+}).openapi("ListedExport");
+
+export const ExportListResponseSchema = z
+  .object({
+    exports: z.array(ListedExportSchema)
+  })
+  .openapi("ExportListResponse");
 
 export const IdPathParamsSchema = z.object({
   id: ObjectIdSchema

@@ -14,6 +14,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../src/config/env";
 import {
   createPetExportHandler,
+  listOwnerExportsHandler,
   type CreatePetExportHandlerDependencies
 } from "../src/controllers/exportController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
@@ -29,6 +30,7 @@ const buildApp = (overrides: CreatePetExportHandlerDependencies = {}): express.E
   const app = express();
   app.use(express.json());
   app.post("/pets/:id/export", authMiddleware, createPetExportHandler(overrides));
+  app.get("/exports", authMiddleware, listOwnerExportsHandler(overrides));
   app.use(errorHandler);
   return app;
 };
@@ -101,4 +103,64 @@ test("POST /pets/:id/export forwards selected eventTypes to export service", asy
     eventTypes: ["vaccine", "treatment", "visit", "operation", "lab", "other"],
     sendEmail: true
   });
+});
+
+test("GET /exports returns the authenticated user's export list", async () => {
+  let receivedOwnerId: string | undefined;
+
+  await withServer(
+    {
+      listOwnerExports: async (ownerId) => {
+        receivedOwnerId = ownerId;
+        return {
+          exports: [
+            {
+              id: EXPORT_ID,
+              ownerId,
+              petId: PET_ID,
+              period: { from: "2026-05-01", to: "2026-05-31" },
+              sections: ["profile", "events"],
+              eventTypes: ["vaccine", "lab"],
+              fileKey: "users/o/p/exports/report.pdf",
+              downloadUrl: "https://download.example/report.pdf",
+              status: "ready",
+              expiresAt: "2026-05-21T10:00:00.000Z",
+              createdAt: "2026-05-14T10:00:00.000Z",
+              updatedAt: "2026-05-14T10:00:00.000Z",
+              isCurrent: true
+            }
+          ]
+        };
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/exports`, {
+        method: "GET",
+        headers: authHeader()
+      });
+
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), {
+        exports: [
+          {
+            id: EXPORT_ID,
+            ownerId: USER_ID,
+            petId: PET_ID,
+            period: { from: "2026-05-01", to: "2026-05-31" },
+            sections: ["profile", "events"],
+            eventTypes: ["vaccine", "lab"],
+            fileKey: "users/o/p/exports/report.pdf",
+            downloadUrl: "https://download.example/report.pdf",
+            status: "ready",
+            expiresAt: "2026-05-21T10:00:00.000Z",
+            createdAt: "2026-05-14T10:00:00.000Z",
+            updatedAt: "2026-05-14T10:00:00.000Z",
+            isCurrent: true
+          }
+        ]
+      });
+    }
+  );
+
+  assert.equal(receivedOwnerId, USER_ID);
 });

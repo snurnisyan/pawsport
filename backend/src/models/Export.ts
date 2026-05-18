@@ -1,5 +1,7 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose";
 
+import { EVENT_TYPES, type EventType } from "./Event";
+
 export const EXPORT_STATUSES = ["pending", "ready", "failed"] as const;
 export const EXPORT_SECTIONS = ["profile", "events", "files", "reminders"] as const;
 
@@ -17,6 +19,7 @@ export interface IExport {
   petId: Types.ObjectId;
   period?: IExportPeriod;
   sections: ExportSection[];
+  eventTypes?: EventType[];
   artifactId?: Types.ObjectId;
   dataHash?: string;
   fileKey?: string;
@@ -59,6 +62,9 @@ const exportSchema = new Schema<IExport>(
     sections: {
       type: [{ type: String, enum: EXPORT_SECTIONS }],
       default: ["profile", "events"]
+    },
+    eventTypes: {
+      type: [{ type: String, enum: EVENT_TYPES }]
     },
     artifactId: {
       type: Schema.Types.ObjectId,
