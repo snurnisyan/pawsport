@@ -56,23 +56,13 @@ export const createPetEvent = async (
   body: TCreateEventRequest,
   files: File[] = []
 ): Promise<TPetEventResponse> => {
-  if (files.length === 0) {
-    return unwrapApiResponse(
-      apiClient.POST("/pets/{id}/events", {
-        params: { path: { id: petId } },
-        body,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-  }
-
   const uploadedIds = await uploadTemporaryEventFiles(petId, files);
 
   try {
     return await unwrapApiResponse(
       apiClient.POST("/pets/{id}/events", {
         params: { path: { id: petId } },
-        body: { ...body, fileIds: [...body.fileIds, ...uploadedIds] },
+        body: { ...body, fileIds: [...(body.fileIds ?? []), ...uploadedIds] },
         headers: { "Content-Type": "application/json" },
       })
     );

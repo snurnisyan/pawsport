@@ -42,7 +42,6 @@ export const uploadPetFileHandler = (dependencies: UploadPetFileHandlerDependenc
   return asyncHandler(async (req: AuthenticatedRequest, res) => {
     const file = await uploadPetFileFn(requireUserId(req), req.params.id, {
       file: req.file,
-      eventId: req.body?.eventId,
       temporaryForEvent: req.body?.temporaryForEvent
     });
     res.status(201).json({ file });

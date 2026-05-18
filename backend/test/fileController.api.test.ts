@@ -133,12 +133,11 @@ test("GET /pets/:id/files forwards optional from/to filters", async () => {
   assert.deepEqual(receivedQuery, { from: "2026-05-01", to: "2026-05-31" });
 });
 
-test("POST /pets/:id/files forwards temporaryForEvent multipart field", async () => {
+test("POST /pets/:id/files forwards temporaryForEvent but not eventId", async () => {
   let uploadCall:
     | {
         ownerId: string;
         petId: string;
-        eventId?: unknown;
         temporaryForEvent?: unknown;
         file?: { mimetype: string; originalname: string };
       }
@@ -150,7 +149,6 @@ test("POST /pets/:id/files forwards temporaryForEvent multipart field", async ()
         uploadCall = {
           ownerId,
           petId,
-          eventId: input.eventId,
           temporaryForEvent: input.temporaryForEvent,
           file: input.file
             ? {
@@ -165,6 +163,7 @@ test("POST /pets/:id/files forwards temporaryForEvent multipart field", async ()
     async (baseUrl) => {
       const form = new FormData();
       form.append("file", bufferToBlob(Buffer.from("pdf"), "application/pdf"), "draft.pdf");
+      form.append("eventId", "60a7c1aa9e1d4f12345678ab");
       form.append("temporaryForEvent", "true");
 
       const res = await fetch(`${baseUrl}/pets/${PET_ID}/files`, {
@@ -180,7 +179,6 @@ test("POST /pets/:id/files forwards temporaryForEvent multipart field", async ()
   assert.deepEqual(uploadCall, {
     ownerId: USER_ID,
     petId: PET_ID,
-    eventId: undefined,
     temporaryForEvent: "true",
     file: { mimetype: "application/pdf", originalname: "draft.pdf" }
   });

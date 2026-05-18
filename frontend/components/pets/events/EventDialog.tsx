@@ -13,7 +13,7 @@ import {
   type TPetEvent,
   type TUpdateEventRequest,
 } from "@/lib/eventsApi";
-import { deleteFile } from "@/lib/petsApi";
+import { deleteFile, petFilesQueryKey } from "@/lib/petsApi";
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 import {
@@ -53,6 +53,8 @@ const todayIsoDate = (): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+type TEventPayloadBase = Omit<TCreateEventRequest, "fileIds">;
+
 const fromEvent = (event: TPetEvent): TEventFormData => {
   const { date, time } = splitDateTime(event.eventDate);
   return {
@@ -70,7 +72,7 @@ const fromEvent = (event: TPetEvent): TEventFormData => {
   };
 };
 
-const buildPayload = (data: TEventFormData): TCreateEventRequest => ({
+const buildPayload = (data: TEventFormData): TEventPayloadBase => ({
   type: data.type as TPetEventType,
   subtype: isEventSubtypeSupported(data.type) ? data.subtype || undefined : undefined,
   title: data.title.trim(),
@@ -79,7 +81,6 @@ const buildPayload = (data: TEventFormData): TCreateEventRequest => ({
   clinicName: data.clinic.trim() || undefined,
   comment: data.comment.trim() || undefined,
   reminderOffset: data.reminder === "none" ? undefined : data.reminder,
-  fileIds: [],
 });
 
 const apiErrorMessage = (error: unknown, fallback: string): string =>
@@ -122,6 +123,7 @@ export function EventDialog({
   const invalidateEvents = async () => {
     if (targetPetId) {
       await queryClient.invalidateQueries({ queryKey: petEventsQueryKey(targetPetId) });
+      await queryClient.invalidateQueries({ queryKey: petFilesQueryKey(targetPetId) });
     }
     if (event?.id) {
       await queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) });
@@ -129,9 +131,9 @@ export function EventDialog({
   };
 
   const createMutation = useMutation({
-    mutationFn: (body: TCreateEventRequest) => {
+    mutationFn: (body: TEventPayloadBase) => {
       if (!petId) throw new Error("Не удалось создать событие: нет идентификатора питомца.");
-      return createPetEvent(petId, body, data.files);
+      return createPetEvent(petId, { ...body, fileIds: [] }, data.files);
     },
     onSuccess: async () => {
       await invalidateEvents();
