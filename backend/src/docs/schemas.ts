@@ -337,7 +337,6 @@ export const FileListResponseSchema = z
 export const UploadPetFileRequestSchema = z
   .object({
     file: z.string().openapi({ format: "binary" }),
-    eventId: ObjectIdSchema.optional(),
     temporaryForEvent: z.boolean().optional().openapi({
       description:
         "Set to true when uploading files before creating an event. Temporary files are hidden from the pet file list and cleaned up if they are not later referenced by event fileIds."

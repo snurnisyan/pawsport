@@ -627,7 +627,6 @@ export interface components {
         UploadPetFileRequest: {
             /** Format: binary */
             file: string;
-            eventId?: components["schemas"]["ObjectId"];
             /** @description Set to true when uploading files before creating an event. Temporary files are hidden from the pet file list and cleaned up if they are not later referenced by event fileIds. */
             temporaryForEvent?: boolean;
         };

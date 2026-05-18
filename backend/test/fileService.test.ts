@@ -27,7 +27,6 @@ import type { FileStorage } from "../src/storage/s3Storage";
 const ownerId = "507f1f77bcf86cd799439011";
 const otherOwnerId = "507f1f77bcf86cd799439099";
 const petId = "60a7c1aa9e1d4f1234567890";
-const otherPetId = "60a7c1aa9e1d4f1234567891";
 const eventId = "60a7c1aa9e1d4f12345678ab";
 const fileId = "60a7c1aa9e1d4f12345678cd";
 
@@ -58,7 +57,6 @@ const makeFileRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const petFound = async () => ({ _id: new Types.ObjectId(petId) });
-const eventFound = async () => ({ _id: new Types.ObjectId(eventId), petId: new Types.ObjectId(petId) });
 
 const makeStorage = (overrides: Partial<FileStorage> = {}): FileStorage => ({
   putObject: async () => {},
@@ -81,7 +79,7 @@ test("uploadPetFile verifies ownership, stores object, creates metadata, and ser
   const result = await uploadPetFile(
     ownerId,
     petId,
-    { file: makeUpload(), eventId },
+    { file: makeUpload() },
     {
       storage: makeStorage({
         putObject: async (input) => {
@@ -93,18 +91,12 @@ test("uploadPetFile verifies ownership, stores object, creates metadata, and ser
         assert.equal(owner.toString(), ownerId);
         return { _id: id };
       },
-      findEventByIdForOwner: async (id, owner) => {
-        assert.equal(id.toString(), eventId);
-        assert.equal(owner.toString(), ownerId);
-        return { _id: id, petId: new Types.ObjectId(petId) };
-      },
       createFileRecord: async (input) => {
         captured = input as unknown as Record<string, unknown>;
         return makeFileRecord({
           _id: input._id,
           ownerId: input.ownerId,
           petId: input.petId,
-          eventId: input.eventId,
           originalName: input.originalName,
           mimeType: input.mimeType,
           sizeBytes: input.sizeBytes,
@@ -124,14 +116,14 @@ test("uploadPetFile verifies ownership, stores object, creates metadata, and ser
   assert.ok(captured);
   assert.equal((captured.ownerId as Types.ObjectId).toString(), ownerId);
   assert.equal((captured.petId as Types.ObjectId).toString(), petId);
-  assert.equal((captured.eventId as Types.ObjectId).toString(), eventId);
+  assert.equal(captured.eventId, undefined);
   assert.equal(captured.originalName, "vet report.pdf");
   assert.equal(captured.mimeType, "application/pdf");
   assert.equal(captured.sizeBytes, 11);
 
   assert.equal(result.ownerId, ownerId);
   assert.equal(result.petId, petId);
-  assert.equal(result.eventId, eventId);
+  assert.equal(result.eventId, undefined);
   assert.equal(result.originalName, "vet report.pdf");
   assert.equal(result.uploadedAt, uploadedAt.toISOString());
 });
@@ -192,19 +184,6 @@ test("uploadPetFile marks event-creation files temporary and schedules cleanup",
   assert.equal(
     cleanupJob?.idempotencyKey,
     `${TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE}:${(captured._id as Types.ObjectId).toString()}`
-  );
-});
-
-test("uploadPetFile rejects temporaryForEvent together with eventId", async () => {
-  await assert.rejects(
-    () =>
-      uploadPetFile(
-        ownerId,
-        petId,
-        { file: makeUpload(), eventId, temporaryForEvent: true },
-        { findPetByIdForOwner: petFound }
-      ),
-    assertAppError(400, "TEMPORARY_FILE_EVENT_CONFLICT")
   );
 });
 
@@ -283,34 +262,6 @@ test("uploadPetFile rejects unsupported MIME type", async () => {
   await assert.rejects(
     () => uploadPetFile(ownerId, petId, { file: makeUpload({ mimetype: "text/plain" }) }),
     assertAppError(400, "UNSUPPORTED_FILE_TYPE")
-  );
-});
-
-test("uploadPetFile returns 404 for an event outside the owner scope", async () => {
-  await assert.rejects(
-    () =>
-      uploadPetFile(ownerId, petId, { file: makeUpload(), eventId }, {
-        findPetByIdForOwner: petFound,
-        findEventByIdForOwner: async () => null,
-        createFileRecord: async () => {
-          throw new Error("should not create metadata");
-        }
-      }),
-    assertAppError(404, "EVENT_NOT_FOUND")
-  );
-});
-
-test("uploadPetFile returns 404 when event belongs to another pet", async () => {
-  await assert.rejects(
-    () =>
-      uploadPetFile(ownerId, petId, { file: makeUpload(), eventId }, {
-        findPetByIdForOwner: petFound,
-        findEventByIdForOwner: async () => ({ _id: new Types.ObjectId(eventId), petId: new Types.ObjectId(otherPetId) }),
-        createFileRecord: async () => {
-          throw new Error("should not create metadata");
-        }
-      }),
-    assertAppError(404, "EVENT_NOT_FOUND")
   );
 });
 

@@ -5,7 +5,7 @@ import { Types, isValidObjectId } from "mongoose";
 import { AppError } from "../middleware/errorHandler";
 import { enqueueJob, type EnqueueJobInput } from "../jobs/backgroundJobService";
 import { ALLOWED_FILE_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../middleware/uploadMiddleware";
-import { EventModel, type IEvent } from "../models/Event";
+import { EventModel } from "../models/Event";
 import { FileModel, type AllowedFileMimeType, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
 import {
@@ -34,7 +34,6 @@ export interface UploadedFileInput {
 
 export interface UploadPetFileInput {
   file?: UploadedFileInput;
-  eventId?: unknown;
   temporaryForEvent?: unknown;
 }
 
@@ -75,13 +74,11 @@ type FileRecord = Pick<
 >;
 
 type PetRecord = Pick<IPet, "_id" | "photoFileId">;
-type EventRecord = Pick<IEvent, "_id" | "petId">;
 
 interface CreateFilePersistInput {
   _id: Types.ObjectId;
   ownerId: Types.ObjectId;
   petId: Types.ObjectId;
-  eventId?: Types.ObjectId;
   tempExpiresAt?: Date;
   originalName: string;
   mimeType: AllowedFileMimeType;
@@ -93,7 +90,6 @@ interface CreateFilePersistInput {
 export interface FileServiceDependencies {
   storage?: FileStorage;
   findPetByIdForOwner?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
-  findEventByIdForOwner?: (eventId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<EventRecord | null>;
   createFileRecord?: (input: CreateFilePersistInput) => Promise<FileRecord>;
   enqueueTemporaryFileCleanup?: (input: EnqueueJobInput) => Promise<unknown>;
   listFilesForPet?: (
@@ -114,9 +110,8 @@ const isFileServiceDependencies = (
   return (
     candidate.storage !== undefined ||
     typeof candidate.findPetByIdForOwner === "function" ||
-  typeof candidate.findEventByIdForOwner === "function" ||
-  typeof candidate.createFileRecord === "function" ||
-  typeof candidate.enqueueTemporaryFileCleanup === "function" ||
+    typeof candidate.createFileRecord === "function" ||
+    typeof candidate.enqueueTemporaryFileCleanup === "function" ||
     typeof candidate.listFilesForPet === "function" ||
     typeof candidate.findFileByIdForOwner === "function" ||
     typeof candidate.deleteFileRecord === "function" ||
@@ -135,16 +130,6 @@ const requireOwnerId = (ownerId: string): Types.ObjectId => {
 const requireObjectId = (value: string, code: string, message: string): Types.ObjectId => {
   if (!isValidObjectId(value)) {
     throw new AppError(400, code, message);
-  }
-  return new Types.ObjectId(value);
-};
-
-const parseOptionalEventId = (value: unknown): Types.ObjectId | undefined => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-  if (typeof value !== "string" || !isValidObjectId(value)) {
-    throw new AppError(400, "INVALID_EVENT_ID", "eventId must be a valid id");
   }
   return new Types.ObjectId(value);
 };
@@ -171,14 +156,6 @@ const defaultFindPet: NonNullable<FileServiceDependencies["findPetByIdForOwner"]
   PetModel.findOne({ _id: petId, ownerId })
     .select({ _id: 1, photoFileId: 1 })
     .exec() as Promise<PetRecord | null>;
-
-const defaultFindEvent: NonNullable<FileServiceDependencies["findEventByIdForOwner"]> = async (
-  eventId,
-  ownerId
-) =>
-  EventModel.findOne({ _id: eventId, ownerId })
-    .select({ _id: 1, petId: 1 })
-    .exec() as Promise<EventRecord | null>;
 
 const isAllowedMimeType = (mimeType: string): mimeType is AllowedFileMimeType =>
   (ALLOWED_FILE_MIME_TYPES as readonly string[]).includes(mimeType);
@@ -244,7 +221,6 @@ export const uploadPetFile = async (
   const {
     storage = s3Storage,
     findPetByIdForOwner = defaultFindPet,
-    findEventByIdForOwner = defaultFindEvent,
     createFileRecord = async (payload) => FileModel.create(payload) as unknown as FileRecord,
     deleteFileRecord = async (id, owner) =>
       FileModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
@@ -274,25 +250,7 @@ export const uploadPetFile = async (
     throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
   }
 
-  const eventObjectId = parseOptionalEventId(input.eventId);
   const temporaryForEvent = parseOptionalBoolean(input.temporaryForEvent, "temporaryForEvent");
-  if (eventObjectId && temporaryForEvent) {
-    throw new AppError(
-      400,
-      "TEMPORARY_FILE_EVENT_CONFLICT",
-      "temporaryForEvent cannot be used together with eventId"
-    );
-  }
-
-  if (eventObjectId) {
-    const event = await findEventByIdForOwner(eventObjectId, ownerObjectId);
-    if (!event) {
-      throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-    }
-    if (!event.petId.equals(petObjectId)) {
-      throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-    }
-  }
 
   const fileObjectId = new Types.ObjectId();
   const originalName = normalizeOriginalName(file.originalname);
@@ -316,7 +274,6 @@ export const uploadPetFile = async (
     _id: fileObjectId,
     ownerId: ownerObjectId,
     petId: petObjectId,
-    eventId: eventObjectId,
     tempExpiresAt,
     originalName,
     mimeType: file.mimetype,
