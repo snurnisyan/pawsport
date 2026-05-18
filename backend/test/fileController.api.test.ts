@@ -15,8 +15,10 @@ import jwt from "jsonwebtoken";
 import { env } from "../src/config/env";
 import {
   listPetFilesHandler,
+  uploadPetFileHandler,
   uploadPetPhotoHandler,
   type ListPetFilesHandlerDependencies,
+  type UploadPetFileHandlerDependencies,
   type UploadPetPhotoHandlerDependencies
 } from "../src/controllers/fileController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
@@ -41,6 +43,27 @@ const withServer = async <T>(
   fn: (baseUrl: string) => Promise<T>
 ): Promise<T> => {
   const server = http.createServer(buildApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+const buildUploadApp = (overrides: UploadPetFileHandlerDependencies = {}): express.Express => {
+  const app = express();
+  app.post("/pets/:id/files", authMiddleware, upload.single("file"), uploadPetFileHandler(overrides));
+  app.use(errorHandler);
+  return app;
+};
+
+const withUploadServer = async <T>(
+  overrides: UploadPetFileHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildUploadApp(overrides));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   try {
@@ -108,6 +131,59 @@ test("GET /pets/:id/files forwards optional from/to filters", async () => {
   assert.equal(receivedOwnerId, USER_ID);
   assert.equal(receivedPetId, PET_ID);
   assert.deepEqual(receivedQuery, { from: "2026-05-01", to: "2026-05-31" });
+});
+
+test("POST /pets/:id/files forwards temporaryForEvent multipart field", async () => {
+  let uploadCall:
+    | {
+        ownerId: string;
+        petId: string;
+        eventId?: unknown;
+        temporaryForEvent?: unknown;
+        file?: { mimetype: string; originalname: string };
+      }
+    | undefined;
+
+  await withUploadServer(
+    {
+      uploadPetFile: async (ownerId, petId, input) => {
+        uploadCall = {
+          ownerId,
+          petId,
+          eventId: input.eventId,
+          temporaryForEvent: input.temporaryForEvent,
+          file: input.file
+            ? {
+                mimetype: input.file.mimetype,
+                originalname: input.file.originalname
+              }
+            : undefined
+        };
+        return fakeFile();
+      }
+    },
+    async (baseUrl) => {
+      const form = new FormData();
+      form.append("file", bufferToBlob(Buffer.from("pdf"), "application/pdf"), "draft.pdf");
+      form.append("temporaryForEvent", "true");
+
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}/files`, {
+        method: "POST",
+        headers: authHeader(),
+        body: form
+      });
+
+      assert.equal(res.status, 201);
+    }
+  );
+
+  assert.deepEqual(uploadCall, {
+    ownerId: USER_ID,
+    petId: PET_ID,
+    eventId: undefined,
+    temporaryForEvent: "true",
+    file: { mimetype: "application/pdf", originalname: "draft.pdf" }
+  });
 });
 
 const buildPhotoApp = (overrides: UploadPetPhotoHandlerDependencies = {}): express.Express => {

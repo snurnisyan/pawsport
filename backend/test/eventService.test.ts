@@ -48,6 +48,14 @@ test("createPetEvent persists normalized input and returns serialized event", as
   let captured: Record<string, unknown> | undefined;
   let reminderSync: Record<string, unknown> | undefined;
   let validatedFileIds: Types.ObjectId[] | undefined;
+  let attachedFiles:
+    | {
+        owner: string;
+        pet: string;
+        event: string;
+        ids: string[];
+      }
+    | undefined;
 
   const result = await createPetEvent(
     ownerId,
@@ -90,6 +98,14 @@ test("createPetEvent persists normalized input and returns serialized event", as
       syncPendingReminderForEvent: async (input) => {
         reminderSync = input as unknown as Record<string, unknown>;
       },
+      attachFilesToEvent: async (owner, pet, event, ids) => {
+        attachedFiles = {
+          owner: owner.toString(),
+          pet: pet.toString(),
+          event: event.toString(),
+          ids: ids.map((id) => id.toString())
+        };
+      },
       listFilesByIds: async (owner, ids) => {
         assert.equal(owner.toString(), ownerId);
         assert.deepEqual(ids.map((id) => id.toString()), [fileId]);
@@ -116,6 +132,12 @@ test("createPetEvent persists normalized input and returns serialized event", as
   assert.equal(captured.reminderOffset, "week");
   assert.equal((captured.fileIds as Types.ObjectId[]).length, 1);
   assert.equal((captured.fileIds as Types.ObjectId[])[0].toString(), fileId);
+  assert.deepEqual(attachedFiles, {
+    owner: ownerId,
+    pet: petId,
+    event: eventId,
+    ids: [fileId]
+  });
 
   assert.equal(result.id, eventId);
   assert.equal(result.ownerId, ownerId);

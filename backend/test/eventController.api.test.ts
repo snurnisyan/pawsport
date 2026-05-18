@@ -22,8 +22,6 @@ import {
 } from "../src/controllers/eventController";
 import { authMiddleware } from "../src/middleware/authMiddleware";
 import { errorHandler } from "../src/middleware/errorHandler";
-import { multipartOnly } from "../src/middleware/multipartOnly";
-import { upload } from "../src/middleware/uploadMiddleware";
 
 const USER_ID = "507f1f77bcf86cd799439011";
 const PET_ID = "60a7c1aa9e1d4f1234567890";
@@ -46,7 +44,6 @@ const buildCreateApp = (
   app.post(
     "/pets/:id/events",
     authMiddleware,
-    multipartOnly(upload.array("files")),
     createPetEventHandler(overrides)
   );
   app.use(errorHandler);
@@ -61,7 +58,6 @@ const buildUpdateApp = (
   app.patch(
     "/events/:id",
     authMiddleware,
-    multipartOnly(upload.array("files")),
     updateEventHandler(overrides)
   );
   app.use(errorHandler);
@@ -225,18 +221,12 @@ test("GET /pets/:id/events forwards optional eventTypes filters", async () => {
   assert.deepEqual(receivedQuery, { eventTypes: ["vaccine", "lab", "other"] });
 });
 
-test("POST /pets/:id/events (multipart) parses event JSON, uploads files, and attaches them", async () => {
+test("POST /pets/:id/events forwards JSON fileIds", async () => {
   const fileIds = [
     "60a7c1aa9e1d4f12345678cd",
     "60a7c1aa9e1d4f12345678ce"
   ];
   let receivedEventInput: Record<string, unknown> | undefined;
-  const uploaded: Array<{
-    originalName?: string;
-    mimeType?: string;
-    eventId?: unknown;
-  }> = [];
-  let receivedUpdate: Record<string, unknown> | undefined;
 
   await withCreateServer(
     {
@@ -244,36 +234,8 @@ test("POST /pets/:id/events (multipart) parses event JSON, uploads files, and at
         assert.equal(ownerId, USER_ID);
         assert.equal(petId, PET_ID);
         receivedEventInput = input as Record<string, unknown>;
-        return fakeEvent();
-      },
-      uploadPetFile: async (ownerId, petId, input) => {
-        assert.equal(ownerId, USER_ID);
-        assert.equal(petId, PET_ID);
-        uploaded.push({
-          originalName: input.file?.originalname,
-          mimeType: input.file?.mimetype,
-          eventId: input.eventId
-        });
-        const id = fileIds[uploaded.length - 1];
         return {
-          id,
-          ownerId: USER_ID,
-          petId: PET_ID,
-          eventId: EVENT_ID,
-          originalName: input.file?.originalname ?? "file",
-          mimeType: input.file?.mimetype as "application/pdf" | "image/png" | "image/jpeg",
-          sizeBytes: input.file?.size ?? 0,
-          uploadedAt: "2026-05-12T00:00:00.000Z",
-          createdAt: "2026-05-12T00:00:00.000Z",
-          updatedAt: "2026-05-12T00:00:00.000Z"
-        };
-      },
-      updateEvent: async (ownerId, eventId, input) => {
-        assert.equal(ownerId, USER_ID);
-        assert.equal(eventId, EVENT_ID);
-        receivedUpdate = input as Record<string, unknown>;
-        return {
-          ...fakeEvent(),
+          ...fakeEventWithFiles(),
           files: [
             { fileId: fileIds[0], originalName: "rabies.pdf" },
             { fileId: fileIds[1], originalName: "result.png" }
@@ -282,15 +244,15 @@ test("POST /pets/:id/events (multipart) parses event JSON, uploads files, and at
       }
     },
     async (baseUrl) => {
-      const formData = new FormData();
-      formData.append("event", JSON.stringify(validEventPayload()));
-      formData.append("files", new Blob(["pdf"], { type: "application/pdf" }), "rabies.pdf");
-      formData.append("files", new Blob(["png"], { type: "image/png" }), "result.png");
+      const payload = { ...validEventPayload(), fileIds };
 
       const res = await fetch(`${baseUrl}/pets/${PET_ID}/events`, {
         method: "POST",
-        headers: authHeader(),
-        body: formData
+        headers: {
+          ...authHeader(),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
 
       assert.equal(res.status, 201);
@@ -299,88 +261,21 @@ test("POST /pets/:id/events (multipart) parses event JSON, uploads files, and at
     }
   );
 
-  assert.deepEqual(receivedEventInput, validEventPayload());
-  assert.deepEqual(uploaded, [
-    { originalName: "rabies.pdf", mimeType: "application/pdf", eventId: EVENT_ID },
-    { originalName: "result.png", mimeType: "image/png", eventId: EVENT_ID }
-  ]);
-  assert.deepEqual(receivedUpdate, { fileIds });
+  assert.deepEqual(receivedEventInput, { ...validEventPayload(), fileIds });
 });
 
-test("POST /pets/:id/events (multipart) returns 400 when event field is not valid JSON", async () => {
-  let createCalled = false;
-
-  await withCreateServer(
-    {
-      createPetEvent: async () => {
-        createCalled = true;
-        return fakeEvent();
-      }
-    },
-    async (baseUrl) => {
-      const formData = new FormData();
-      formData.append("event", "{not json");
-      formData.append("files", new Blob(["pdf"], { type: "application/pdf" }), "rabies.pdf");
-
-      const res = await fetch(`${baseUrl}/pets/${PET_ID}/events`, {
-        method: "POST",
-        headers: authHeader(),
-        body: formData
-      });
-
-      assert.equal(res.status, 400);
-      const body = (await res.json()) as { error: { code: string } };
-      assert.equal(body.error.code, "INVALID_EVENT_PAYLOAD");
-    }
-  );
-
-  assert.equal(createCalled, false);
-});
-
-test("PATCH /events/:id (multipart) parses event JSON, uploads files, and appends them", async () => {
-  const existingFileId = "60a7c1aa9e1d4f12345678aa";
-  const newFileIds = [
+test("PATCH /events/:id allows replacing fileIds with one file removed", async () => {
+  const keptFileId = "60a7c1aa9e1d4f12345678aa";
+  const removedFileId = "60a7c1aa9e1d4f12345678ab";
+  const requestedFileIds = [
+    keptFileId,
     "60a7c1aa9e1d4f12345678cd",
     "60a7c1aa9e1d4f12345678ce"
   ];
-  const uploaded: Array<{
-    petId?: string;
-    originalName?: string;
-    eventId?: unknown;
-  }> = [];
   let receivedUpdate: Record<string, unknown> | undefined;
 
   await withUpdateServer(
     {
-      getEvent: async (ownerId, eventId) => {
-        assert.equal(ownerId, USER_ID);
-        assert.equal(eventId, EVENT_ID);
-        return {
-          ...fakeEventWithFiles(),
-          files: [{ fileId: existingFileId, originalName: "old.pdf" }]
-        };
-      },
-      uploadPetFile: async (ownerId, petId, input) => {
-        assert.equal(ownerId, USER_ID);
-        uploaded.push({
-          petId,
-          originalName: input.file?.originalname,
-          eventId: input.eventId
-        });
-        const id = newFileIds[uploaded.length - 1];
-        return {
-          id,
-          ownerId: USER_ID,
-          petId,
-          eventId: EVENT_ID,
-          originalName: input.file?.originalname ?? "file",
-          mimeType: input.file?.mimetype as "application/pdf" | "image/png" | "image/jpeg",
-          sizeBytes: input.file?.size ?? 0,
-          uploadedAt: "2026-05-12T00:00:00.000Z",
-          createdAt: "2026-05-12T00:00:00.000Z",
-          updatedAt: "2026-05-12T00:00:00.000Z"
-        };
-      },
       updateEvent: async (ownerId, eventId, input) => {
         assert.equal(ownerId, USER_ID);
         assert.equal(eventId, EVENT_ID);
@@ -389,52 +284,11 @@ test("PATCH /events/:id (multipart) parses event JSON, uploads files, and append
           ...fakeEvent(),
           title: "Updated title",
           files: [
-            { fileId: existingFileId, originalName: "old.pdf" },
-            { fileId: newFileIds[0], originalName: "rabies.pdf" },
-            { fileId: newFileIds[1], originalName: "result.png" }
+            { fileId: keptFileId, originalName: "old.pdf" },
+            { fileId: requestedFileIds[1], originalName: "rabies.pdf" },
+            { fileId: requestedFileIds[2], originalName: "result.png" }
           ]
         };
-      }
-    },
-    async (baseUrl) => {
-      const formData = new FormData();
-      formData.append("event", JSON.stringify({ title: "Updated title" }));
-      formData.append("files", new Blob(["pdf"], { type: "application/pdf" }), "rabies.pdf");
-      formData.append("files", new Blob(["png"], { type: "image/png" }), "result.png");
-
-      const res = await fetch(`${baseUrl}/events/${EVENT_ID}`, {
-        method: "PATCH",
-        headers: authHeader(),
-        body: formData
-      });
-
-      assert.equal(res.status, 200);
-      const body = (await res.json()) as { event: { files: Array<{ fileId: string }> } };
-      assert.deepEqual(
-        body.event.files.map((file) => file.fileId),
-        [existingFileId, ...newFileIds]
-      );
-    }
-  );
-
-  assert.deepEqual(uploaded, [
-    { petId: PET_ID, originalName: "rabies.pdf", eventId: EVENT_ID },
-    { petId: PET_ID, originalName: "result.png", eventId: EVENT_ID }
-  ]);
-  assert.deepEqual(receivedUpdate, {
-    title: "Updated title",
-    fileIds: [existingFileId, ...newFileIds]
-  });
-});
-
-test("PATCH /events/:id rejects fileIds in JSON payload", async () => {
-  let updateCalled = false;
-
-  await withUpdateServer(
-    {
-      updateEvent: async () => {
-        updateCalled = true;
-        return fakeEvent();
       }
     },
     async (baseUrl) => {
@@ -444,14 +298,24 @@ test("PATCH /events/:id rejects fileIds in JSON payload", async () => {
           ...authHeader(),
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ fileIds: ["60a7c1aa9e1d4f12345678cd"] })
+        body: JSON.stringify({
+          title: "Updated title",
+          fileIds: requestedFileIds
+        })
       });
 
-      assert.equal(res.status, 400);
-      const body = (await res.json()) as { error: { code: string } };
-      assert.equal(body.error.code, "FILE_IDS_CONFLICT");
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { event: { files: Array<{ fileId: string }> } };
+      assert.deepEqual(
+        body.event.files.map((file) => file.fileId),
+        requestedFileIds
+      );
     }
   );
 
-  assert.equal(updateCalled, false);
+  assert.equal(requestedFileIds.includes(removedFileId), false);
+  assert.deepEqual(receivedUpdate, {
+    title: "Updated title",
+    fileIds: requestedFileIds
+  });
 });

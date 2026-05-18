@@ -336,6 +336,7 @@ test("updateEvent validates fileIds against the existing event's pet", async () 
       },
       listFilesByIds: async (_owner, ids) =>
         ids.map((id) => ({ _id: id, originalName: "rabies-certificate.pdf" })),
+      attachFilesToEvent: async () => {},
       updateEventRecord: async () => makeEventRecord({ fileIds: [new Types.ObjectId(fileId)] })
     }
   );
@@ -343,6 +344,64 @@ test("updateEvent validates fileIds against the existing event's pet", async () 
   assert.ok(validatedIds);
   assert.equal(validatedIds.length, 1);
   assert.equal(validatedIds[0].toString(), fileId);
+});
+
+test("updateEvent replaces fileIds with the provided list", async () => {
+  const removedFileId = "60a7c1aa9e1d4f12345678aa";
+  const keptFileId = "60a7c1aa9e1d4f12345678bb";
+  const addedFileId = "60a7c1aa9e1d4f12345678cc";
+  const requestedFileIds = [keptFileId, addedFileId];
+  let captured: EventUpdates | undefined;
+  let attached:
+    | {
+        owner: string;
+        pet: string;
+        event: string;
+        ids: string[];
+      }
+    | undefined;
+
+  const result = await updateEvent(
+    ownerId,
+    eventId,
+    { fileIds: requestedFileIds },
+    {
+      findEventByIdForOwner: async () =>
+        makeEventRecord({
+          fileIds: [new Types.ObjectId(removedFileId), new Types.ObjectId(keptFileId)]
+        }),
+      validateFileIdsForPet: async (_owner, _pet, ids) => {
+        assert.deepEqual(ids.map((id) => id.toString()), requestedFileIds);
+      },
+      listFilesByIds: async (_owner, ids) =>
+        ids.map((id) => ({ _id: id, originalName: `${id.toString()}.pdf` })),
+      updateEventRecord: async (_id, _owner, updates) => {
+        captured = updates;
+        return makeEventRecord({ fileIds: updates.set.fileIds });
+      },
+      attachFilesToEvent: async (owner, pet, event, ids) => {
+        attached = {
+          owner: owner.toString(),
+          pet: pet.toString(),
+          event: event.toString(),
+          ids: ids.map((id) => id.toString())
+        };
+      }
+    }
+  );
+
+  assert.deepEqual(
+    (captured?.set.fileIds as Types.ObjectId[]).map((id) => id.toString()),
+    requestedFileIds
+  );
+  assert.equal(result.files.some((file) => file.fileId === removedFileId), false);
+  assert.deepEqual(result.files.map((file) => file.fileId), requestedFileIds);
+  assert.deepEqual(attached, {
+    owner: ownerId,
+    pet: petId,
+    event: eventId,
+    ids: requestedFileIds
+  });
 });
 
 test("updateEvent rejects fileIds outside the pet/owner scope with 400", async () => {

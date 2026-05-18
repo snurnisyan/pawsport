@@ -4,6 +4,7 @@ import { createApp } from "./app";
 import { startReminderScheduler, stopReminderScheduler } from "./scheduler/reminderScheduler";
 import { startBackgroundJobRunner, stopBackgroundJobRunner } from "./jobs/backgroundJobRunner";
 import { registerPetExportJobHandler } from "./jobs/handlers/petExportHandler";
+import { registerTemporaryEventFileCleanupJobHandler } from "./jobs/handlers/temporaryEventFileCleanupHandler";
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   stopReminderScheduler();
@@ -16,6 +17,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 const bootstrap = async (): Promise<void> => {
   await connectDatabase();
   registerPetExportJobHandler();
+  registerTemporaryEventFileCleanupJobHandler();
 
   const app = createApp();
 
