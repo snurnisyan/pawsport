@@ -5,7 +5,12 @@ import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 
 import { AppError } from "../src/middleware/errorHandler";
-import { confirmEmail, hashToken, registerUser } from "../src/services/authService";
+import {
+  confirmEmail,
+  hashToken,
+  registerUser,
+  resendConfirmationEmail
+} from "../src/services/authService";
 
 const userId = "507f1f77bcf86cd799439011";
 const userObjectId = new Types.ObjectId(userId);
@@ -129,6 +134,102 @@ test("registerUser rejects invalid input", async () => {
       }
     );
   }
+});
+
+test("resendConfirmationEmail refreshes the token and sends a confirmation email", async () => {
+  let saved = false;
+  let sentConfirmationUrl = "";
+  const user = {
+    email: "user@example.com",
+    emailVerified: false,
+    verificationTokenHash: hashToken("old-token") as string | undefined,
+    verificationTokenExpiresAt: new Date("2026-05-12T12:00:00.000Z") as Date | undefined,
+    save: async () => {
+      saved = true;
+      return user;
+    }
+  };
+
+  await resendConfirmationEmail(
+    userId,
+    {
+      findEmailConfirmationResendUserById: async (id) => {
+        assert.equal(id.toString(), userId);
+        return user as never;
+      },
+      generateToken: () => "new-confirmation-token",
+      sendConfirmationEmail: async ({ to, confirmationUrl }) => {
+        assert.equal(to, "user@example.com");
+        sentConfirmationUrl = confirmationUrl;
+      },
+      awaitConfirmationEmail: true,
+      now: () => new Date("2026-05-12T00:00:00.000Z")
+    }
+  );
+
+  assert.equal(saved, true);
+  assert.equal(user.verificationTokenHash, hashToken("new-confirmation-token"));
+  assert.equal(user.verificationTokenExpiresAt?.toISOString(), "2026-05-13T00:00:00.000Z");
+  assert.match(sentConfirmationUrl, /\/auth\/email-confirmed\?token=new-confirmation-token$/);
+});
+
+test("resendConfirmationEmail is a no-op for already verified accounts", async () => {
+  let generateCalls = 0;
+  let sendCalls = 0;
+  let saved = false;
+
+  await resendConfirmationEmail(
+    userId,
+    {
+      findEmailConfirmationResendUserById: async () =>
+        ({
+          email: "verified@example.com",
+          emailVerified: true,
+          verificationTokenHash: undefined,
+          verificationTokenExpiresAt: undefined,
+          save: async () => {
+            saved = true;
+          }
+        }) as never,
+      generateToken: () => {
+        generateCalls += 1;
+        return "unused-token";
+      },
+      sendConfirmationEmail: async () => {
+        sendCalls += 1;
+      },
+      awaitConfirmationEmail: true
+    }
+  );
+
+  assert.equal(generateCalls, 0);
+  assert.equal(sendCalls, 0);
+  assert.equal(saved, false);
+});
+
+test("resendConfirmationEmail rejects invalid or missing JWT users", async () => {
+  await assert.rejects(
+    () => resendConfirmationEmail("not-an-object-id"),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 401);
+      assert.equal(error.code, "UNAUTHORIZED");
+      return true;
+    }
+  );
+
+  await assert.rejects(
+    () =>
+      resendConfirmationEmail(userId, {
+        findEmailConfirmationResendUserById: async () => null
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 404);
+      assert.equal(error.code, "USER_NOT_FOUND");
+      return true;
+    }
+  );
 });
 
 const buildConfirmationUser = () => {

@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request a new email confirmation link */
+        post: operations["resendEmailConfirmation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -441,14 +458,14 @@ export interface components {
         ConfirmEmailRequest: {
             token: string;
         };
+        MessageResponse: {
+            message: string;
+        };
         LoginRequest: {
             /** Format: email */
             email: string;
             /** Format: password */
             password: string;
-        };
-        MessageResponse: {
-            message: string;
         };
         PasswordResetRequest: {
             /** Format: email */
@@ -895,6 +912,44 @@ export interface operations {
             };
             /** @description Invalid or expired confirmation token */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resendEmailConfirmation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Email confirmation resend request accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
