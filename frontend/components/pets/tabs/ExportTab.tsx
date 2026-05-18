@@ -407,7 +407,7 @@ export function ExportTab({ petId, petName, usesBackend }: TExportTabProps) {
               ...current,
               exportId: response.export.id,
               export: response.export,
-              status: response.export.status === "failed" ? "failed" : "pending",
+              status: response.export.status,
             }
           : current
       );

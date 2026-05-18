@@ -12,7 +12,11 @@ const otherOwnerId = "507f1f77bcf86cd799439099";
 const petId = "507f1f77bcf86cd799439022";
 const otherPetId = "507f1f77bcf86cd799439033";
 const exportId = "507f1f77bcf86cd799439044";
+const artifactId = "507f1f77bcf86cd799439055";
 const now = new Date("2026-05-14T10:00:00.000Z");
+const expiresAt = new Date("2026-05-21T10:00:00.000Z");
+const dataHash = "a".repeat(64);
+const artifactKey = `users/${ownerId}/pets/${petId}/exports/${dataHash}.pdf`;
 
 const makeStorage = (overrides: Partial<FileStorage> = {}): FileStorage => ({
   putObject: async () => {},
@@ -57,13 +61,45 @@ const makeExportRecord = (input: {
   petId: Types.ObjectId;
   period?: { from?: Date; to?: Date };
   sections: ("profile" | "events" | "files" | "reminders")[];
-  fileToken?: string;
+  artifactId?: Types.ObjectId;
+  dataHash?: string;
   status: "pending" | "ready" | "failed";
   fileKey?: string;
+  expiresAt?: Date;
+  cacheHit?: boolean;
 }) => ({
   ...input,
   createdAt: now,
   updatedAt: now
+});
+
+const makeArtifact = (
+  overrides: Partial<{
+    _id: Types.ObjectId;
+    ownerId: Types.ObjectId;
+    petId: Types.ObjectId;
+    status: "pending" | "processing" | "ready" | "failed";
+    fileKey: string;
+    expiresAt: Date;
+    generation: number;
+  }> = {}
+) => ({
+  _id: oid(artifactId),
+  ownerId: oid(ownerId),
+  petId: oid(petId),
+  dataHash,
+  status: "pending" as const,
+  expiresAt,
+  lastAccessedAt: now,
+  generation: 0,
+  createdAt: now,
+  updatedAt: now,
+  ...overrides
+});
+
+const makeFingerprint = () => ({
+  dataHash,
+  canonicalData: { stable: true }
 });
 
 test("createPetExport persists pending export and enqueues a pet-export job", async () => {
@@ -74,8 +110,16 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
         petId: Types.ObjectId;
         period?: { from?: Date; to?: Date };
         sections: ("profile" | "events" | "files" | "reminders")[];
-        fileToken: string;
+        artifactId?: Types.ObjectId;
+        dataHash?: string;
+        expiresAt?: Date;
         status: "pending";
+      }
+    | undefined;
+  let artifactInput:
+    | {
+        dataHash: string;
+        exportId: Types.ObjectId;
       }
     | undefined;
   let enqueued:
@@ -95,10 +139,19 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
       sections: ["profile", "events", "profile"],
       eventTypes: ["vaccine", "lab", "visit", "vaccine"],
       sendEmail: true,
-      notificationEmail: "owner@example.com"
+      notificationEmail: "ignored@example.com"
     },
     {
       findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "owner@example.com",
+        emailVerified: true
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async (input) => {
+        artifactInput = input;
+        return makeArtifact({ _id: oid(artifactId), generation: 3 });
+      },
       createExportRecord: async (input) => {
         persisted = input;
         return makeExportRecord(input);
@@ -106,25 +159,33 @@ test("createPetExport persists pending export and enqueues a pet-export job", as
       enqueuePetExportJob: async (input) => {
         enqueued = input;
       },
-      randomToken: () => "not-guessable-token"
+      now: () => now
     }
   );
 
   assert.ok(persisted);
   assert.equal(persisted.status, "pending");
-  assert.equal(persisted.fileToken, "not-guessable-token");
+  assert.equal(persisted.artifactId?.toString(), artifactId);
+  assert.equal(persisted.dataHash, dataHash);
+  assert.equal(persisted.expiresAt?.toISOString(), expiresAt.toISOString());
   assert.equal(persisted.period?.from?.toISOString(), "2026-05-01T00:00:00.000Z");
   assert.equal(persisted.period?.to?.toISOString(), "2026-05-31T00:00:00.000Z");
   assert.deepEqual(persisted.sections, ["profile", "events"]);
 
+  assert.ok(artifactInput);
+  assert.equal(artifactInput.dataHash, dataHash);
+
   assert.ok(enqueued);
   assert.equal(enqueued.type, "pet-export");
-  assert.equal(enqueued.idempotencyKey, persisted._id.toString());
+  assert.equal(enqueued.idempotencyKey, `pet-export-artifact:${artifactId}:3`);
   assert.equal(enqueued.maxAttempts, 5);
   assert.deepEqual(enqueued.payload, {
     exportId: persisted._id.toString(),
     ownerId,
     petId,
+    artifactId,
+    dataHash,
+    generation: 3,
     period: { from: "2026-05-01", to: "2026-05-31" },
     sections: ["profile", "events"],
     eventTypes: ["vaccine", "lab", "visit"],
@@ -150,6 +211,8 @@ test("createPetExport omits notificationEmail when sendEmail is false", async ()
     },
     {
       findPetByIdForOwner: async () => makePet(),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () => makeArtifact(),
       createExportRecord: async (input) => makeExportRecord(input),
       enqueuePetExportJob: async (input) => {
         enqueuedPayload = input.payload;
@@ -159,6 +222,40 @@ test("createPetExport omits notificationEmail when sendEmail is false", async ()
 
   assert.ok(enqueuedPayload);
   assert.equal("notificationEmail" in enqueuedPayload, false);
+});
+
+test("createPetExport reuses an in-progress artifact without resetting generation", async () => {
+  let enqueued:
+    | {
+        idempotencyKey?: string;
+        payload: Record<string, unknown>;
+      }
+    | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"]
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () =>
+        makeArtifact({
+          status: "processing",
+          generation: 2
+        }),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueued = { idempotencyKey: input.idempotencyKey, payload: input.payload };
+      }
+    }
+  );
+
+  assert.ok(enqueued);
+  assert.equal(enqueued.idempotencyKey, `pet-export-artifact:${artifactId}:2`);
+  assert.equal(enqueued.payload.generation, 2);
 });
 
 test("createPetExport omits notificationEmail when sendEmail is omitted", async () => {
@@ -174,6 +271,8 @@ test("createPetExport omits notificationEmail when sendEmail is omitted", async 
     },
     {
       findPetByIdForOwner: async () => makePet(),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () => makeArtifact(),
       createExportRecord: async (input) => makeExportRecord(input),
       enqueuePetExportJob: async (input) => {
         enqueuedPayload = input.payload;
@@ -198,6 +297,12 @@ test("createPetExport defaults to the authenticated user's email when sendEmail 
     },
     {
       findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "verified-owner@example.com",
+        emailVerified: true
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () => makeArtifact(),
       createExportRecord: async (input) => makeExportRecord(input),
       enqueuePetExportJob: async (input) => {
         enqueuedPayload = input.payload;
@@ -205,10 +310,10 @@ test("createPetExport defaults to the authenticated user's email when sendEmail 
     }
   );
 
-  assert.equal(enqueuedPayload?.notificationEmail, "owner@example.com");
+  assert.equal(enqueuedPayload?.notificationEmail, "verified-owner@example.com");
 });
 
-test("createPetExport prefers explicit notificationEmail when sendEmail is true", async () => {
+test("createPetExport ignores explicit notificationEmail and uses the confirmed user email", async () => {
   let enqueuedPayload: Record<string, unknown> | undefined;
 
   await createPetExport(
@@ -222,6 +327,12 @@ test("createPetExport prefers explicit notificationEmail when sendEmail is true"
     },
     {
       findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "confirmed@example.com",
+        emailVerified: true
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () => makeArtifact(),
       createExportRecord: async (input) => makeExportRecord(input),
       enqueuePetExportJob: async (input) => {
         enqueuedPayload = input.payload;
@@ -229,7 +340,146 @@ test("createPetExport prefers explicit notificationEmail when sendEmail is true"
     }
   );
 
-  assert.equal(enqueuedPayload?.notificationEmail, "explicit@example.com");
+  assert.equal(enqueuedPayload?.notificationEmail, "confirmed@example.com");
+});
+
+test("createPetExport omits notificationEmail when user has not verified email", async () => {
+  let enqueuedPayload: Record<string, unknown> | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: true,
+      notificationEmail: "ignored@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "owner@example.com",
+        emailVerified: false
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () => makeArtifact(),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueuedPayload = input.payload;
+      }
+    }
+  );
+
+  assert.ok(enqueuedPayload);
+  assert.equal("notificationEmail" in enqueuedPayload, false);
+});
+
+test("createPetExport returns a ready cached export without enqueueing render work", async () => {
+  let enqueued = false;
+
+  const result = await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: false
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () =>
+        makeArtifact({
+          status: "ready",
+          fileKey: artifactKey
+        }),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async () => {
+        enqueued = true;
+      },
+      getPublicUrl: (key) => `https://download.example/${key}`
+    }
+  );
+
+  assert.equal(result.status, "ready");
+  assert.equal(result.fileKey, artifactKey);
+  assert.equal(
+    result.downloadUrl,
+    `https://download.example/${artifactKey}`
+  );
+  assert.equal(result.expiresAt, expiresAt.toISOString());
+  assert.equal(enqueued, false);
+});
+
+test("createPetExport enqueues email-only work for a ready cache hit when email is requested", async () => {
+  let enqueued:
+    | {
+        idempotencyKey?: string;
+        payload: Record<string, unknown>;
+      }
+    | undefined;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: true,
+      notificationEmail: "ignored@example.com"
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "owner@example.com",
+        emailVerified: true
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () =>
+        makeArtifact({
+          status: "ready",
+          fileKey: artifactKey
+        }),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async (input) => {
+        enqueued = { idempotencyKey: input.idempotencyKey, payload: input.payload };
+      }
+    }
+  );
+
+  assert.ok(enqueued);
+  assert.equal(enqueued.idempotencyKey, `export-email:${enqueued.payload.exportId}`);
+  assert.equal(enqueued.payload.notificationEmail, "owner@example.com");
+  assert.equal(enqueued.payload.artifactId, artifactId);
+});
+
+test("createPetExport does not enqueue email-only work for cache hit with unverified email", async () => {
+  let enqueued = false;
+
+  await createPetExport(
+    ownerId,
+    petId,
+    {
+      sections: ["profile"],
+      sendEmail: true
+    },
+    {
+      findPetByIdForOwner: async () => makePet(),
+      loadNotificationRecipient: async () => ({
+        email: "owner@example.com",
+        emailVerified: false
+      }),
+      buildFingerprint: async () => makeFingerprint(),
+      createOrReuseArtifact: async () =>
+        makeArtifact({
+          status: "ready",
+          fileKey: artifactKey
+        }),
+      createExportRecord: async (input) => makeExportRecord(input),
+      enqueuePetExportJob: async () => {
+        enqueued = true;
+      }
+    }
+  );
+
+  assert.equal(enqueued, false);
 });
 
 test("createPetExport hides pets owned by another user before creating an export", async () => {
@@ -377,9 +627,11 @@ test("deleteAllExportsForOwner deletes ready exports from storage and clears met
       assert.equal(owner.toString(), ownerId);
       return [ready, pending];
     },
+    listOwnerArtifacts: async () => [],
     deleteOwnerExports: async () => {
       metadataDeleted = true;
-    }
+    },
+    deleteOwnerArtifacts: async () => {}
   });
 
   assert.deepEqual(deletedKeys, [ready.fileKey]);
@@ -398,9 +650,11 @@ test("deleteAllExportsForOwner tolerates missing storage objects", async () => {
       }
     }),
     listOwnerExports: async () => [{ _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }],
+    listOwnerArtifacts: async () => [],
     deleteOwnerExports: async () => {
       metadataDeleted = true;
-    }
+    },
+    deleteOwnerArtifacts: async () => {}
   });
 
   assert.equal(metadataDeleted, true);
@@ -421,9 +675,11 @@ test("deleteAllExportsForOwner throws on hard storage failure and keeps metadata
         listOwnerExports: async () => [
           { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }
         ],
+        listOwnerArtifacts: async () => [],
         deleteOwnerExports: async () => {
           metadataDeleted = true;
-        }
+        },
+        deleteOwnerArtifacts: async () => {}
       }),
     assertAppError(502, "EXPORT_STORAGE_DELETE_FAILED")
   );
@@ -443,9 +699,11 @@ test("deleteAllExportsForOwner clears metadata when no exports exist", async () 
       }
     }),
     listOwnerExports: async () => [],
+    listOwnerArtifacts: async () => [],
     deleteOwnerExports: async () => {
       metadataDeleted = true;
-    }
+    },
+    deleteOwnerArtifacts: async () => {}
   });
 
   assert.equal(storageCalled, false);

@@ -14,7 +14,10 @@ petExports.route("post", "/", {
   operationId: "createPetExport",
   summary: "Create an export for a pet",
   request: { params: IdPathParamsSchema, body: jsonRequestBody(CreateExportRequestSchema, false) },
-  responses: { 202: jsonResponse("Export queued", ExportResponseSchema) },
+  responses: {
+    200: jsonResponse("Cached export ready", ExportResponseSchema),
+    202: jsonResponse("Export queued", ExportResponseSchema)
+  },
   handlers: [createPetExport]
 });
 

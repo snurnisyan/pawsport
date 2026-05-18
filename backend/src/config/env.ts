@@ -49,6 +49,10 @@ const envSchema = z
   BACKGROUND_JOB_VISIBILITY_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   BACKGROUND_JOB_DEFAULT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
 
+  EXPORT_RETENTION_DAYS: z.coerce.number().positive().default(7),
+  EXPORT_CLEANUP_INTERVAL_HOURS: z.coerce.number().positive().default(24),
+  EXPORT_CLEANUP_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+
   GOTENBERG_URL: z.string().url().optional(),
   GOTENBERG_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
 

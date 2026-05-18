@@ -82,8 +82,7 @@ test("POST /pets/:id/export forwards selected eventTypes to export service", asy
           period: { from: "2026-05-01", to: "2026-05-31" },
           sections: ["profile", "events"],
           eventTypes: ["vaccine", "treatment", "visit", "operation", "lab", "other"],
-          sendEmail: true,
-          notificationEmail: "explicit@example.com"
+          sendEmail: true
         })
       });
 
@@ -100,8 +99,6 @@ test("POST /pets/:id/export forwards selected eventTypes to export service", asy
     period: { from: "2026-05-01", to: "2026-05-31" },
     sections: ["profile", "events"],
     eventTypes: ["vaccine", "treatment", "visit", "operation", "lab", "other"],
-    sendEmail: true,
-    notificationEmail: "explicit@example.com",
-    fallbackNotificationEmail: "user@example.com"
+    sendEmail: true
   });
 });

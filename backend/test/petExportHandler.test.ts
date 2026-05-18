@@ -12,7 +12,11 @@ import type { ExportSection } from "../src/models/Export";
 const ownerId = new Types.ObjectId("507f1f77bcf86cd799439011");
 const petId = new Types.ObjectId("507f1f77bcf86cd799439022");
 const exportId = new Types.ObjectId("507f1f77bcf86cd799439033");
+const artifactId = new Types.ObjectId("507f1f77bcf86cd799439044");
 const now = new Date("2026-05-14T10:00:00.000Z");
+const expiresAt = new Date("2026-05-21T10:00:00.000Z");
+const dataHash = "b".repeat(64);
+const artifactKey = `users/${ownerId.toString()}/pets/${petId.toString()}/exports/${dataHash}.pdf`;
 
 const makePet = () => ({
   _id: petId,
@@ -34,10 +38,12 @@ const makePet = () => ({
 const makeRecord = (
   overrides: Partial<{
     fileKey: string;
-    fileToken: string;
     status: "pending" | "ready" | "failed";
     emailSentAt: Date;
     sections: ExportSection[];
+    artifactId: Types.ObjectId;
+    dataHash: string;
+    expiresAt: Date;
   }> = {}
 ) => ({
   _id: exportId,
@@ -45,8 +51,27 @@ const makeRecord = (
   petId,
   period: { from: new Date("2026-05-01T00:00:00.000Z"), to: new Date("2026-05-31T00:00:00.000Z") },
   sections: ["profile"] as ExportSection[],
-  fileToken: "token",
   status: "pending" as const,
+  createdAt: now,
+  updatedAt: now,
+  ...overrides
+});
+
+const makeArtifact = (
+  overrides: Partial<{
+    fileKey: string;
+    status: "pending" | "ready" | "failed";
+    generation: number;
+  }> = {}
+) => ({
+  _id: artifactId,
+  ownerId,
+  petId,
+  dataHash,
+  status: "pending" as const,
+  expiresAt,
+  lastAccessedAt: now,
+  generation: 0,
   createdAt: now,
   updatedAt: now,
   ...overrides
@@ -61,8 +86,7 @@ const makeJob = (overrides: Partial<BackgroundJobContext> = {}): BackgroundJobCo
     petId: petId.toString(),
     period: { from: "2026-05-01", to: "2026-05-31" },
     sections: ["profile"],
-    eventTypes: ["vaccine", "lab", "visit"],
-    notificationEmail: "owner@example.com"
+    eventTypes: ["vaccine", "lab", "visit"]
   },
   attempts: 0,
   maxAttempts: 5,
@@ -74,8 +98,9 @@ const makeJob = (overrides: Partial<BackgroundJobContext> = {}): BackgroundJobCo
   ...overrides
 });
 
-test("pet-export handler renders, uploads, marks ready, and sends one email", async () => {
-  let record = makeRecord();
+test("pet-export handler renders, uploads, marks ready, and enqueues one email job", async () => {
+  let record = makeRecord({ artifactId, dataHash });
+  let artifact = makeArtifact();
   const updates: unknown[] = [];
   let uploaded:
     | {
@@ -84,7 +109,7 @@ test("pet-export handler renders, uploads, marks ready, and sends one email", as
         contentType: string;
       }
     | undefined;
-  let emailAttachment: Buffer | undefined;
+  let emailJob: Record<string, unknown> | undefined;
 
   const handler = createPetExportJobHandler({
     findExportById: async () => record,
@@ -93,6 +118,17 @@ test("pet-export handler renders, uploads, marks ready, and sends one email", as
       record = { ...record, ...update.set };
       return record;
     },
+    findArtifactById: async () => artifact,
+    claimArtifactForRender: async (_id, _owner, _generation, _now, claimExpiresAt) => {
+      artifact = { ...artifact, status: "processing", renderClaimExpiresAt: claimExpiresAt };
+      return artifact;
+    },
+    updateArtifactRecord: async (_id, _owner, update) => {
+      artifact = { ...artifact, ...update.set };
+      if (update.unset && "renderClaimExpiresAt" in update.unset) artifact.renderClaimExpiresAt = undefined;
+      return artifact;
+    },
+    markExportsForArtifactReady: async () => {},
     findPet: async () => makePet(),
     buildReport: async (input) => {
       assert.deepEqual(input.eventTypes, ["vaccine", "lab", "visit"]);
@@ -132,33 +168,38 @@ test("pet-export handler renders, uploads, marks ready, and sends one email", as
       },
       deleteObject: async () => {}
     },
-    sendExportReadyEmail: async (payload) => {
-      emailAttachment = payload.attachment.content;
-      assert.equal(payload.to, "owner@example.com");
-      assert.equal(payload.downloadUrl, `https://storage.example/${record.fileKey}`);
+    enqueueEmailJob: async (input) => {
+      emailJob = input.payload;
+      assert.equal(input.type, "export-email");
+      assert.equal(input.maxAttempts, 3);
+      assert.equal(input.idempotencyKey, `export-email:${exportId.toString()}`);
     },
-    getPublicUrl: (key) => `https://storage.example/${key}`,
     now: () => now
   });
 
-  await handler(makeJob());
+  await handler(makeJob({ payload: { ...makeJob().payload, notificationEmail: "owner@example.com" } }));
 
   assert.ok(uploaded);
-  assert.equal(
-    uploaded.key,
-    `users/${ownerId.toString()}/pets/${petId.toString()}/exports/${exportId.toString()}-token.pdf`
-  );
+  assert.equal(uploaded.key, artifactKey);
   assert.equal(uploaded.contentType, "application/pdf");
   assert.equal(uploaded.body.toString("utf8"), "%PDF-rendered");
-  assert.equal(emailAttachment?.toString("utf8"), "%PDF-rendered");
+  assert.equal(emailJob?.notificationEmail, "owner@example.com");
+  assert.equal(emailJob?.artifactId, artifactId.toString());
   assert.equal(record.status, "ready");
-  assert.equal(record.emailSentAt?.toISOString(), now.toISOString());
-  assert.equal(updates.length, 2);
+  assert.equal(record.emailSentAt, undefined);
+  assert.equal(updates.length, 1);
 });
 
-test("pet-export handler skips email when the job payload has no notificationEmail", async () => {
-  let record = makeRecord();
-  let emails = 0;
+test("pet-export handler stores artifact-backed PDFs under a deterministic hash key", async () => {
+  let record = makeRecord({ artifactId, dataHash });
+  let artifact = makeArtifact();
+  let uploadedKey: string | undefined;
+  let exportsMarkedReady:
+    | {
+        artifactId: Types.ObjectId;
+        fileKey: string;
+      }
+    | undefined;
 
   const handler = createPetExportJobHandler({
     findExportById: async () => record,
@@ -166,6 +207,160 @@ test("pet-export handler skips email when the job payload has no notificationEma
       record = { ...record, ...update.set };
       return record;
     },
+    findArtifactById: async () => artifact,
+    claimArtifactForRender: async (_id, _owner, _generation, _now, claimExpiresAt) => {
+      artifact = { ...artifact, status: "processing", renderClaimExpiresAt: claimExpiresAt };
+      return artifact;
+    },
+    updateArtifactRecord: async (_id, _owner, update) => {
+      artifact = { ...artifact, ...update.set };
+      if (update.unset && "renderClaimExpiresAt" in update.unset) artifact.renderClaimExpiresAt = undefined;
+      return artifact;
+    },
+    markExportsForArtifactReady: async (id, _owner, updates) => {
+      exportsMarkedReady = { artifactId: id, fileKey: updates.fileKey };
+    },
+    findPet: async () => makePet(),
+    buildReport: async (input) => ({
+      exportId: input.exportId.toString(),
+      ownerId: input.ownerId.toString(),
+      petId: input.petId.toString(),
+      generatedAt: input.generatedAt.toISOString(),
+      sections: input.sections
+    }),
+    renderTemplate: async () => ({ html: "<html>Miso</html>" }),
+    renderPdf: async () => Buffer.from("%PDF-rendered"),
+    storage: {
+      putObject: async ({ key }) => {
+        uploadedKey = key;
+      },
+      getObject: async () => {
+        throw new Error("not used");
+      },
+      deleteObject: async () => {}
+    },
+    now: () => now
+  });
+
+  await handler(
+    makeJob({
+      payload: {
+        exportId: exportId.toString(),
+        ownerId: ownerId.toString(),
+        petId: petId.toString(),
+        artifactId: artifactId.toString(),
+        dataHash,
+        generation: 0,
+        sections: ["profile"]
+      }
+    })
+  );
+
+  assert.equal(
+    uploadedKey,
+    artifactKey
+  );
+  assert.equal(artifact.status, "ready");
+  assert.equal(artifact.fileKey, uploadedKey);
+  assert.equal(exportsMarkedReady?.artifactId.toString(), artifactId.toString());
+  assert.equal(exportsMarkedReady?.fileKey, uploadedKey);
+});
+
+test("pet-export handler reuses a ready artifact for email without rendering", async () => {
+  let record = makeRecord({ artifactId, dataHash });
+  let renders = 0;
+  let uploads = 0;
+  let emailJobs = 0;
+
+  const handler = createPetExportJobHandler({
+    findExportById: async () => record,
+    updateExportRecord: async (_id, _owner, update) => {
+      record = { ...record, ...update.set };
+      return record;
+    },
+    findArtifactById: async () =>
+      makeArtifact({
+        status: "ready",
+        fileKey: artifactKey
+      }),
+    updateArtifactRecord: async (_id, _owner, update) => ({
+      ...makeArtifact({
+        status: "ready",
+        fileKey: artifactKey
+      }),
+      ...update.set
+    }),
+    findPet: async () => makePet(),
+    buildReport: async (input) => {
+      renders += 1;
+      return {
+        exportId: input.exportId.toString(),
+        ownerId: input.ownerId.toString(),
+        petId: input.petId.toString(),
+        generatedAt: input.generatedAt.toISOString(),
+        sections: input.sections
+      };
+    },
+    storage: {
+      putObject: async () => {
+        uploads += 1;
+      },
+      getObject: async () => {
+        throw new Error("not used");
+      },
+      deleteObject: async () => {}
+    },
+    enqueueEmailJob: async (input) => {
+      emailJobs += 1;
+      assert.equal(input.type, "export-email");
+      assert.equal(input.payload.notificationEmail, "owner@example.com");
+    },
+    now: () => now
+  });
+
+  await handler(
+    makeJob({
+      payload: {
+        exportId: exportId.toString(),
+        ownerId: ownerId.toString(),
+        petId: petId.toString(),
+        artifactId: artifactId.toString(),
+        dataHash,
+        generation: 0,
+        sections: ["profile"],
+        notificationEmail: "owner@example.com"
+      }
+    })
+  );
+
+  assert.equal(renders, 0);
+  assert.equal(uploads, 0);
+  assert.equal(emailJobs, 1);
+  assert.equal(record.status, "ready");
+});
+
+test("pet-export handler skips email when the job payload has no notificationEmail", async () => {
+  let record = makeRecord({ artifactId, dataHash });
+  let artifact = makeArtifact();
+  let emailJobs = 0;
+
+  const handler = createPetExportJobHandler({
+    findExportById: async () => record,
+    updateExportRecord: async (_id, _owner, update) => {
+      record = { ...record, ...update.set };
+      return record;
+    },
+    findArtifactById: async () => artifact,
+    claimArtifactForRender: async (_id, _owner, _generation, _now, claimExpiresAt) => {
+      artifact = { ...artifact, status: "processing", renderClaimExpiresAt: claimExpiresAt };
+      return artifact;
+    },
+    updateArtifactRecord: async (_id, _owner, update) => {
+      artifact = { ...artifact, ...update.set };
+      if (update.unset && "renderClaimExpiresAt" in update.unset) artifact.renderClaimExpiresAt = undefined;
+      return artifact;
+    },
+    markExportsForArtifactReady: async () => {},
     findPet: async () => makePet(),
     buildReport: async (input) => ({
       exportId: input.exportId.toString(),
@@ -183,8 +378,8 @@ test("pet-export handler skips email when the job payload has no notificationEma
       },
       deleteObject: async () => {}
     },
-    sendExportReadyEmail: async () => {
-      emails += 1;
+    enqueueEmailJob: async () => {
+      emailJobs += 1;
     },
     now: () => now
   });
@@ -195,6 +390,9 @@ test("pet-export handler skips email when the job payload has no notificationEma
         exportId: exportId.toString(),
         ownerId: ownerId.toString(),
         petId: petId.toString(),
+        artifactId: artifactId.toString(),
+        dataHash,
+        generation: 0,
         period: { from: "2026-05-01", to: "2026-05-31" },
         sections: ["profile"]
       }
@@ -203,17 +401,30 @@ test("pet-export handler skips email when the job payload has no notificationEma
 
   assert.equal(record.status, "ready");
   assert.equal(record.emailSentAt, undefined);
-  assert.equal(emails, 0);
+  assert.equal(emailJobs, 0);
 });
 
 test("pet-export handler retries retryable Gotenberg failures and marks export failed on final attempt", async () => {
-  let record = makeRecord();
+  let record = makeRecord({ artifactId, dataHash });
+  let artifact = makeArtifact();
 
   const handler = createPetExportJobHandler({
     findExportById: async () => record,
     updateExportRecord: async (_id, _owner, update) => {
       record = { ...record, ...update.set };
       return record;
+    },
+    findArtifactById: async () => artifact,
+    claimArtifactForRender: async (_id, _owner, _generation, _now, claimExpiresAt) => {
+      artifact = { ...artifact, status: "processing", renderClaimExpiresAt: claimExpiresAt };
+      return artifact;
+    },
+    updateArtifactRecord: async (_id, _owner, update) => {
+      artifact = { ...artifact, ...update.set };
+      if (update.unset && "renderClaimExpiresAt" in update.unset) {
+        artifact.renderClaimExpiresAt = undefined;
+      }
+      return artifact;
     },
     findPet: async () => makePet(),
     buildReport: async (input) => ({
@@ -231,11 +442,14 @@ test("pet-export handler retries retryable Gotenberg failures and marks export f
 
   await assert.rejects(() => handler(makeJob({ attempts: 4, maxAttempts: 5 })), GotenbergUnavailableError);
   assert.equal(record.status, "failed");
+  assert.equal(artifact.status, "failed");
+  assert.equal(artifact.renderClaimExpiresAt, undefined);
   assert.match(record.lastError ?? "", /service unavailable/);
 });
 
 test("pet-export handler fail-fast marks export failed for non-retryable Gotenberg errors", async () => {
-  let record = makeRecord();
+  let record = makeRecord({ artifactId, dataHash });
+  let artifact = makeArtifact();
   let uploaded = false;
 
   const handler = createPetExportJobHandler({
@@ -243,6 +457,15 @@ test("pet-export handler fail-fast marks export failed for non-retryable Gotenbe
     updateExportRecord: async (_id, _owner, update) => {
       record = { ...record, ...update.set };
       return record;
+    },
+    findArtifactById: async () => artifact,
+    claimArtifactForRender: async (_id, _owner, _generation, _now, claimExpiresAt) => {
+      artifact = { ...artifact, status: "processing", renderClaimExpiresAt: claimExpiresAt };
+      return artifact;
+    },
+    updateArtifactRecord: async (_id, _owner, update) => {
+      artifact = { ...artifact, ...update.set };
+      return artifact;
     },
     findPet: async () => makePet(),
     buildReport: async (input) => ({
@@ -272,14 +495,15 @@ test("pet-export handler fail-fast marks export failed for non-retryable Gotenbe
   assert.equal(uploaded, false);
 });
 
-test("pet-export handler retries email only after a ready export and gates with emailSentAt", async () => {
+test("pet-export handler does not enqueue email when emailSentAt is already set", async () => {
   let record = makeRecord({
     status: "ready",
-    fileKey: "users/o/p/exports/e-token.pdf"
+    fileKey: artifactKey,
+    emailSentAt: now
   });
   let renders = 0;
   let uploads = 0;
-  let emails = 0;
+  let emailJobs = 0;
 
   const handler = createPetExportJobHandler({
     findExportById: async () => record,
@@ -302,26 +526,22 @@ test("pet-export handler retries email only after a ready export and gates with 
       putObject: async () => {
         uploads += 1;
       },
-      getObject: async ({ key }) => {
-        assert.equal(key, "users/o/p/exports/e-token.pdf");
-        return { body: Readable.from(Buffer.from("%PDF-existing")) };
+      getObject: async () => {
+        throw new Error("not used");
       },
       deleteObject: async () => {}
     },
-    sendExportReadyEmail: async (payload) => {
-      emails += 1;
-      assert.equal(payload.attachment.content.toString("utf8"), "%PDF-existing");
+    enqueueEmailJob: async () => {
+      emailJobs += 1;
     },
-    getPublicUrl: (key) => `https://storage.example/${key}`,
     now: () => now
   });
 
-  await handler(makeJob());
-  await handler(makeJob());
+  await handler(makeJob({ payload: { ...makeJob().payload, notificationEmail: "owner@example.com" } }));
 
   assert.equal(renders, 0);
   assert.equal(uploads, 0);
-  assert.equal(emails, 1);
+  assert.equal(emailJobs, 0);
   assert.equal(record.emailSentAt?.toISOString(), now.toISOString());
 });
 
