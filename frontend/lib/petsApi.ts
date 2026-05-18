@@ -92,6 +92,11 @@ export const updatePet = (
     })
   );
 
+export const deletePet = (id: string): Promise<void> =>
+  unwrapVoidApiResponse(
+    apiClient.DELETE("/pets/{id}", { params: { path: { id } } })
+  );
+
 export const listPetFiles = (
   petId: string,
   query?: TPetFilesQuery

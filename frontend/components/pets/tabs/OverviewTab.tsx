@@ -9,9 +9,10 @@ import type { TPet } from "@/store/pets";
 type TOverviewTabProps = {
   pet: TPet;
   backendPetId?: string;
+  onPetDeleted?: () => void;
 };
 
-export function OverviewTab({ pet, backendPetId }: TOverviewTabProps) {
+export function OverviewTab({ pet, backendPetId, onPetDeleted }: TOverviewTabProps) {
   return (
     <Stack gap="20px">
       <Grid templateColumns={["1fr", null, null, "2fr 1fr"]} gap="20px">
@@ -31,7 +32,11 @@ export function OverviewTab({ pet, backendPetId }: TOverviewTabProps) {
       </Grid>
 
       <Flex justify="center">
-        <DeletePetButton petName={pet.name} />
+        <DeletePetButton
+          petName={pet.name}
+          petId={backendPetId}
+          onDeleted={onPetDeleted}
+        />
       </Flex>
     </Stack>
   );
