@@ -154,7 +154,17 @@ export const updatePetHandler = (dependencies: UpdatePetHandlerDependencies = {}
 
 export const updatePet = updatePetHandler();
 
-export const deletePet = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  await petService.deletePet(requireUserId(req), req.params.id);
-  res.status(204).send();
-});
+export interface DeletePetHandlerDependencies {
+  deletePet?: typeof petService.deletePet;
+}
+
+export const deletePetHandler = (dependencies: DeletePetHandlerDependencies = {}) => {
+  const { deletePet: deletePetFn = petService.deletePet } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    await deletePetFn(requireUserId(req), req.params.id);
+    res.status(204).send();
+  });
+};
+
+export const deletePet = deletePetHandler();

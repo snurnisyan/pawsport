@@ -22,10 +22,12 @@ import jwt from "jsonwebtoken";
 import { env } from "../src/config/env";
 import {
   createPetHandler,
+  deletePetHandler,
   getPetHandler,
   listPetsHandler,
   updatePetHandler,
   type CreatePetHandlerDependencies,
+  type DeletePetHandlerDependencies,
   type GetPetHandlerDependencies,
   type ListPetsHandlerDependencies,
   type UpdatePetHandlerDependencies
@@ -652,6 +654,91 @@ test("PATCH /pets/:id replaces photoFileId with signed photoUrl when pet has a p
   assert.equal(updateCall?.ownerId, USER_ID);
   assert.equal(updateCall?.petId, PET_ID);
   assert.deepEqual(updateCall?.input, { name: "Cooper Updated" });
+});
+
+const buildDeleteApp = (overrides: DeletePetHandlerDependencies = {}): express.Express => {
+  const app = express();
+  app.delete("/pets/:id", authMiddleware, deletePetHandler(overrides));
+  app.use(errorHandler);
+  return app;
+};
+
+const withDeleteServer = async <T>(
+  overrides: DeletePetHandlerDependencies,
+  fn: (baseUrl: string) => Promise<T>
+): Promise<T> => {
+  const server = http.createServer(buildDeleteApp(overrides));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+test("DELETE /pets/:id deletes pet for the authenticated user", async () => {
+  let deleteCall: { ownerId: string; petId: string } | undefined;
+
+  await withDeleteServer(
+    {
+      deletePet: async (ownerId, petId) => {
+        deleteCall = { ownerId, petId };
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, {
+        method: "DELETE",
+        headers: authHeader()
+      });
+
+      assert.equal(res.status, 204);
+      assert.equal(await res.text(), "");
+    }
+  );
+
+  assert.deepEqual(deleteCall, { ownerId: USER_ID, petId: PET_ID });
+});
+
+test("DELETE /pets/:id surfaces service 404 unchanged", async () => {
+  await withDeleteServer(
+    {
+      deletePet: async () => {
+        throw new AppError(404, "PET_NOT_FOUND", "Pet was not found");
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, {
+        method: "DELETE",
+        headers: authHeader()
+      });
+
+      assert.equal(res.status, 404);
+      const body = (await res.json()) as { error: { code: string } };
+      assert.equal(body.error.code, "PET_NOT_FOUND");
+    }
+  );
+});
+
+test("DELETE /pets/:id returns 401 when Authorization header is missing", async () => {
+  let deleteCalled = false;
+
+  await withDeleteServer(
+    {
+      deletePet: async () => {
+        deleteCalled = true;
+      }
+    },
+    async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/pets/${PET_ID}`, { method: "DELETE" });
+
+      assert.equal(res.status, 401);
+      const body = (await res.json()) as { error: { code: string } };
+      assert.equal(body.error.code, "UNAUTHORIZED");
+    }
+  );
+
+  assert.equal(deleteCalled, false);
 });
 
 test("POST /pets rejects non-image uploads at the multer fileFilter (before controller runs)", async () => {
