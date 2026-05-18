@@ -1,9 +1,12 @@
+import { Router } from "express";
+
 import {
   confirmEmail,
   confirmPasswordReset,
   login,
   register,
   requestPasswordReset,
+  resendConfirmationEmail,
   validatePasswordResetToken
 } from "../controllers/authController";
 import { createDocumentedRouter } from "../docs/route";
@@ -21,6 +24,7 @@ import {
 } from "../docs/schemas";
 
 const auth = createDocumentedRouter({ basePath: "/auth", tags: ["Auth"] });
+const protectedAuth = createDocumentedRouter({ basePath: "/auth", tags: ["Auth"], auth: true });
 
 auth.route("post", "/register", {
   operationId: "register",
@@ -39,6 +43,13 @@ auth.route("post", "/confirm", {
     400: jsonResponse("Invalid or expired confirmation token", ErrorResponseSchema)
   },
   handlers: [confirmEmail]
+});
+
+protectedAuth.route("post", "/resend", {
+  operationId: "resendEmailConfirmation",
+  summary: "Request a new email confirmation link",
+  responses: { 202: jsonResponse("Email confirmation resend request accepted", MessageResponseSchema) },
+  handlers: [resendConfirmationEmail]
 });
 
 auth.route("post", "/login", {
@@ -82,4 +93,6 @@ auth.route("post", "/password-reset/confirm", {
   handlers: [confirmPasswordReset]
 });
 
-export const authRoutes = auth.router;
+export const authRoutes = Router();
+authRoutes.use(auth.router);
+authRoutes.use(protectedAuth.router);

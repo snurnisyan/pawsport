@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt, { type SignOptions } from "jsonwebtoken";
-import { Types } from "mongoose";
+import { isValidObjectId, Types } from "mongoose";
 import nodemailer from "nodemailer";
 
 import { env } from "../config/env";
@@ -94,6 +94,11 @@ type PasswordResetRequestUser = Pick<
   "email" | "resetTokenHash" | "resetTokenExpiresAt" | "save"
 >;
 
+type EmailConfirmationResendUser = Pick<
+  UserDocument,
+  "email" | "emailVerified" | "verificationTokenHash" | "verificationTokenExpiresAt" | "save"
+>;
+
 type PasswordResetConfirmUser = Pick<
   UserDocument,
   "passwordHash" | "resetTokenHash" | "resetTokenExpiresAt" | "save"
@@ -108,6 +113,9 @@ export interface AuthServiceDependencies {
   findUserByEmail?: (email: string) => Promise<unknown>;
   createUser?: (input: CreateUserInput) => Promise<Pick<IUser, "_id" | "email" | "emailVerified">>;
   findUserByVerificationTokenHash?: (tokenHash: string) => Promise<ConfirmationUser | null>;
+  findEmailConfirmationResendUserById?: (
+    id: Types.ObjectId
+  ) => Promise<EmailConfirmationResendUser | null>;
   findLoginUserByEmail?: (email: string) => Promise<LoginUser | null>;
   findPasswordResetUserByEmail?: (email: string) => Promise<PasswordResetRequestUser | null>;
   findUserByResetTokenHash?: (tokenHash: string) => Promise<PasswordResetConfirmUser | null>;
@@ -238,6 +246,20 @@ const validateRegistrationInput = (input: RegisterInput): { email: string; passw
   }
 
   return { email, password };
+};
+
+const parseEmailInput = (input: { email?: unknown }): string => {
+  if (typeof input.email !== "string") {
+    throw new AppError(400, "INVALID_EMAIL", "Email is required");
+  }
+
+  const email = normalizeEmail(input.email);
+
+  if (!emailPattern.test(email)) {
+    throw new AppError(400, "INVALID_EMAIL", "Email must be a valid email address");
+  }
+
+  return email;
 };
 
 const toSafeUser = (user: Pick<IUser, "_id" | "email" | "emailVerified">): SafeAuthUser => ({
@@ -383,6 +405,50 @@ export const registerUser = async (
   };
 };
 
+export const resendConfirmationEmail = async (
+  userId: string,
+  dependencies: AuthServiceDependencies = {}
+): Promise<void> => {
+  const {
+    findEmailConfirmationResendUserById = async (id) =>
+      UserModel.findById(id).exec() as Promise<EmailConfirmationResendUser | null>,
+    generateToken = defaultGenerateToken,
+    sendConfirmationEmail = defaultSendConfirmationEmail,
+    now = () => new Date(),
+    awaitConfirmationEmail = false
+  } = dependencies;
+
+  if (!isValidObjectId(userId)) {
+    throw new AppError(401, "UNAUTHORIZED", "Invalid access token");
+  }
+
+  const user = await findEmailConfirmationResendUserById(new Types.ObjectId(userId));
+
+  if (!user) {
+    throw new AppError(404, "USER_NOT_FOUND", "User was not found");
+  }
+
+  if (user.emailVerified) {
+    return;
+  }
+
+  const confirmationToken = generateToken();
+  user.verificationTokenHash = hashToken(confirmationToken);
+  user.verificationTokenExpiresAt = new Date(now().getTime() + EMAIL_CONFIRMATION_TOKEN_TTL_MS);
+  await user.save();
+
+  const emailTask = sendEmailSafely(sendConfirmationEmail, {
+    to: user.email,
+    confirmationUrl: buildConfirmationUrl(confirmationToken)
+  });
+
+  if (awaitConfirmationEmail) {
+    await emailTask;
+  } else {
+    void emailTask;
+  }
+};
+
 const invalidConfirmationTokenError = (): AppError =>
   new AppError(
     400,
@@ -489,17 +555,7 @@ export const loginUser = async (
 };
 
 const parsePasswordResetEmail = (input: PasswordResetRequestInput): string => {
-  if (typeof input.email !== "string") {
-    throw new AppError(400, "INVALID_EMAIL", "Email is required");
-  }
-
-  const email = normalizeEmail(input.email);
-
-  if (!emailPattern.test(email)) {
-    throw new AppError(400, "INVALID_EMAIL", "Email must be a valid email address");
-  }
-
-  return email;
+  return parseEmailInput(input);
 };
 
 export const requestPasswordReset = async (
