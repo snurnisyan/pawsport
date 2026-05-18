@@ -1,18 +1,14 @@
 import { createPetEvent, deleteEvent, getEvent, listPetEvents, updateEvent } from "../controllers/eventController";
 import { createDocumentedRouter } from "../docs/route";
-import { jsonResponse } from "../docs/routeContent";
+import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
 import {
-  CreateEventMultipartRequestSchema,
   CreateEventRequestSchema,
   EventListQuerySchema,
   EventListResponseSchema,
   EventResponseSchema,
   IdPathParamsSchema,
-  UpdateEventMultipartRequestSchema,
   UpdateEventRequestSchema
 } from "../docs/schemas";
-import { multipartOnly } from "../middleware/multipartOnly";
-import { upload } from "../middleware/uploadMiddleware";
 
 const petEvents = createDocumentedRouter({
   basePath: "/pets/:id/events",
@@ -31,19 +27,10 @@ petEvents.route("get", "/", {
 
 petEvents.route("post", "/", {
   operationId: "createPetEvent",
-  summary: "Create an event for a pet (optionally with inline files via multipart/form-data)",
-  request: {
-    params: IdPathParamsSchema,
-    body: {
-      required: true,
-      content: {
-        "application/json": { schema: CreateEventRequestSchema },
-        "multipart/form-data": { schema: CreateEventMultipartRequestSchema }
-      }
-    }
-  },
+  summary: "Create an event for a pet",
+  request: { params: IdPathParamsSchema, body: jsonRequestBody(CreateEventRequestSchema) },
   responses: { 201: jsonResponse("Event created", EventResponseSchema) },
-  handlers: [multipartOnly(upload.array("files")), createPetEvent]
+  handlers: [createPetEvent]
 });
 
 const events = createDocumentedRouter({ basePath: "/events", tags: ["Events"], auth: true });
@@ -59,18 +46,9 @@ events.route("get", "/:id", {
 events.route("patch", "/:id", {
   operationId: "updateEvent",
   summary: "Update an event",
-  request: {
-    params: IdPathParamsSchema,
-    body: {
-      required: true,
-      content: {
-        "application/json": { schema: UpdateEventRequestSchema },
-        "multipart/form-data": { schema: UpdateEventMultipartRequestSchema }
-      }
-    }
-  },
+  request: { params: IdPathParamsSchema, body: jsonRequestBody(UpdateEventRequestSchema) },
   responses: { 200: jsonResponse("Event updated", EventResponseSchema) },
-  handlers: [multipartOnly(upload.array("files")), updateEvent]
+  handlers: [updateEvent]
 });
 
 events.route("delete", "/:id", {

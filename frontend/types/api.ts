@@ -133,7 +133,7 @@ export interface paths {
         /** List events for a pet */
         get: operations["listPetEvents"];
         put?: never;
-        /** Create an event for a pet (optionally with inline files via multipart/form-data) */
+        /** Create an event for a pet */
         post: operations["createPetEvent"];
         delete?: never;
         options?: never;
@@ -510,12 +510,8 @@ export interface components {
              * @enum {string}
              */
             reminderOffset?: "day" | "week" | "month";
-        };
-        CreateEventMultipartRequest: {
-            /** @description JSON-encoded CreateEventRequest payload (omit fileIds when sending files). */
-            event: string;
-            /** @description Optional PDF/PNG/JPG files to attach to the created event. */
-            files?: string[];
+            /** @default [] */
+            fileIds: components["schemas"]["ObjectId"][];
         };
         UpdateEventRequest: {
             /** @enum {string} */
@@ -533,12 +529,7 @@ export interface components {
              * @enum {string}
              */
             reminderOffset?: "day" | "week" | "month";
-        };
-        UpdateEventMultipartRequest: {
-            /** @description JSON-encoded UpdateEventRequest payload (omit fileIds when sending files). */
-            event: string;
-            /** @description Optional PDF/PNG/JPG files to add to the event. */
-            files?: string[];
+            fileIds?: components["schemas"]["ObjectId"][];
         };
         ExportPeriod: {
             /**
@@ -612,6 +603,8 @@ export interface components {
             /** Format: binary */
             file: string;
             eventId?: components["schemas"]["ObjectId"];
+            /** @description Set to true when uploading files before creating an event. Temporary files are hidden from the pet file list and cleaned up if they are not later referenced by event fileIds. */
+            temporaryForEvent?: boolean;
         };
         VetContact: {
             name?: string;
@@ -1133,7 +1126,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateEventRequest"];
-                "multipart/form-data": components["schemas"]["CreateEventMultipartRequest"];
             };
         };
         responses: {
@@ -1283,7 +1275,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateEventRequest"];
-                "multipart/form-data": components["schemas"]["UpdateEventMultipartRequest"];
             };
         };
         responses: {

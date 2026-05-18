@@ -32,13 +32,24 @@ export const listPetFilesHandler = (dependencies: ListPetFilesHandlerDependencie
 
 export const listPetFiles = listPetFilesHandler();
 
-export const uploadPetFile = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const file = await fileService.uploadPetFile(requireUserId(req), req.params.id, {
-    file: req.file,
-    eventId: req.body?.eventId
+export interface UploadPetFileHandlerDependencies {
+  uploadPetFile?: typeof fileService.uploadPetFile;
+}
+
+export const uploadPetFileHandler = (dependencies: UploadPetFileHandlerDependencies = {}) => {
+  const { uploadPetFile: uploadPetFileFn = fileService.uploadPetFile } = dependencies;
+
+  return asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const file = await uploadPetFileFn(requireUserId(req), req.params.id, {
+      file: req.file,
+      eventId: req.body?.eventId,
+      temporaryForEvent: req.body?.temporaryForEvent
+    });
+    res.status(201).json({ file });
   });
-  res.status(201).json({ file });
-});
+};
+
+export const uploadPetFile = uploadPetFileHandler();
 
 export interface UploadPetPhotoHandlerDependencies {
   uploadPetPhoto?: typeof fileService.uploadPetPhoto;

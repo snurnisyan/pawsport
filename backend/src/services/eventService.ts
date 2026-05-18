@@ -19,6 +19,7 @@ import { FileModel, type IStoredFile } from "../models/File";
 import { PetModel, type IPet } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
 import {
+  attachFilesToEvent as defaultAttachFilesToEvent,
   detachEventFromFiles as defaultDetachEventFromFiles,
   validateFileIdsForPet as defaultValidateFileIdsForPet
 } from "./fileService";
@@ -163,6 +164,12 @@ export interface EventServiceDependencies {
     petId: Types.ObjectId,
     fileIds: Types.ObjectId[]
   ) => Promise<void>;
+  attachFilesToEvent?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId,
+    eventId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<void>;
   listFilesByIds?: (
     ownerId: Types.ObjectId,
     fileIds: Types.ObjectId[]
@@ -187,6 +194,7 @@ const isEventServiceDependencies = (
     typeof candidate.syncPendingReminderForEvent === "function" ||
     typeof candidate.deleteRemindersForEvent === "function" ||
     typeof candidate.validateFileIdsForPet === "function" ||
+    typeof candidate.attachFilesToEvent === "function" ||
     typeof candidate.listFilesByIds === "function" ||
     typeof candidate.detachFilesFromEvent === "function"
   );
@@ -735,6 +743,8 @@ export const createPetEvent = async (
     findPetByIdForOwner = defaultFindPet,
     syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
     validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids),
+    attachFilesToEvent = (owner, pet, eventId, ids) =>
+      defaultAttachFilesToEvent(owner, pet, eventId, ids),
     listFilesByIds = defaultListFilesByIds
   } = dependencies;
 
@@ -754,6 +764,8 @@ export const createPetEvent = async (
     petId: petObjectId,
     ...normalized
   });
+
+  await attachFilesToEvent(ownerObjectId, petObjectId, event._id, normalized.fileIds);
 
   if (event.reminderOffset) {
     await syncPendingReminderForEvent({
@@ -835,6 +847,8 @@ export const updateEvent = async (
     findEventByIdForOwner = defaultFindEvent,
     syncPendingReminderForEvent = defaultSyncPendingReminderForEvent,
     validateFileIdsForPet = (owner, pet, ids) => defaultValidateFileIdsForPet(owner, pet, ids),
+    attachFilesToEvent = (owner, pet, eventId, ids) =>
+      defaultAttachFilesToEvent(owner, pet, eventId, ids),
     listFilesByIds = defaultListFilesByIds,
     updateEventRecord = async (id, owner, updates) => {
       const op: Record<string, unknown> = {};
@@ -897,6 +911,11 @@ export const updateEvent = async (
       eventDate: updated.eventDate,
       reminderOffset: updated.reminderOffset
     });
+  }
+
+  if (fileIdsInUpdate) {
+    const requestedFileIds = (updates.set.fileIds as Types.ObjectId[] | undefined) ?? [];
+    await attachFilesToEvent(ownerObjectId, updated.petId, updated._id, requestedFileIds);
   }
 
   return serializeEventWithFiles(ownerObjectId, updated, listFilesByIds);

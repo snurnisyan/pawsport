@@ -9,6 +9,7 @@ export interface IStoredFile {
   ownerId: Types.ObjectId;
   petId: Types.ObjectId;
   eventId?: Types.ObjectId;
+  tempExpiresAt?: Date;
   originalName: string;
   mimeType: AllowedFileMimeType;
   sizeBytes: number;
@@ -37,6 +38,10 @@ const fileSchema = new Schema<IStoredFile>(
     eventId: {
       type: Schema.Types.ObjectId,
       ref: "Event",
+      index: true
+    },
+    tempExpiresAt: {
+      type: Date,
       index: true
     },
     originalName: {
@@ -73,6 +78,7 @@ const fileSchema = new Schema<IStoredFile>(
 );
 
 fileSchema.index({ ownerId: 1, petId: 1, uploadedAt: -1 });
+fileSchema.index({ tempExpiresAt: 1, eventId: 1 });
 fileSchema.index({ ownerId: 1, originalName: "text" });
 
 export const FileModel = model<IStoredFile>("File", fileSchema);

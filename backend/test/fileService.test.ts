@@ -10,10 +10,14 @@ import {
   deleteFile,
   detachEventFromFiles,
   downloadFile,
+  cleanupExpiredTemporaryFile,
   listPetFiles,
   serializeFile,
+  TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE,
+  TEMPORARY_EVENT_FILE_TTL_MS,
   uploadPetFile,
   uploadPetPhoto,
+  attachFilesToEvent,
   validateFileIdsForPet,
   type PetPhotoPetRecord,
   type UploadedFileInput
@@ -130,6 +134,78 @@ test("uploadPetFile verifies ownership, stores object, creates metadata, and ser
   assert.equal(result.eventId, eventId);
   assert.equal(result.originalName, "vet report.pdf");
   assert.equal(result.uploadedAt, uploadedAt.toISOString());
+});
+
+test("uploadPetFile marks event-creation files temporary and schedules cleanup", async () => {
+  let captured: Record<string, unknown> | undefined;
+  let cleanupJob:
+    | {
+        type: string;
+        payload: Record<string, unknown>;
+        runAt?: Date;
+        idempotencyKey?: string;
+      }
+    | undefined;
+
+  await uploadPetFile(
+    ownerId,
+    petId,
+    { file: makeUpload(), temporaryForEvent: "true" },
+    {
+      storage: makeStorage(),
+      findPetByIdForOwner: petFound,
+      createFileRecord: async (input) => {
+        captured = input as unknown as Record<string, unknown>;
+        return makeFileRecord({
+          _id: input._id,
+          ownerId: input.ownerId,
+          petId: input.petId,
+          tempExpiresAt: input.tempExpiresAt,
+          originalName: input.originalName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          storageKey: input.storageKey,
+          uploadedAt: input.uploadedAt
+        });
+      },
+      enqueueTemporaryFileCleanup: async (input) => {
+        cleanupJob = {
+          type: input.type,
+          payload: input.payload,
+          runAt: input.runAt,
+          idempotencyKey: input.idempotencyKey
+        };
+      },
+      now: () => uploadedAt
+    }
+  );
+
+  assert.ok(captured?.tempExpiresAt instanceof Date);
+  assert.equal(
+    (captured.tempExpiresAt as Date).toISOString(),
+    new Date(uploadedAt.getTime() + TEMPORARY_EVENT_FILE_TTL_MS).toISOString()
+  );
+  assert.equal(cleanupJob?.type, TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE);
+  assert.equal(cleanupJob?.payload.ownerId, ownerId);
+  assert.equal(cleanupJob?.payload.fileId, (captured._id as Types.ObjectId).toString());
+  assert.equal(cleanupJob?.runAt?.toISOString(), (captured.tempExpiresAt as Date).toISOString());
+  assert.equal(
+    cleanupJob?.idempotencyKey,
+    `${TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE}:${(captured._id as Types.ObjectId).toString()}`
+  );
+});
+
+test("uploadPetFile rejects temporaryForEvent together with eventId", async () => {
+  await assert.rejects(
+    () =>
+      uploadPetFile(
+        ownerId,
+        petId,
+        { file: makeUpload(), eventId, temporaryForEvent: true },
+        { findPetByIdForOwner: petFound }
+      ),
+    assertAppError(400, "TEMPORARY_FILE_EVENT_CONFLICT")
+  );
 });
 
 test("uploadPetFile decodes latin1-mojibake UTF-8 original names", async () => {
@@ -295,6 +371,25 @@ test("listPetFiles excludes the current pet photo file", async () => {
   assert.deepEqual(
     result.map((file) => file.originalName),
     ["vet report.pdf"]
+  );
+});
+
+test("listPetFiles excludes temporary event-creation files", async () => {
+  const visible = makeFileRecord({ _id: new Types.ObjectId(), originalName: "visible.pdf" });
+  const temporary = makeFileRecord({
+    _id: new Types.ObjectId(),
+    originalName: "draft.pdf",
+    tempExpiresAt: new Date("2026-05-13T10:00:00.000Z")
+  });
+
+  const result = await listPetFiles(ownerId, petId, {
+    findPetByIdForOwner: petFound,
+    listFilesForPet: async () => [temporary, visible]
+  });
+
+  assert.deepEqual(
+    result.map((file) => file.originalName),
+    ["visible.pdf"]
   );
 });
 
@@ -720,6 +815,104 @@ test("detachEventFromFiles unsets eventId on matching files for the owner", asyn
   });
 
   assert.deepEqual(observed, { owner: ownerId, event: eventId });
+});
+
+test("attachFilesToEvent sets eventId and clears temporary expiry", async () => {
+  const fileIds = [new Types.ObjectId(fileId), new Types.ObjectId(fileId)];
+  let observed:
+    | {
+        owner: string;
+        pet: string;
+        event: string;
+        ids: string[];
+      }
+    | undefined;
+
+  await attachFilesToEvent(
+    new Types.ObjectId(ownerId),
+    new Types.ObjectId(petId),
+    new Types.ObjectId(eventId),
+    fileIds,
+    {
+      attachFileRecordsToEvent: async (owner, pet, event, ids) => {
+        observed = {
+          owner: owner.toString(),
+          pet: pet.toString(),
+          event: event.toString(),
+          ids: ids.map((id) => id.toString())
+        };
+      }
+    }
+  );
+
+  assert.deepEqual(observed, {
+    owner: ownerId,
+    pet: petId,
+    event: eventId,
+    ids: [fileId]
+  });
+});
+
+test("cleanupExpiredTemporaryFile deletes expired unattached temporary file", async () => {
+  const deletedKeys: string[] = [];
+  let metadataDeleted = false;
+  const tempExpiresAt = new Date("2026-05-12T09:00:00.000Z");
+
+  await cleanupExpiredTemporaryFile(ownerId, fileId, {
+    storage: makeStorage({
+      deleteObject: async ({ key }) => {
+        deletedKeys.push(key);
+      }
+    }),
+    findTemporaryFileByIdForOwner: async (id, owner) => {
+      assert.equal(id.toString(), fileId);
+      assert.equal(owner.toString(), ownerId);
+      return makeFileRecord({ tempExpiresAt });
+    },
+    deleteTemporaryFileRecord: async (id, owner) => {
+      assert.equal(id.toString(), fileId);
+      assert.equal(owner.toString(), ownerId);
+      metadataDeleted = true;
+      return makeFileRecord({ tempExpiresAt });
+    },
+    now: () => uploadedAt
+  });
+
+  assert.deepEqual(deletedKeys, [makeFileRecord().storageKey]);
+  assert.equal(metadataDeleted, true);
+});
+
+test("cleanupExpiredTemporaryFile keeps files that are attached or not expired", async () => {
+  let storageCalled = false;
+
+  await cleanupExpiredTemporaryFile(ownerId, fileId, {
+    storage: makeStorage({
+      deleteObject: async () => {
+        storageCalled = true;
+      }
+    }),
+    findTemporaryFileByIdForOwner: async () =>
+      makeFileRecord({
+        eventId: new Types.ObjectId(eventId),
+        tempExpiresAt: new Date("2026-05-12T09:00:00.000Z")
+      }),
+    now: () => uploadedAt
+  });
+
+  await cleanupExpiredTemporaryFile(ownerId, fileId, {
+    storage: makeStorage({
+      deleteObject: async () => {
+        storageCalled = true;
+      }
+    }),
+    findTemporaryFileByIdForOwner: async () =>
+      makeFileRecord({
+        tempExpiresAt: new Date("2026-05-12T11:00:00.000Z")
+      }),
+    now: () => uploadedAt
+  });
+
+  assert.equal(storageCalled, false);
 });
 
 test("deleteAllFilesForPet removes pet files from storage and metadata", async () => {

@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { Types, isValidObjectId } from "mongoose";
 
 import { AppError } from "../middleware/errorHandler";
+import { enqueueJob, type EnqueueJobInput } from "../jobs/backgroundJobService";
 import { ALLOWED_FILE_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../middleware/uploadMiddleware";
 import { EventModel, type IEvent } from "../models/Event";
 import { FileModel, type AllowedFileMimeType, type IStoredFile } from "../models/File";
@@ -21,6 +22,8 @@ import {
 
 export const ALLOWED_PHOTO_MIME_TYPES = ["image/png", "image/jpeg"] as const;
 export type AllowedPhotoMimeType = (typeof ALLOWED_PHOTO_MIME_TYPES)[number];
+export const TEMPORARY_EVENT_FILE_TTL_MS = 24 * 60 * 60 * 1000;
+export const TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE = "temporary-event-file-cleanup";
 
 export interface UploadedFileInput {
   originalname: string;
@@ -32,6 +35,7 @@ export interface UploadedFileInput {
 export interface UploadPetFileInput {
   file?: UploadedFileInput;
   eventId?: unknown;
+  temporaryForEvent?: unknown;
 }
 
 export interface SerializedFile {
@@ -60,6 +64,7 @@ type FileRecord = Pick<
   | "ownerId"
   | "petId"
   | "eventId"
+  | "tempExpiresAt"
   | "originalName"
   | "mimeType"
   | "sizeBytes"
@@ -77,6 +82,7 @@ interface CreateFilePersistInput {
   ownerId: Types.ObjectId;
   petId: Types.ObjectId;
   eventId?: Types.ObjectId;
+  tempExpiresAt?: Date;
   originalName: string;
   mimeType: AllowedFileMimeType;
   sizeBytes: number;
@@ -89,6 +95,7 @@ export interface FileServiceDependencies {
   findPetByIdForOwner?: (petId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<PetRecord | null>;
   findEventByIdForOwner?: (eventId: Types.ObjectId, ownerId: Types.ObjectId) => Promise<EventRecord | null>;
   createFileRecord?: (input: CreateFilePersistInput) => Promise<FileRecord>;
+  enqueueTemporaryFileCleanup?: (input: EnqueueJobInput) => Promise<unknown>;
   listFilesForPet?: (
     ownerId: Types.ObjectId,
     petId: Types.ObjectId,
@@ -107,8 +114,9 @@ const isFileServiceDependencies = (
   return (
     candidate.storage !== undefined ||
     typeof candidate.findPetByIdForOwner === "function" ||
-    typeof candidate.findEventByIdForOwner === "function" ||
-    typeof candidate.createFileRecord === "function" ||
+  typeof candidate.findEventByIdForOwner === "function" ||
+  typeof candidate.createFileRecord === "function" ||
+  typeof candidate.enqueueTemporaryFileCleanup === "function" ||
     typeof candidate.listFilesForPet === "function" ||
     typeof candidate.findFileByIdForOwner === "function" ||
     typeof candidate.deleteFileRecord === "function" ||
@@ -139,6 +147,21 @@ const parseOptionalEventId = (value: unknown): Types.ObjectId | undefined => {
     throw new AppError(400, "INVALID_EVENT_ID", "eventId must be a valid id");
   }
   return new Types.ObjectId(value);
+};
+
+const parseOptionalBoolean = (value: unknown, fieldName: string): boolean => {
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.toLowerCase();
+    if (["true", "1", "yes"].includes(normalized)) return true;
+    if (["false", "0", "no"].includes(normalized)) return false;
+  }
+  throw new AppError(400, "INVALID_TEMPORARY_FOR_EVENT", `${fieldName} must be a boolean`);
 };
 
 const defaultFindPet: NonNullable<FileServiceDependencies["findPetByIdForOwner"]> = async (
@@ -223,6 +246,9 @@ export const uploadPetFile = async (
     findPetByIdForOwner = defaultFindPet,
     findEventByIdForOwner = defaultFindEvent,
     createFileRecord = async (payload) => FileModel.create(payload) as unknown as FileRecord,
+    deleteFileRecord = async (id, owner) =>
+      FileModel.findOneAndDelete({ _id: id, ownerId: owner }).exec() as unknown as FileRecord | null,
+    enqueueTemporaryFileCleanup = enqueueJob,
     now = () => new Date()
   } = dependencies;
 
@@ -249,6 +275,15 @@ export const uploadPetFile = async (
   }
 
   const eventObjectId = parseOptionalEventId(input.eventId);
+  const temporaryForEvent = parseOptionalBoolean(input.temporaryForEvent, "temporaryForEvent");
+  if (eventObjectId && temporaryForEvent) {
+    throw new AppError(
+      400,
+      "TEMPORARY_FILE_EVENT_CONFLICT",
+      "temporaryForEvent cannot be used together with eventId"
+    );
+  }
+
   if (eventObjectId) {
     const event = await findEventByIdForOwner(eventObjectId, ownerObjectId);
     if (!event) {
@@ -263,6 +298,9 @@ export const uploadPetFile = async (
   const originalName = normalizeOriginalName(file.originalname);
   const storageKey = buildStorageKey(ownerObjectId, petObjectId, fileObjectId, originalName);
   const uploadedAt = now();
+  const tempExpiresAt = temporaryForEvent
+    ? new Date(uploadedAt.getTime() + TEMPORARY_EVENT_FILE_TTL_MS)
+    : undefined;
 
   try {
     await storage.putObject({
@@ -279,12 +317,36 @@ export const uploadPetFile = async (
     ownerId: ownerObjectId,
     petId: petObjectId,
     eventId: eventObjectId,
+    tempExpiresAt,
     originalName,
     mimeType: file.mimetype,
     sizeBytes: file.size,
     storageKey,
     uploadedAt
   });
+
+  if (tempExpiresAt) {
+    try {
+      await enqueueTemporaryFileCleanup({
+        type: TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE,
+        payload: {
+          fileId: fileObjectId.toString(),
+          ownerId: ownerObjectId.toString()
+        },
+        runAt: tempExpiresAt,
+        maxAttempts: 5,
+        idempotencyKey: `${TEMPORARY_EVENT_FILE_CLEANUP_JOB_TYPE}:${fileObjectId.toString()}`
+      });
+    } catch (error) {
+      await deleteFileRecord(fileObjectId, ownerObjectId);
+      try {
+        await storage.deleteObject({ key: storageKey });
+      } catch {
+        // Best effort: surface the enqueue failure because without the job the temp file may leak.
+      }
+      throw toStorageError(error, "TEMPORARY_FILE_CLEANUP_ENQUEUE_FAILED", "Could not schedule temporary file cleanup");
+    }
+  }
 
   return serializeFile(created);
 };
@@ -534,7 +596,11 @@ export const listPetFiles = async (
   const {
     findPetByIdForOwner = defaultFindPet,
     listFilesForPet = async (owner, pet, range) => {
-      const filter: Record<string, unknown> = { ownerId: owner, petId: pet };
+      const filter: Record<string, unknown> = {
+        ownerId: owner,
+        petId: pet,
+        tempExpiresAt: { $exists: false }
+      };
       const uploadedAt: Record<string, Date> = {};
       if (range.from) uploadedAt.$gte = range.from;
       if (range.to) uploadedAt.$lte = range.to;
@@ -557,8 +623,8 @@ export const listPetFiles = async (
 
   const files = await listFilesForPet(ownerObjectId, petObjectId, range);
   const visibleFiles = pet.photoFileId
-    ? files.filter((file) => !file._id.equals(pet.photoFileId))
-    : files;
+    ? files.filter((file) => !file._id.equals(pet.photoFileId) && !file.tempExpiresAt)
+    : files.filter((file) => !file.tempExpiresAt);
   return visibleFiles.map(serializeFile);
 };
 
@@ -643,6 +709,7 @@ export interface ValidateFileIdsDependencies {
     petId: Types.ObjectId,
     fileIds: Types.ObjectId[]
   ) => Promise<number>;
+  now?: () => Date;
 }
 
 export const validateFileIdsForPet = async (
@@ -657,7 +724,15 @@ export const validateFileIdsForPet = async (
 
   const {
     countFilesForPet = async (owner, pet, ids) =>
-      FileModel.countDocuments({ _id: { $in: ids }, ownerId: owner, petId: pet }).exec()
+      FileModel.countDocuments({
+        _id: { $in: ids },
+        ownerId: owner,
+        petId: pet,
+        $or: [
+          { tempExpiresAt: { $exists: false } },
+          { tempExpiresAt: { $gt: (dependencies.now ?? (() => new Date()))() } }
+        ]
+      }).exec()
   } = dependencies;
 
   const uniqueIds = Array.from(
@@ -671,6 +746,104 @@ export const validateFileIdsForPet = async (
       "INVALID_FILE_IDS",
       "fileIds must reference files belonging to the same pet"
     );
+  }
+};
+
+export interface AttachFilesToEventDependencies {
+  attachFileRecordsToEvent?: (
+    ownerId: Types.ObjectId,
+    petId: Types.ObjectId,
+    eventId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<void>;
+}
+
+export const attachFilesToEvent = async (
+  ownerId: Types.ObjectId,
+  petId: Types.ObjectId,
+  eventId: Types.ObjectId,
+  fileIds: Types.ObjectId[],
+  dependencies: AttachFilesToEventDependencies = {}
+): Promise<void> => {
+  if (fileIds.length === 0) {
+    return;
+  }
+
+  const {
+    attachFileRecordsToEvent = async (owner, pet, event, ids) => {
+      await FileModel.updateMany(
+        { _id: { $in: ids }, ownerId: owner, petId: pet },
+        {
+          $set: { eventId: event },
+          $unset: { tempExpiresAt: "" }
+        }
+      ).exec();
+    }
+  } = dependencies;
+
+  const uniqueIds = Array.from(
+    new Map(fileIds.map((id) => [id.toString(), id])).values()
+  );
+  await attachFileRecordsToEvent(ownerId, petId, eventId, uniqueIds);
+};
+
+type TemporaryFileRecord = Pick<
+  IStoredFile,
+  "_id" | "ownerId" | "eventId" | "storageKey" | "tempExpiresAt"
+>;
+
+export interface CleanupExpiredTemporaryFileDependencies {
+  storage?: FileStorage;
+  findTemporaryFileByIdForOwner?: (
+    fileId: Types.ObjectId,
+    ownerId: Types.ObjectId
+  ) => Promise<TemporaryFileRecord | null>;
+  deleteTemporaryFileRecord?: (
+    fileId: Types.ObjectId,
+    ownerId: Types.ObjectId,
+    tempExpiresAt: Date
+  ) => Promise<TemporaryFileRecord | null>;
+  now?: () => Date;
+}
+
+export const cleanupExpiredTemporaryFile = async (
+  ownerId: string,
+  fileId: string,
+  dependencies: CleanupExpiredTemporaryFileDependencies = {}
+): Promise<void> => {
+  const {
+    storage = s3Storage,
+    findTemporaryFileByIdForOwner = async (id, owner) =>
+      FileModel.findOne({ _id: id, ownerId: owner }).exec() as unknown as TemporaryFileRecord | null,
+    deleteTemporaryFileRecord = async (id, owner, expiresAt) =>
+      FileModel.findOneAndDelete({
+        _id: id,
+        ownerId: owner,
+        eventId: { $exists: false },
+        tempExpiresAt: expiresAt
+      }).exec() as unknown as TemporaryFileRecord | null,
+    now = () => new Date()
+  } = dependencies;
+
+  const ownerObjectId = requireOwnerId(ownerId);
+  const fileObjectId = requireObjectId(fileId, "INVALID_FILE_ID", "fileId must be a valid id");
+  const file = await findTemporaryFileByIdForOwner(fileObjectId, ownerObjectId);
+
+  if (!file || file.eventId || !file.tempExpiresAt || file.tempExpiresAt.getTime() > now().getTime()) {
+    return;
+  }
+
+  const deleted = await deleteTemporaryFileRecord(fileObjectId, ownerObjectId, file.tempExpiresAt);
+  if (!deleted) {
+    return;
+  }
+
+  try {
+    await storage.deleteObject({ key: deleted.storageKey });
+  } catch (error) {
+    if (!isMissingObjectError(error)) {
+      throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+    }
   }
 };
 
