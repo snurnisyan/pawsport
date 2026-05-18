@@ -1,7 +1,12 @@
-import { createPetExport, getPetExport } from "../controllers/exportController";
+import { createPetExport, getPetExport, listOwnerExports } from "../controllers/exportController";
 import { createDocumentedRouter } from "../docs/route";
 import { jsonRequestBody, jsonResponse } from "../docs/routeContent";
-import { CreateExportRequestSchema, ExportResponseSchema, IdPathParamsSchema } from "../docs/schemas";
+import {
+  CreateExportRequestSchema,
+  ExportListResponseSchema,
+  ExportResponseSchema,
+  IdPathParamsSchema
+} from "../docs/schemas";
 
 const petExports = createDocumentedRouter({
   basePath: "/pets/:id/export",
@@ -25,6 +30,13 @@ const exportStatus = createDocumentedRouter({
   basePath: "/exports",
   tags: ["Exports"],
   auth: true
+});
+
+exportStatus.route("get", "/", {
+  operationId: "listOwnerExports",
+  summary: "List current user's exports",
+  responses: { 200: jsonResponse("Export list", ExportListResponseSchema) },
+  handlers: [listOwnerExports]
 });
 
 exportStatus.route("get", "/:id", {
