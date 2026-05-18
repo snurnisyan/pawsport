@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   apiClient,
-  authenticatedFetch,
-  normalizeApiError,
   unwrapApiResponse,
   unwrapVoidApiResponse,
 } from "@/lib/api";
 import {
+  deleteFile,
   petEventsQueryKey,
   listPetEvents,
+  uploadPetFile,
   type TPetEvent,
   type TPetEventListResponse,
   type TPetEventsQuery,
@@ -28,7 +28,30 @@ export const eventQueryKey = (id: string) => ["events", id] as const;
 export const getEvent = (id: string): Promise<TPetEventResponse> =>
   unwrapApiResponse(apiClient.GET("/events/{id}", { params: { path: { id } } }));
 
-export const createPetEvent = (
+const cleanupUploadedFiles = async (fileIds: string[]): Promise<void> => {
+  await Promise.allSettled(fileIds.map((id) => deleteFile(id)));
+};
+
+const uploadTemporaryEventFiles = async (
+  petId: string,
+  files: File[]
+): Promise<string[]> => {
+  const uploadedIds: string[] = [];
+  for (const file of files) {
+    try {
+      const result = await uploadPetFile(petId, file, {
+        temporaryForEvent: true,
+      });
+      uploadedIds.push(result.file.id);
+    } catch (error) {
+      await cleanupUploadedFiles(uploadedIds);
+      throw error;
+    }
+  }
+  return uploadedIds;
+};
+
+export const createPetEvent = async (
   petId: string,
   body: TCreateEventRequest,
   files: File[] = []
@@ -43,30 +66,36 @@ export const createPetEvent = (
     );
   }
 
-  const formData = new FormData();
-  formData.append("event", JSON.stringify(body));
-  files.forEach((file) => formData.append("files", file));
+  const uploadedIds = await uploadTemporaryEventFiles(petId, files);
 
-  return authenticatedFetch(`/pets/${petId}/events`, {
-    method: "POST",
-    body: formData,
-  }).then(async (response) => {
-    const payload = (await response.json().catch(() => undefined)) as unknown;
-
-    if (!response.ok) {
-      throw normalizeApiError(payload, response);
-    }
-
-    return payload as TPetEventResponse;
-  });
+  try {
+    return await unwrapApiResponse(
+      apiClient.POST("/pets/{id}/events", {
+        params: { path: { id: petId } },
+        body: { ...body, fileIds: [...body.fileIds, ...uploadedIds] },
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  } catch (error) {
+    await cleanupUploadedFiles(uploadedIds);
+    throw error;
+  }
 };
 
-export const updateEvent = (
+export type TUpdateEventOptions = {
+  petId?: string;
+  files?: File[];
+  existingFileIds?: string[];
+};
+
+export const updateEvent = async (
   id: string,
   body: TUpdateEventRequest,
-  files: File[] = []
+  options: TUpdateEventOptions = {}
 ): Promise<TPetEventResponse> => {
-  if (files.length === 0) {
+  const { petId, files = [], existingFileIds } = options;
+
+  if (files.length === 0 || !petId) {
     return unwrapApiResponse(
       apiClient.PATCH("/events/{id}", {
         params: { path: { id } },
@@ -76,22 +105,23 @@ export const updateEvent = (
     );
   }
 
-  const formData = new FormData();
-  formData.append("event", JSON.stringify(body));
-  files.forEach((file) => formData.append("files", file));
+  const uploadedIds = await uploadTemporaryEventFiles(petId, files);
 
-  return authenticatedFetch(`/events/${id}`, {
-    method: "PATCH",
-    body: formData,
-  }).then(async (response) => {
-    const payload = (await response.json().catch(() => undefined)) as unknown;
-
-    if (!response.ok) {
-      throw normalizeApiError(payload, response);
-    }
-
-    return payload as TPetEventResponse;
-  });
+  try {
+    return await unwrapApiResponse(
+      apiClient.PATCH("/events/{id}", {
+        params: { path: { id } },
+        body: {
+          ...body,
+          fileIds: [...(existingFileIds ?? []), ...uploadedIds],
+        },
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  } catch (error) {
+    await cleanupUploadedFiles(uploadedIds);
+    throw error;
+  }
 };
 
 export const deleteEvent = (id: string): Promise<void> =>

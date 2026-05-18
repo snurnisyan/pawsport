@@ -13,12 +13,14 @@ import {
   type TPetEvent,
   type TUpdateEventRequest,
 } from "@/lib/eventsApi";
+import { deleteFile } from "@/lib/petsApi";
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import type { TPetEventType } from "@/store/pets";
 import {
   EventForm,
   INITIAL_EVENT,
   type TEventFormData,
+  type TExistingEventFile,
   type TReminderValue,
 } from "./EventForm";
 
@@ -77,6 +79,7 @@ const buildPayload = (data: TEventFormData): TCreateEventRequest => ({
   clinicName: data.clinic.trim() || undefined,
   comment: data.comment.trim() || undefined,
   reminderOffset: data.reminder === "none" ? undefined : data.reminder,
+  fileIds: [],
 });
 
 const apiErrorMessage = (error: unknown, fallback: string): string =>
@@ -93,6 +96,7 @@ export function EventDialog({
   const isEdit = Boolean(event);
   const queryClient = useQueryClient();
   const [data, setData] = useState<TEventFormData>(INITIAL_EVENT);
+  const [keptExistingFiles, setKeptExistingFiles] = useState<TExistingEventFile[]>([]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -103,13 +107,17 @@ export function EventDialog({
           ? fromEvent(event)
           : { ...INITIAL_EVENT, date: todayIsoDate(), ...(initialData ?? {}) },
       );
+      setKeptExistingFiles(event?.files ?? []);
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [open, event, initialData]);
 
   const targetPetId = event?.petId ?? petId;
-  const existingFiles = event?.files ?? [];
+
+  const handleRemoveExistingFile = (fileId: string) => {
+    setKeptExistingFiles((prev) => prev.filter((f) => f.fileId !== fileId));
+  };
 
   const invalidateEvents = async () => {
     if (targetPetId) {
@@ -142,9 +150,23 @@ export function EventDialog({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (body: TUpdateEventRequest) => {
+    mutationFn: async (body: TUpdateEventRequest) => {
       if (!event?.id) throw new Error("Не удалось обновить событие: нет идентификатора события.");
-      return updateEvent(event.id, body, data.files);
+      const originalIds = (event.files ?? []).map((f) => f.fileId);
+      const keptIds = keptExistingFiles.map((f) => f.fileId);
+      const removedIds = originalIds.filter((id) => !keptIds.includes(id));
+
+      const result = await updateEvent(event.id, body, {
+        petId: event.petId,
+        files: data.files,
+        existingFileIds: keptIds,
+      });
+
+      if (removedIds.length > 0) {
+        await Promise.allSettled(removedIds.map((id) => deleteFile(id)));
+      }
+
+      return result;
     },
     onSuccess: async () => {
       await invalidateEvents();
@@ -204,7 +226,8 @@ export function EventDialog({
       <EventForm
         data={data}
         onChange={(patch) => setData((d) => ({ ...d, ...patch }))}
-        existingFiles={existingFiles}
+        existingFiles={keptExistingFiles}
+        onRemoveExistingFile={isEdit ? handleRemoveExistingFile : undefined}
       />
     </DialogShell>
   );

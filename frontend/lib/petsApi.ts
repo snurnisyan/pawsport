@@ -52,6 +52,7 @@ export type TPetFilesQuery = {
 };
 export type TUploadPetFileOptions = {
   eventId?: string;
+  temporaryForEvent?: boolean;
 };
 
 export const petsQueryKey = ["pets"] as const;
@@ -137,6 +138,7 @@ export const uploadPetFile = async (
   const body = new FormData();
   body.append("file", file);
   if (options?.eventId) body.append("eventId", options.eventId);
+  if (options?.temporaryForEvent) body.append("temporaryForEvent", "true");
 
   const response = await authenticatedFetch(`/pets/${petId}/files`, {
     method: "POST",

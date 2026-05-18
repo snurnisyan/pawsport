@@ -80,6 +80,7 @@ type TEventFormProps = {
   onChange: (patch: Partial<TEventFormData>) => void;
   pets?: TPetOption[];
   existingFiles?: TExistingEventFile[];
+  onRemoveExistingFile?: (fileId: string) => void;
 };
 
 const FILE_ACCEPT = "application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg";
@@ -106,6 +107,7 @@ export function EventForm({
   onChange,
   pets,
   existingFiles = [],
+  onRemoveExistingFile,
 }: TEventFormProps) {
   const handleDownload = async (id: string, fallbackName: string) => {
     try {
@@ -304,6 +306,22 @@ export function EventForm({
                 <Icon color="fg.muted" flexShrink={0}>
                   <LuDownload />
                 </Icon>
+                {onRemoveExistingFile && (
+                  <IconButton
+                    aria-label="Убрать файл"
+                    size="sm"
+                    variant="ghost"
+                    color="fg.muted"
+                    flexShrink={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveExistingFile(file.fileId);
+                    }}
+                    _hover={{ color: "fg.default", bg: "secondary.700" }}
+                  >
+                    <LuX />
+                  </IconButton>
+                )}
               </HStack>
             ))}
 
