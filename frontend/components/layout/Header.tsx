@@ -14,8 +14,10 @@ import { LuBell, LuCalendar, LuChevronDown, LuHouse, LuLogOut, LuMenu } from "re
 import { Logo } from "@/components/ui/Logo";
 import { ChakraLink } from "@/components/ui/NextLink";
 import { Pressable } from "@/components/ui/Pressable";
+import { PrimaryButton } from "@/components/ui/Buttons";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api";
+import { resendEmailConfirmation } from "@/lib/authApi";
 import { EVENT_TYPE_META } from "@/lib/eventTypes";
 import {
   listActiveReminders,
@@ -240,6 +242,24 @@ function RemindersContent({
   );
 }
 
+type TEmailNotVerifiedBlockProps = {
+  onResend: () => void;
+  isPending: boolean;
+};
+
+function EmailNotVerifiedBlock({ onResend, isPending }: TEmailNotVerifiedBlockProps) {
+  return (
+    <Stack gap="8px" px="4px" py="4px">
+      <Text fontSize="13px" color="fg.muted" textAlign="center">
+        Ваш email не подтвержден
+      </Text>
+      <PrimaryButton h="36px" onClick={onResend} loading={isPending}>
+        Подтвердить
+      </PrimaryButton>
+    </Stack>
+  );
+}
+
 type TLogoutRowProps = {
   onClick: () => void;
 };
@@ -289,6 +309,27 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
   const [desktopRemindersOpen, setDesktopRemindersOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const email = session?.user.email ?? userEmail;
+  const emailVerified = session?.user.emailVerified ?? true;
+  const resendEmailMutation = useMutation({
+    mutationFn: resendEmailConfirmation,
+    onSuccess: () => {
+      toaster.create({
+        type: "success",
+        title: "Письмо отправлено",
+        description: "Проверьте почту, чтобы подтвердить email.",
+      });
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось отправить письмо",
+        description:
+          error instanceof ApiError
+            ? error.message
+            : "Попробуйте еще раз позже.",
+      });
+    },
+  });
+  const handleResendEmail = () => resendEmailMutation.mutate();
   const remindersQuery = useQuery({
     queryKey: ACTIVE_REMINDERS_QUERY_KEY,
     queryFn: listActiveReminders,
@@ -467,8 +508,19 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
             </Popover.Trigger>
             <Portal>
               <Popover.Positioner>
-                <Popover.Content {...POPOVER_CONTENT_PROPS} minW="auto" w="140px">
-                  <LogoutRow onClick={logout} />
+                <Popover.Content {...POPOVER_CONTENT_PROPS} minW="auto" w="280px">
+                  <Stack gap="4px">
+                    {!emailVerified && (
+                      <>
+                        <EmailNotVerifiedBlock
+                          onResend={handleResendEmail}
+                          isPending={resendEmailMutation.isPending}
+                        />
+                        <Box h="1px" bg="border.subtle" my="4px" />
+                      </>
+                    )}
+                    <LogoutRow onClick={logout} />
+                  </Stack>
                 </Popover.Content>
               </Popover.Positioner>
             </Portal>
@@ -526,6 +578,15 @@ export function Header({ userEmail = "user@test.ru" }: THeaderProps) {
                       showTitle={false}
                     />
                     <Box h="1px" bg="border.subtle" my="4px" />
+                    {!emailVerified && (
+                      <>
+                        <EmailNotVerifiedBlock
+                          onResend={handleResendEmail}
+                          isPending={resendEmailMutation.isPending}
+                        />
+                        <Box h="1px" bg="border.subtle" my="4px" />
+                      </>
+                    )}
                     <LogoutRow onClick={logout} />
                   </Stack>
                 </Popover.Content>

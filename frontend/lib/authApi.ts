@@ -18,6 +18,9 @@ export const loginUser = (body: TLoginRequest): Promise<TAuthResponse> =>
 export const confirmEmail = (token: string): Promise<TAuthResponse> =>
   unwrapApiResponse(apiClient.POST("/auth/confirm", { body: { token } }));
 
+export const resendEmailConfirmation = (): Promise<TMessageResponse> =>
+  unwrapApiResponse(apiClient.POST("/auth/resend", {}));
+
 export const requestPasswordReset = (
   body: TPasswordResetRequest
 ): Promise<TMessageResponse> =>
