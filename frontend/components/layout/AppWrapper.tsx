@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Box, Container, Spinner, Stack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useAuthSession, useClientReady } from "@/lib/session";
+import { Footer } from "./Footer";
 import { Header } from "./Header";
 
 type TAppWrapperProps = {
@@ -40,16 +41,18 @@ export function AppWrapper({ children, maxW = "1024px" }: TAppWrapperProps) {
   }
 
   return (
-    <Box minH="100vh" bg="bg.canvas">
+    <Box minH="100vh" bg="bg.canvas" display="flex" flexDirection="column">
       <Header />
       <Container
         maxW={maxW}
         px={["16px", null, "24px"]}
         py={["24px", null, "40px"]}
         mx={"auto"}
+        flex="1"
       >
         {children}
       </Container>
+      <Footer />
     </Box>
   );
 }
