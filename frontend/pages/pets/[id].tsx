@@ -116,7 +116,13 @@ export default function PetPage() {
             value={tab}
             onChange={(value) => setPetTab(id, value as TPetPageTab)}
           />
-          {tab === "overview" && <OverviewTab pet={pet} backendPetId={petQuery.data?.pet.id} />}
+          {tab === "overview" && (
+            <OverviewTab
+              pet={pet}
+              backendPetId={petQuery.data?.pet.id}
+              onPetDeleted={() => router.push("/pets")}
+            />
+          )}
           {tab === "events" && <EventsTab petId={petQuery.data?.pet.id} />}
           {tab === "files" && <FilesTab petId={petQuery.data?.pet.id} />}
           {tab === "export" && (
