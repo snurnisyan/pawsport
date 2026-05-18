@@ -1,128 +1,396 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Drawer,
   Grid,
   HStack,
+  Icon,
   IconButton,
   Stack,
   Text,
   useDisclosure,
 } from "@chakra-ui/react";
 import Head from "next/head";
-import { useMemo, useState } from "react";
-import { LuChevronLeft, LuChevronRight, LuFilter } from "react-icons/lu";
-import { CalendarFilters } from "@/components/calendar/CalendarFilters";
+import { useEffect, useMemo, useState } from "react";
+import {
+  LuCalendarOff,
+  LuChevronLeft,
+  LuChevronRight,
+  LuFilter,
+  LuSearchX,
+} from "react-icons/lu";
+import {
+  CalendarFilters,
+  type TCalendarPetFilterOption,
+} from "@/components/calendar/CalendarFilters";
 import { MiniMonth, type TMiniDayEvent } from "@/components/calendar/MiniMonth";
 import { DayDialog } from "@/components/calendar/day/DayDialog";
-import type { TDayEvent, TDayEventType } from "@/components/calendar/day/DayEventCard";
+import type { TDayEvent } from "@/components/calendar/day/DayEventCard";
+import type { TEventFormData } from "@/components/pets/events/EventForm";
+import { buildPayload } from "@/components/pets/events/eventFormMapping";
 import { AppWrapper } from "@/components/layout/AppWrapper";
-import { usePetsStore, type TPet } from "@/store/pets";
+import { toaster } from "@/components/ui/toaster";
+import { ApiError } from "@/lib/api";
+import {
+  calendarQueryKey,
+  useCalendarEventsQuery,
+  type TCalendarQuery,
+} from "@/lib/calendarApi";
+import {
+  createPetEvent,
+  eventQueryKey,
+  petEventsQueryKey,
+  updateEvent,
+  type TPetEvent,
+} from "@/lib/eventsApi";
+import {
+  EVENT_TYPE_FILTER_OPTIONS,
+} from "@/lib/eventTypes";
+import {
+  deleteFile,
+  petFilesQueryKey,
+  usePetsQuery,
+  type TPetDetail,
+} from "@/lib/petsApi";
+import type { TPetEventType } from "@/store/pets";
 
-type TMark = "vaccine" | "treatment" | "visit" | "lab";
+type TSelectedDay = { year: number; month: number; day: number };
+type TEventsByMonth = Record<number, Record<number, TDayEvent[]>>;
+type TMiniEventsByMonth = Record<number, Record<number, TMiniDayEvent[]>>;
 
-const SAMPLE_MARKS: Record<number, Record<number, TMark[]>> = {
-  0: { 12: ["vaccine"] },
-  2: { 22: ["vaccine"] },
-  4: { 15: ["visit"], 29: ["treatment"] },
-  6: { 18: ["vaccine"] },
-  7: { 18: ["treatment"] },
-  8: { 2: ["visit", "vaccine", "treatment"], 15: ["vaccine"], 28: ["treatment"] },
-  9: { 6: ["lab"] },
-  10: { 11: ["visit"] },
-};
+const EMPTY_EVENTS: TPetEvent[] = [];
 
-const MARK_TO_EVENT: Record<TMark, { type: TDayEventType; title: string }> = {
-  vaccine: { type: "vaccine", title: "Вакцинация (бешенство)" },
-  treatment: { type: "treatment", title: "Обработка от паразитов" },
-  visit: { type: "visit", title: "Чек-ап" },
-  lab: { type: "lab", title: "Анализы и обследования" },
-};
+const ALL_EVENT_TYPES = EVENT_TYPE_FILTER_OPTIONS.map(
+  (option) => option.value
+) as TPetEventType[];
 
-const TIMES = ["09:00", "10:30", "14:00", "16:30"];
-
-const SEX_LABEL: Record<TPet["sex"], string> = {
+const SEX_LABEL: Record<TPetDetail["sex"], string> = {
   male: "мальчик",
   female: "девочка",
   unknown: "пол не указан",
 };
-const SPECIES_LABEL: Record<TPet["species"], string> = {
+
+const SPECIES_LABEL: Record<string, string> = {
   dog: "собака",
   cat: "кот",
   other: "питомец",
 };
 
-const petDescription = (pet: TPet) =>
-  `${pet.name}, ${SPECIES_LABEL[pet.species]} (${SEX_LABEL[pet.sex]}, ${pet.ageLabel})`;
+const pad = (n: number) => String(n).padStart(2, "0");
 
-const buildSampleEvents = (marks: TMark[], pets: TPet[]): TDayEvent[] => {
-  if (pets.length === 0) return [];
-  return marks.map((mark, idx) => {
-    const meta = MARK_TO_EVENT[mark];
-    const pet = pets[idx % pets.length];
-    return {
-      id: `${mark}-${idx}`,
-      type: meta.type,
-      title: meta.title,
-      time: TIMES[idx % TIMES.length],
-      petId: pet.id,
-      petName: pet.name,
-      petDescription: petDescription(pet),
-      place: "Ветеринарная клиника",
-      nextDate: mark === "vaccine" ? "2027-06-12" : undefined,
-      reminder: "day",
-      comment:
-        mark === "vaccine"
-          ? "Вакцинация от бешенства, нужно прийти натощак"
-          : undefined,
-      files:
-        idx === 1
-          ? [{ name: "Направление.pdf" }, { name: "Анализы.pdf" }]
-          : undefined,
-    };
+const dateParam = (year: number, month: number, day: number) =>
+  `${year}-${pad(month)}-${pad(day)}`;
+
+const sameValues = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((value, idx) => value === b[idx]);
+
+const apiErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof ApiError ? error.message : fallback;
+
+const formatEventDate = (iso: string): string | undefined => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 };
 
-type TSelectedDay = { year: number; month: number; day: number };
+const formatEventTime = (iso: string): string | undefined => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const petDescription = (pet?: TPetDetail): string | undefined => {
+  if (!pet) return undefined;
+  const species = SPECIES_LABEL[pet.species] ?? "питомец";
+  const breed = pet.breed ? `, ${pet.breed}` : "";
+  return `${pet.name}, ${species}${breed} (${SEX_LABEL[pet.sex]})`;
+};
+
+const toDayEvent = (
+  event: TPetEvent,
+  petsById: Map<string, TPetDetail>
+): TDayEvent | undefined => {
+  const time = formatEventTime(event.eventDate);
+  if (!time) return undefined;
+
+  const pet = petsById.get(event.petId);
+
+  return {
+    id: event.id,
+    type: event.type,
+    subtype: event.subtype,
+    time,
+    title: event.title,
+    petId: event.petId,
+    petName: pet?.name ?? "Питомец",
+    petDescription: petDescription(pet),
+    place: event.clinicName,
+    comment: event.comment,
+    nextDate: event.nextDate ? formatEventDate(event.nextDate) : undefined,
+    reminder: event.reminderOffset ?? "none",
+    files: event.files,
+    source: event,
+  };
+};
+
+const groupEventsByMonth = (
+  events: TPetEvent[],
+  petsById: Map<string, TPetDetail>
+): TEventsByMonth => {
+  const grouped: TEventsByMonth = {};
+
+  for (const event of events) {
+    const date = new Date(event.eventDate);
+    if (Number.isNaN(date.getTime())) continue;
+
+    const viewEvent = toDayEvent(event, petsById);
+    if (!viewEvent) continue;
+
+    const month = date.getMonth();
+    const day = date.getDate();
+    grouped[month] ??= {};
+    grouped[month][day] ??= [];
+    grouped[month][day].push(viewEvent);
+  }
+
+  for (const days of Object.values(grouped)) {
+    for (const dayEvents of Object.values(days)) {
+      dayEvents.sort((a, b) => {
+        const byTime =
+          new Date(a.source.eventDate).getTime() -
+          new Date(b.source.eventDate).getTime();
+        if (byTime !== 0) return byTime;
+        const byTitle = a.title.localeCompare(b.title, "ru");
+        if (byTitle !== 0) return byTitle;
+        return a.id.localeCompare(b.id);
+      });
+    }
+  }
+
+  return grouped;
+};
+
+const toMiniEvents = (eventsByMonth: TEventsByMonth): TMiniEventsByMonth => {
+  const result: TMiniEventsByMonth = {};
+  for (const [monthKey, days] of Object.entries(eventsByMonth)) {
+    const month = Number(monthKey);
+    result[month] = {};
+    for (const [dayKey, events] of Object.entries(days)) {
+      result[month][Number(dayKey)] = events.map((event) => ({
+        mark: event.type,
+        title: event.title,
+        petName: event.petName,
+        time: event.time,
+      }));
+    }
+  }
+  return result;
+};
+
+const toMarks = (eventsByMonth: TEventsByMonth) => {
+  const result: Record<number, Record<number, TPetEventType[]>> = {};
+  for (const [monthKey, days] of Object.entries(eventsByMonth)) {
+    const month = Number(monthKey);
+    result[month] = {};
+    for (const [dayKey, events] of Object.entries(days)) {
+      result[month][Number(dayKey)] = Array.from(
+        new Set(events.map((event) => event.type))
+      );
+    }
+  }
+  return result;
+};
 
 export default function CalendarPage() {
-  const [year, setYear] = useState(2026);
+  const queryClient = useQueryClient();
+  const [year, setYear] = useState(() => new Date().getFullYear());
   const [selectedDay, setSelectedDay] = useState<TSelectedDay | null>(null);
+  const [selectedEventTypes, setSelectedEventTypes] =
+    useState<TPetEventType[]>(ALL_EVENT_TYPES);
+  const [selectedPetIds, setSelectedPetIds] = useState<string[]>([]);
+  const [petFilterTouched, setPetFilterTouched] = useState(false);
   const drawer = useDisclosure();
-  const pets = usePetsStore((s) => s.pets);
 
-  const petOptions = useMemo(
-    () => pets.map((p) => ({ value: p.id, label: p.name })),
-    [pets],
+  const petsQuery = usePetsQuery();
+  const pets = useMemo(() => petsQuery.data?.items ?? [], [petsQuery.data?.items]);
+  const petOptions = useMemo<TCalendarPetFilterOption[]>(
+    () => pets.map((pet) => ({ value: pet.id, label: pet.name })),
+    [pets]
+  );
+  const petIds = useMemo(() => pets.map((pet) => pet.id), [pets]);
+  const petsById = useMemo(
+    () => new Map(pets.map((pet) => [pet.id, pet])),
+    [pets]
   );
 
-  const miniEventsByMonth = useMemo(() => {
-    const result: Record<number, Record<number, TMiniDayEvent[]>> = {};
-    for (const [monthKey, daysMap] of Object.entries(SAMPLE_MARKS)) {
-      const monthIdx = Number(monthKey);
-      result[monthIdx] = {};
-      for (const [dayKey, marks] of Object.entries(daysMap)) {
-        const dayIdx = Number(dayKey);
-        const events = buildSampleEvents(marks, pets);
-        result[monthIdx][dayIdx] = events.map((event, i) => ({
-          mark: marks[i],
-          title: event.title,
-          petName: event.petName,
-          time: event.time,
-        }));
-      }
-    }
-    return result;
-  }, [pets]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSelectedPetIds((current) => {
+        if (!petFilterTouched) return sameValues(current, petIds) ? current : petIds;
+        const valid = current.filter((id) => petIds.includes(id));
+        return sameValues(current, valid) ? current : valid;
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [petFilterTouched, petIds]);
+
+  const calendarQuery = useMemo<TCalendarQuery>(() => {
+    const allPetsSelected =
+      pets.length > 0 && selectedPetIds.length === pets.length;
+    const allTypesSelected = selectedEventTypes.length === ALL_EVENT_TYPES.length;
+
+    return {
+      from: dateParam(year, 1, 1),
+      to: dateParam(year, 12, 31),
+      petIds: allPetsSelected ? undefined : selectedPetIds,
+      eventTypes: allTypesSelected ? undefined : selectedEventTypes,
+    };
+  }, [pets.length, selectedEventTypes, selectedPetIds, year]);
+
+  const calendarEnabled =
+    !petsQuery.isLoading &&
+    selectedPetIds.length > 0 &&
+    selectedEventTypes.length > 0;
+  const calendarQueryResult = useCalendarEventsQuery(
+    calendarQuery,
+    calendarEnabled
+  );
+
+  const backendEvents = useMemo(
+    () =>
+      calendarEnabled
+        ? calendarQueryResult.data?.events ?? EMPTY_EVENTS
+        : EMPTY_EVENTS,
+    [calendarEnabled, calendarQueryResult.data?.events]
+  );
+
+  const eventsByMonth = useMemo(
+    () => groupEventsByMonth(backendEvents, petsById),
+    [backendEvents, petsById]
+  );
+  const miniEventsByMonth = useMemo(() => toMiniEvents(eventsByMonth), [eventsByMonth]);
+  const marksByMonth = useMemo(() => toMarks(eventsByMonth), [eventsByMonth]);
 
   const dayEvents = selectedDay
-    ? buildSampleEvents(
-        SAMPLE_MARKS[selectedDay.month]?.[selectedDay.day] ?? [],
-        pets,
-      )
+    ? eventsByMonth[selectedDay.month]?.[selectedDay.day] ?? []
     : [];
   const dayDate = selectedDay
     ? new Date(selectedDay.year, selectedDay.month, selectedDay.day)
     : new Date();
+
+  const createMutation = useMutation({
+    mutationFn: async (data: TEventFormData) => {
+      if (!data.petId) throw new Error("Выберите питомца для события.");
+      const payload = buildPayload(data);
+      return createPetEvent(data.petId, { ...payload, fileIds: [] }, data.files);
+    },
+    onSuccess: async (response, data) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: calendarQueryKey(calendarQuery) }),
+        queryClient.invalidateQueries({ queryKey: petEventsQueryKey(data.petId) }),
+        data.files.length > 0
+          ? queryClient.invalidateQueries({ queryKey: petFilesQueryKey(data.petId) })
+          : Promise.resolve(),
+      ]);
+      return response;
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось добавить событие",
+        description: apiErrorMessage(error, "Попробуйте еще раз."),
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      event,
+      data,
+      keptExistingFileIds,
+    }: {
+      event: TDayEvent;
+      data: TEventFormData;
+      keptExistingFileIds: string[];
+    }) => {
+      const originalIds = (event.source.files ?? []).map((file) => file.fileId);
+      const removedIds = originalIds.filter((id) => !keptExistingFileIds.includes(id));
+      const payload = buildPayload(data);
+      const result = await updateEvent(event.id, payload, {
+        petId: event.petId,
+        files: data.files,
+        existingFileIds: keptExistingFileIds,
+      });
+
+      if (removedIds.length > 0) {
+        await Promise.allSettled(removedIds.map((id) => deleteFile(id)));
+      }
+
+      return {
+        event,
+        data,
+        result,
+        filesChanged: data.files.length > 0 || removedIds.length > 0,
+      };
+    },
+    onSuccess: async ({ event, data, filesChanged }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: calendarQueryKey(calendarQuery) }),
+        queryClient.invalidateQueries({ queryKey: petEventsQueryKey(event.petId) }),
+        queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) }),
+        filesChanged
+          ? queryClient.invalidateQueries({ queryKey: petFilesQueryKey(event.petId) })
+          : Promise.resolve(),
+      ]);
+      return data;
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось обновить событие",
+        description: apiErrorMessage(error, "Попробуйте еще раз."),
+      });
+    },
+  });
+
+  const mutationPending = createMutation.isPending || updateMutation.isPending;
+  const petsError =
+    petsQuery.error instanceof ApiError
+      ? petsQuery.error.message
+      : petsQuery.isError
+        ? "Не удалось загрузить питомцев"
+        : undefined;
+  const calendarError =
+    calendarQueryResult.error instanceof ApiError
+      ? calendarQueryResult.error.message
+      : calendarQueryResult.isError
+        ? "Попробуйте обновить страницу."
+        : undefined;
+
+  const emptyFiltered = selectedEventTypes.length === 0 || selectedPetIds.length === 0;
+  const emptyEvents =
+    calendarEnabled &&
+    !calendarQueryResult.isLoading &&
+    !calendarQueryResult.isError &&
+    backendEvents.length === 0;
+
+  const filters = (
+    <CalendarFilters
+      selectedEventTypes={selectedEventTypes}
+      selectedPetIds={selectedPetIds}
+      pets={petOptions}
+      petsLoading={petsQuery.isLoading}
+      petsError={petsError}
+      onEventTypesChange={setSelectedEventTypes}
+      onPetIdsChange={(ids) => {
+        setPetFilterTouched(true);
+        setSelectedPetIds(ids);
+      }}
+    />
+  );
 
   return (
     <>
@@ -208,6 +476,37 @@ export default function CalendarPage() {
               </IconButton>
             </HStack>
 
+            {calendarQueryResult.isLoading || emptyFiltered || emptyEvents || calendarError ? (
+              <HStack
+                gap="10px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                rounded="card"
+                px="16px"
+                py="12px"
+                color={calendarError ? "red.200" : "fg.muted"}
+              >
+                <Icon>
+                  {calendarError ? (
+                    <LuSearchX />
+                  ) : emptyEvents || emptyFiltered ? (
+                    <LuCalendarOff />
+                  ) : (
+                    <LuCalendarOff />
+                  )}
+                </Icon>
+                <Text fontSize="14px">
+                  {calendarError ??
+                    (emptyFiltered
+                      ? "Нет выбранных питомцев или типов событий"
+                      : emptyEvents
+                        ? "Событий по выбранным фильтрам нет"
+                        : "Загружаем события...")}
+                </Text>
+              </HStack>
+            ) : null}
+
             <Grid
               templateColumns={["1fr", "1fr 1fr", "repeat(3, 1fr)"]}
               gap="16px"
@@ -217,7 +516,7 @@ export default function CalendarPage() {
                   key={m}
                   year={year}
                   month={m}
-                  marks={SAMPLE_MARKS[m] || {}}
+                  marks={marksByMonth[m] || {}}
                   eventsByDay={miniEventsByMonth[m] || {}}
                   onDayClick={(day) => setSelectedDay({ year, month: m, day })}
                   onDayExpand={(day) => setSelectedDay({ year, month: m, day })}
@@ -227,7 +526,7 @@ export default function CalendarPage() {
           </Stack>
 
           <Box display={["none", null, null, "block"]} position="sticky" top="80px">
-            <CalendarFilters />
+            {filters}
           </Box>
         </Grid>
 
@@ -243,7 +542,7 @@ export default function CalendarPage() {
                 <Drawer.Title>Фильтры</Drawer.Title>
               </Drawer.Header>
               <Drawer.Body px="20px" py="20px">
-                <CalendarFilters />
+                {filters}
               </Drawer.Body>
             </Drawer.Content>
           </Drawer.Positioner>
@@ -255,6 +554,23 @@ export default function CalendarPage() {
           date={dayDate}
           events={dayEvents}
           pets={petOptions}
+          isPending={mutationPending}
+          onCreate={async (data) => {
+            try {
+              await createMutation.mutateAsync(data);
+              return true;
+            } catch {
+              return false;
+            }
+          }}
+          onUpdate={async (event, data, keptExistingFileIds) => {
+            try {
+              await updateMutation.mutateAsync({ event, data, keptExistingFileIds });
+              return true;
+            } catch {
+              return false;
+            }
+          }}
         />
       </AppWrapper>
     </>

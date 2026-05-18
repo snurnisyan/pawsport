@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import {
   LuBell,
@@ -20,17 +20,25 @@ import {
   REMINDER_OPTIONS,
   TYPE_OPTIONS,
   type TEventFormData,
+  type TExistingEventFile,
   type TPetOption,
   type TReminderValue,
 } from "@/components/pets/events/EventForm";
-import { EVENT_TYPE_META, isEventSubtypeSupported } from "@/lib/eventTypes";
-import type { TPetEventType } from "@/store/pets";
+import { fromEvent } from "@/components/pets/events/eventFormMapping";
+import {
+  EVENT_SUBTYPE_LABEL,
+  EVENT_TYPE_META,
+  isEventSubtypeSupported,
+} from "@/lib/eventTypes";
+import type { TPetEvent } from "@/lib/eventsApi";
+import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
 
 export type TDayEventType = TPetEventType;
 
 export type TDayEvent = {
   id: string;
   type: TDayEventType;
+  subtype?: TPetEventSubtype;
   time: string;
   title: string;
   petId: string;
@@ -40,25 +48,12 @@ export type TDayEvent = {
   comment?: string;
   nextDate?: string;
   reminder?: TReminderValue;
-  files?: { name: string }[];
+  files?: TExistingEventFile[];
+  source: TPetEvent;
 };
 
 const lookupLabel = (options: { value: string; label: string }[], v?: string) =>
   options.find((o) => o.value === v)?.label;
-
-const eventToForm = (event: TDayEvent): TEventFormData => ({
-  title: event.title,
-  type: event.type,
-  subtype: "",
-  petId: event.petId,
-  date: "",
-  time: event.time ?? "",
-  nextDate: event.nextDate ?? "",
-  reminder: event.reminder ?? "day",
-  clinic: event.place ?? "",
-  comment: event.comment ?? "",
-  files: [],
-});
 
 type TFieldRowProps = {
   icon: ReactNode;
@@ -95,7 +90,7 @@ function FieldRow({ icon, label, children }: TFieldRowProps) {
 }
 
 type TFilesListProps = {
-  files: { name: string }[];
+  files: TExistingEventFile[];
 };
 
 function FilesList({ files }: TFilesListProps) {
@@ -103,7 +98,7 @@ function FilesList({ files }: TFilesListProps) {
     <Stack gap="6px">
       {files.map((f, i) => (
         <HStack
-          key={`${f.name}-${i}`}
+          key={`${f.fileId}-${i}`}
           gap="8px"
           bg="secondary.700"
           rounded="md"
@@ -114,7 +109,7 @@ function FilesList({ files }: TFilesListProps) {
             <LuFile />
           </Icon>
           <Text fontSize="13px" truncate>
-            {f.name}
+            {f.originalName}
           </Text>
         </HStack>
       ))}
@@ -134,7 +129,12 @@ function ReadView({ event, onEdit }: TReadViewProps) {
         {event.title}
       </FieldRow>
       <FieldRow icon={<LuTag />} label="Тип">
-        {lookupLabel(TYPE_OPTIONS, event.type) ?? event.type}
+        {[
+          lookupLabel(TYPE_OPTIONS, event.type) ?? event.type,
+          event.subtype ? EVENT_SUBTYPE_LABEL[event.subtype] : undefined,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </FieldRow>
       {event.petDescription && (
         <FieldRow icon={<LuPawPrint />} label="Питомец">
@@ -183,16 +183,36 @@ type TEditViewProps = {
   onSave: () => void;
   pets: TPetOption[];
   saveLabel: string;
+  existingFiles?: TExistingEventFile[];
+  onRemoveExistingFile?: (fileId: string) => void;
+  isPending?: boolean;
 };
 
-function EditView({ data, onChange, onCancel, onSave, pets, saveLabel }: TEditViewProps) {
+function EditView({
+  data,
+  onChange,
+  onCancel,
+  onSave,
+  pets,
+  saveLabel,
+  existingFiles,
+  onRemoveExistingFile,
+  isPending,
+}: TEditViewProps) {
   const subtypeMissing = isEventSubtypeSupported(data.type) && !data.subtype;
-  const disabled = !data.title.trim() || !data.type || !data.petId || subtypeMissing;
+  const disabled =
+    Boolean(isPending) || !data.title.trim() || !data.type || !data.petId || subtypeMissing;
   return (
     <Stack gap="20px" px="16px" pb="16px" pt="8px">
-      <EventForm data={data} onChange={onChange} pets={pets} />
+      <EventForm
+        data={data}
+        onChange={onChange}
+        pets={pets.length > 0 ? pets : undefined}
+        existingFiles={existingFiles}
+        onRemoveExistingFile={onRemoveExistingFile}
+      />
       <HStack gap="12px" pt="4px">
-        <GhostButton flex={1} onClick={onCancel}>
+        <GhostButton flex={1} onClick={onCancel} disabled={isPending}>
           Отменить
         </GhostButton>
         <PrimaryButton flex={1} onClick={onSave} disabled={disabled}>
@@ -207,22 +227,44 @@ type TDayEventCardProps = {
   event?: TDayEvent;
   pets: TPetOption[];
   expanded: boolean;
+  initialData?: Partial<TEventFormData>;
+  isPending?: boolean;
   onToggle?: () => void;
-  onSave: (data: TEventFormData) => void;
+  onSave: (data: TEventFormData, keptExistingFileIds: string[]) => boolean | Promise<boolean>;
   onCancel?: () => void;
 };
 
 export function DayEventCard({ event,
                                 pets,
                                 expanded,
+                                initialData,
+                                isPending = false,
                                 onToggle,
                                 onSave,
                                 onCancel }: TDayEventCardProps) {
   const isCreate = !event;
   const [editMode, setEditMode] = useState(isCreate);
   const [form, setForm] = useState<TEventFormData>(() =>
-    event ? eventToForm(event) : INITIAL_EVENT,
+    event ? fromEvent(event.source) : { ...INITIAL_EVENT, ...(initialData ?? {}) },
   );
+  const [keptExistingFiles, setKeptExistingFiles] = useState<TExistingEventFile[]>(
+    event?.files ?? []
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (event) {
+        setForm(fromEvent(event.source));
+        setKeptExistingFiles(event.files ?? []);
+        return;
+      }
+
+      setForm({ ...INITIAL_EVENT, ...(initialData ?? {}) });
+      setKeptExistingFiles([]);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [event, initialData]);
 
   const meta = event ? EVENT_TYPE_META[event.type] : EVENT_TYPE_META.visit;
   const EventIcon = meta.Icon;
@@ -230,7 +272,10 @@ export function DayEventCard({ event,
   const headerTitle = event ? `${event.title} — ${event.petName}` : "Новое событие";
 
   const startEdit = () => {
-    if (event) setForm(eventToForm(event));
+    if (event) {
+      setForm(fromEvent(event.source));
+      setKeptExistingFiles(event.files ?? []);
+    }
     setEditMode(true);
   };
 
@@ -239,12 +284,19 @@ export function DayEventCard({ event,
       onCancel?.();
       return;
     }
-    if (event) setForm(eventToForm(event));
+    if (event) {
+      setForm(fromEvent(event.source));
+      setKeptExistingFiles(event.files ?? []);
+    }
     setEditMode(false);
   };
 
-  const handleSave = () => {
-    onSave(form);
+  const handleSave = async () => {
+    const saved = await onSave(
+      form,
+      keptExistingFiles.map((file) => file.fileId)
+    );
+    if (!saved) return;
     if (!isCreate) setEditMode(false);
   };
 
@@ -340,8 +392,18 @@ export function DayEventCard({ event,
               onChange={(patch) => setForm((d) => ({ ...d, ...patch }))}
               onCancel={cancelEdit}
               onSave={handleSave}
-              pets={pets}
+              pets={isCreate ? pets : []}
               saveLabel={isCreate ? "Добавить" : "Сохранить"}
+              existingFiles={isCreate ? [] : keptExistingFiles}
+              onRemoveExistingFile={
+                isCreate
+                  ? undefined
+                  : (fileId) =>
+                      setKeptExistingFiles((prev) =>
+                        prev.filter((file) => file.fileId !== fileId)
+                      )
+              }
+              isPending={isPending}
             />
           ) : event ? (
             <ReadView event={event} onEdit={startEdit} />
