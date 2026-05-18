@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import { LuPlus } from "react-icons/lu";
 import { DialogShell } from "@/components/ui/DialogShell";
@@ -25,8 +25,13 @@ type TDayDialogProps = {
   date: Date;
   events: TDayEvent[];
   pets: TPetOption[];
-  onCreate?: (data: TEventFormData) => void;
-  onUpdate?: (eventId: string, data: TEventFormData) => void;
+  isPending?: boolean;
+  onCreate?: (data: TEventFormData) => boolean | Promise<boolean>;
+  onUpdate?: (
+    event: TDayEvent,
+    data: TEventFormData,
+    keptExistingFileIds: string[]
+  ) => boolean | Promise<boolean>;
 };
 
 export function DayDialog({ open,
@@ -34,29 +39,44 @@ export function DayDialog({ open,
                             date,
                             events,
                             pets,
+                            isPending = false,
                             onCreate,
                             onUpdate }: TDayDialogProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      setExpandedId(null);
-      setCreating(false);
-    } else if (!creating) {
-      setExpandedId(events[0]?.id ?? null);
-    }
+    const timer = window.setTimeout(() => {
+      if (!open) {
+        setExpandedId(null);
+        setCreating(false);
+      } else if (!creating) {
+        setExpandedId(events[0]?.id ?? null);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [open, events, creating]);
 
   const title = `${date.getDate()} ${RU_MONTH[date.getMonth()]}`;
   const subtitle = `${events.length} ${eventsWord(events.length)}`;
 
   const hasContent = creating || events.length > 0;
+  const initialCreateData = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return {
+      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+      petId: pets.length === 1 ? pets[0].value : "",
+    };
+  }, [date, pets]);
 
   return (
     <DialogShell
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => {
+        if (isPending) return;
+        onOpenChange(next);
+      }}
       title={title}
       subtitle={subtitle}
       footer={
@@ -66,11 +86,11 @@ export function DayDialog({ open,
             setCreating(true);
             setExpandedId(null);
           }}
-          disabled={creating}
+          disabled={creating || isPending || pets.length === 0}
         >
           <HStack gap="8px">
             <LuPlus />
-            <Text>Добавить новое событие</Text>
+            <Text>{pets.length === 0 ? "Сначала добавьте питомца" : "Добавить новое событие"}</Text>
           </HStack>
         </PrimaryButton>
       }
@@ -87,9 +107,12 @@ export function DayDialog({ open,
             <DayEventCard
               pets={pets}
               expanded
-              onSave={(data) => {
-                onCreate?.(data);
-                setCreating(false);
+              initialData={initialCreateData}
+              isPending={isPending}
+              onSave={async (data) => {
+                const saved = (await onCreate?.(data)) ?? false;
+                if (saved) setCreating(false);
+                return saved;
               }}
               onCancel={() => setCreating(false)}
             />
@@ -103,7 +126,10 @@ export function DayDialog({ open,
               onToggle={() =>
                 setExpandedId((cur) => (cur === event.id ? null : event.id))
               }
-              onSave={(data) => onUpdate?.(event.id, data)}
+              isPending={isPending}
+              onSave={(data, keptExistingFileIds) =>
+                onUpdate?.(event, data, keptExistingFileIds) ?? false
+              }
             />
           ))}
         </Stack>

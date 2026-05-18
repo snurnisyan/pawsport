@@ -89,7 +89,10 @@ export const updateEvent = async (
     return unwrapApiResponse(
       apiClient.PATCH("/events/{id}", {
         params: { path: { id } },
-        body,
+        body:
+          existingFileIds !== undefined
+            ? { ...body, fileIds: existingFileIds }
+            : body,
         headers: { "Content-Type": "application/json" },
       })
     );
