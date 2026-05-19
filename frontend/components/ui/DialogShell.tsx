@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import {CloseButton, Dialog, HStack, IconButton, Stack, Text} from "@chakra-ui/react";
-import { LuX } from "react-icons/lu";
+import { CloseButton, Dialog, HStack, Stack, Text } from "@chakra-ui/react";
 
 type TDialogShellSize = "sm" | "md" | "lg";
 
@@ -20,13 +19,15 @@ const MAX_W: Record<TDialogShellSize, string> = {
   lg: "720px",
 };
 
-export function DialogShell({ open,
-                              onOpenChange,
-                              title,
-                              subtitle,
-                              children,
-                              footer,
-                              size = "md" }: TDialogShellProps) {
+export function DialogShell({
+  open,
+  onOpenChange,
+  title,
+  subtitle,
+  children,
+  footer,
+  size = "md",
+}: TDialogShellProps) {
   return (
     <Dialog.Root
       open={open}
@@ -54,7 +55,12 @@ export function DialogShell({ open,
             borderBottomWidth="1px"
             borderColor="border.subtle"
           >
-            <HStack justify="space-between" align="flex-start" gap="16px" w="full">
+            <HStack
+              justify="space-between"
+              align="flex-start"
+              gap="16px"
+              w="full"
+            >
               <Stack gap="4px" flex={1} minW={0}>
                 <Dialog.Title fontSize="20px" fontWeight={700}>
                   {title}
