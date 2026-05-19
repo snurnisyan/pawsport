@@ -5,6 +5,7 @@ export type TPetPageTab = "overview" | "events" | "files" | "export";
 type TPetNavigationState = {
   petTabs: Record<string, TPetPageTab>;
   setPetTab: (petId: string, tab: TPetPageTab) => void;
+  reset: () => void;
 };
 
 export const usePetNavigationStore = create<TPetNavigationState>((set) => ({
@@ -16,4 +17,5 @@ export const usePetNavigationStore = create<TPetNavigationState>((set) => ({
         [petId]: tab,
       },
     })),
+  reset: () => set({ petTabs: {} }),
 }));
