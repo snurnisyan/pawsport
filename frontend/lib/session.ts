@@ -1,108 +1,67 @@
-import { useSyncExternalStore } from "react";
-import type { components } from "@/types/api";
+import { useEffect, useMemo } from "react";
+import { ApiError } from "@/lib/api";
+import { getCurrentUser } from "@/lib/authApi";
+import { useAuthStore, type TAuthUser } from "@/store/auth";
 
-export type TAuthUser = components["schemas"]["AuthUser"];
+export type { TAuthUser };
 
 export type TAuthSession = {
-  accessToken: string;
   user: TAuthUser;
 };
 
-const STORAGE_KEY = "pawsport.auth.v1";
-const SESSION_EVENT = "pawsport:auth-session";
+const toAuthUser = (user: {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+}): TAuthUser => ({
+  id: user.id,
+  email: user.email,
+  emailVerified: user.emailVerified,
+});
 
-const isBrowser = () => typeof window !== "undefined";
-
-let cachedRawSession: string | null | undefined;
-let cachedSession: TAuthSession | null = null;
-
-const readSession = (): TAuthSession | null => {
-  if (!isBrowser()) return null;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === cachedRawSession) return cachedSession;
-
-    cachedRawSession = raw;
-    if (!raw) {
-      cachedSession = null;
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<TAuthSession>;
-    if (
-      typeof parsed.accessToken !== "string" ||
-      !parsed.accessToken ||
-      !parsed.user ||
-      typeof parsed.user.id !== "string" ||
-      typeof parsed.user.email !== "string" ||
-      typeof parsed.user.emailVerified !== "boolean"
-    ) {
-      cachedSession = null;
-      return null;
-    }
-
-    cachedSession = { accessToken: parsed.accessToken, user: parsed.user };
-    return cachedSession;
-  } catch {
-    cachedSession = null;
-    return null;
-  }
+export const getAuthSession = (): TAuthSession | null => {
+  const { user } = useAuthStore.getState();
+  return user ? { user } : null;
 };
-
-const emitSessionChange = () => {
-  if (isBrowser()) {
-    window.dispatchEvent(new Event(SESSION_EVENT));
-  }
-};
-
-export const getAuthSession = (): TAuthSession | null => readSession();
-
-export const getAccessToken = (): string | null => readSession()?.accessToken ?? null;
 
 export const persistAuthSession = (session: TAuthSession): void => {
-  if (!isBrowser()) return;
-
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      accessToken: session.accessToken,
-      user: {
-        id: session.user.id,
-        email: session.user.email,
-        emailVerified: session.user.emailVerified,
-      },
-    })
-  );
-  emitSessionChange();
+  useAuthStore.getState().setUser(session.user);
 };
 
 export const clearAuthSession = (): void => {
-  if (!isBrowser()) return;
-
-  window.localStorage.removeItem(STORAGE_KEY);
-  cachedRawSession = null;
-  cachedSession = null;
-  emitSessionChange();
+  useAuthStore.getState().setAnonymous();
 };
 
-const subscribe = (onStoreChange: () => void) => {
-  if (!isBrowser()) return () => undefined;
-
-  window.addEventListener(SESSION_EVENT, onStoreChange);
-  window.addEventListener("storage", onStoreChange);
-  return () => {
-    window.removeEventListener(SESSION_EVENT, onStoreChange);
-    window.removeEventListener("storage", onStoreChange);
-  };
+export const useAuthSession = (): TAuthSession | null => {
+  const user = useAuthStore((state) => state.user);
+  return useMemo(() => (user ? { user } : null), [user]);
 };
 
-export const useAuthSession = () => {
-  return useSyncExternalStore(subscribe, readSession, () => null);
-};
-
-const subscribeClientReady = () => () => undefined;
+export const useAuthStatus = () => useAuthStore((state) => state.status);
 
 export const useClientReady = () => {
-  return useSyncExternalStore(subscribeClientReady, () => true, () => false);
+  const status = useAuthStatus();
+  return status !== "loading";
 };
+
+let bootstrapStarted = false;
+
+export function AuthSessionBootstrap() {
+  useEffect(() => {
+    if (bootstrapStarted) return;
+    bootstrapStarted = true;
+
+    getCurrentUser()
+      .then(({ user }) => {
+        useAuthStore.getState().setUser(toAuthUser(user));
+      })
+      .catch((error) => {
+        if (error instanceof ApiError && error.status !== 401) {
+          console.error("Failed to restore auth session", error);
+        }
+        useAuthStore.getState().setAnonymous();
+      });
+  }, []);
+
+  return null;
+}

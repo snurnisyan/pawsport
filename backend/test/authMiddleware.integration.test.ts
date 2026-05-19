@@ -62,3 +62,17 @@ test("authMiddleware lets a request through when JWT is valid", async () => {
     assert.equal(body.email, "user@example.com");
   });
 });
+
+test("authMiddleware lets a request through when auth cookie is valid", async () => {
+  const token = jwt.sign({ sub: "507f1f77bcf86cd799439011", email: "user@example.com" }, env.JWT_SECRET);
+
+  await withServer(async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/protected`, {
+      headers: { Cookie: `pawsport.access_token=${token}` }
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { userId: string; email: string };
+    assert.equal(body.userId, "507f1f77bcf86cd799439011");
+    assert.equal(body.email, "user@example.com");
+  });
+});

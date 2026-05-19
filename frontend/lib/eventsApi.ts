@@ -131,6 +131,6 @@ export const usePetEventsQuery = (petId?: string, query?: TPetEventsQuery) => {
       ? petEventsQueryKey(petId, query)
       : ["pets", "events", "missing"],
     queryFn: () => listPetEvents(petId!, query),
-    enabled: Boolean(petId) && Boolean(session?.accessToken),
+    enabled: Boolean(petId) && Boolean(session),
   });
 };

@@ -139,7 +139,7 @@ export function FilesTab({ petId }: TFilesTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filters, setFilters] = useState<TFilesFilters>(INITIAL_FILES_FILTERS);
   const [fileToDelete, setFileToDelete] = useState<TPetFile | null>(null);
-  const usesBackend = Boolean(session?.accessToken && petId);
+  const usesBackend = Boolean(session && petId);
   const dateFilters = useMemo<TPetFilesQuery>(
     () => ({
       from: filters.dateRange.from || undefined,

@@ -17,12 +17,12 @@ export function AppWrapper({ children, maxW = "1024px" }: TAppWrapperProps) {
   const clientReady = useClientReady();
 
   useEffect(() => {
-    if (clientReady && !session?.accessToken) {
+    if (clientReady && !session) {
       router.replace("/auth/login");
     }
-  }, [clientReady, router, session?.accessToken]);
+  }, [clientReady, router, session]);
 
-  if (!clientReady || !session?.accessToken) {
+  if (!clientReady || !session) {
     return (
       <Box
         minH="100vh"

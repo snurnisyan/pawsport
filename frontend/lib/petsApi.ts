@@ -249,6 +249,6 @@ export const usePetsQuery = () => {
   return useQuery({
     queryKey: petsQueryKey,
     queryFn: listPets,
-    enabled: Boolean(session?.accessToken),
+    enabled: Boolean(session),
   });
 };

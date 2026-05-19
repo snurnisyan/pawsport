@@ -41,7 +41,7 @@ export type TUseRemindersResult = {
 export function useReminders(open: boolean): TUseRemindersResult {
   const session = useAuthSession();
   const queryClient = useQueryClient();
-  const authenticated = Boolean(session?.accessToken);
+  const authenticated = Boolean(session);
 
   const remindersQuery = useQuery({
     queryKey: ACTIVE_REMINDERS_QUERY_KEY,
