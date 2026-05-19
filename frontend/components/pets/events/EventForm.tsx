@@ -25,7 +25,12 @@ import {
 } from "@/lib/eventTypes";
 import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
-import { formatSize, saveBlob } from "@/utils/files";
+import {
+  MAX_UPLOAD_LABEL,
+  acceptFilesWithSizeGuard,
+  formatSize,
+  saveBlob,
+} from "@/utils/files";
 
 export type TReminderValue = "none" | "day" | "week" | "month";
 
@@ -246,9 +251,12 @@ export function EventForm({
           w="full"
           accept={FILE_ACCEPT}
           maxFiles={20}
-          onFileAccept={({ files }) =>
-            onChange({ files: [...data.files, ...files] })
-          }
+          onFileAccept={({ files }) => {
+            const accepted = acceptFilesWithSizeGuard(files);
+            if (accepted.length > 0) {
+              onChange({ files: [...data.files, ...accepted] });
+            }
+          }}
         >
           <FileUpload.HiddenInput />
           <Stack gap="8px" w="full">
@@ -380,7 +388,7 @@ export function EventForm({
                     textTransform="uppercase"
                     letterSpacing="0.08em"
                   >
-                    PDF, PNG, JPG (макс. 20MB)
+                    PDF, PNG, JPG (макс. {MAX_UPLOAD_LABEL})
                   </Text>
                 </Stack>
               </HStack>

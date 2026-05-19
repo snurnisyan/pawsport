@@ -65,8 +65,6 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
   const shouldRedirectPlainRegistration =
     redirectPlainRegistration && router.isReady && router.query.step !== "pet";
   const isOnPetStep = router.query.step === "pet";
-  // Authenticated users that land on the plain registration form get sent away.
-  // The pet-onboarding step (?step=pet) requires an active session, so we keep it.
   const shouldRedirectAuthenticated =
     clientReady && Boolean(session) && router.isReady && !isOnPetStep && step === 1;
   const visibleStep: 1 | 2 | 3 =
