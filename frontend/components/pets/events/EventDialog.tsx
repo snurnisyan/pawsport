@@ -12,7 +12,7 @@ import {
   type TPetEvent,
   type TUpdateEventRequest,
 } from "@/lib/eventsApi";
-import { deleteFile, petFilesQueryPrefix } from "@/lib/petsApi";
+import { deleteFile, petFilesQueryPrefix, petsQueryKey } from "@/lib/petsApi";
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import {
   EventForm,
@@ -78,6 +78,7 @@ export function EventDialog({
       await queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(targetPetId) });
       await queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(targetPetId) });
     }
+    await queryClient.invalidateQueries({ queryKey: petsQueryKey });
     if (event?.id) {
       await queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) });
     }

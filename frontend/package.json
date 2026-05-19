@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "node --test test/*.test.mjs",
     "gen:api": "yarn --cwd ../backend openapi /tmp/pawsport-openapi.json && openapi-typescript /tmp/pawsport-openapi.json -o types/api.ts",
     "start": "next start",
     "lint": "eslint"
