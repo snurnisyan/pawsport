@@ -28,7 +28,6 @@ const makePet = () => ({
   sex: "female" as const,
   weight: 4.2,
   microchipNumber: "123456789012345",
-  tags: ["indoor"],
   notes: ["likes travel"],
   vetContact: { name: "Dr. Smith", email: "vet@example.com" },
   createdAt: now,
@@ -145,7 +144,6 @@ test("pet-export handler renders, uploads, marks ready, and enqueues one email j
           name: input.pet.name,
           species: input.pet.species,
           sex: input.pet.sex,
-          tags: [],
           notes: []
         }
       };
@@ -557,15 +555,14 @@ test("pet export template HTML-escapes user-controlled pet fields", async () => 
       name: '<script>alert("x")</script>',
       species: "cat",
       sex: "unknown",
-      tags: ['tag"quoted'],
       notes: ["<b>note</b>"]
     }
   });
 
   assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
-  assert.match(html, /tag&quot;quoted/);
   assert.match(html, /&lt;b&gt;note&lt;\/b&gt;/);
   assert.doesNotMatch(html, /<script>alert/);
+  assert.doesNotMatch(html, /tag&quot;quoted|tag-list/);
 });
 
 test("pet export template renders base64 profile photos without escaping the data URI", async () => {
@@ -580,7 +577,6 @@ test("pet export template renders base64 profile photos without escaping the dat
       name: "Miso",
       species: "cat",
       sex: "unknown",
-      tags: [],
       notes: [],
       photo: {
         src: "data:image/png;base64,cG5nLWRhdGE=",
@@ -614,7 +610,6 @@ test("pet export template renders compact timeline cards and clickable file link
       sex: "male",
       weight: 28.5,
       microchipNumber: "123456789012345",
-      tags: ["active"],
       notes: ["Mild grain allergy."],
       vetContact: { name: "Dr. Anna Volkova", email: "anna@example.test" }
     },
@@ -643,7 +638,7 @@ test("pet export template renders compact timeline cards and clickable file link
     ]
   });
 
-  assert.match(html, /Microchip 123456789012345/);
+  assert.match(html, /Микрочип: 123456789012345/);
   assert.doesNotMatch(html, /years old/i);
   assert.doesNotMatch(html, /Veterinarian|Dr\. Anna Volkova/);
   assert.match(html, /<article class="tl-event past">/);

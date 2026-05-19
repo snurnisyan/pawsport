@@ -52,7 +52,6 @@ const makePet = () => ({
   sex: "female" as const,
   weight: 4.2,
   microchipNumber: "123456789012345",
-  tags: ["indoor"],
   notes: ["likes travel"],
   vetContact: { name: "Dr. Smith", email: "vet@example.com" },
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
