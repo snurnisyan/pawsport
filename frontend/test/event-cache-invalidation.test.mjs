@@ -10,6 +10,7 @@ const invalidatesPetsList = (source) =>
 
 test("event create/update invalidates the pet list cache that owns expiredEvents", async () => {
   const eventDialog = await readSource("components/pets/events/EventDialog.tsx");
+  const calendarPage = await readSource("pages/calendar/index.tsx");
 
   assert.ok(
     /\bpetsQueryKey\b/.test(eventDialog),
@@ -18,6 +19,14 @@ test("event create/update invalidates the pet list cache that owns expiredEvents
   assert.ok(
     invalidatesPetsList(eventDialog),
     "EventDialog create/update success must invalidate petsQueryKey because /pets expiredEvents depend on events"
+  );
+  assert.ok(
+    /\bpetsQueryKey\b/.test(calendarPage),
+    "Calendar create/update success must reference petsQueryKey"
+  );
+  assert.ok(
+    invalidatesPetsList(calendarPage),
+    "Calendar create/update success must invalidate petsQueryKey because /pets expiredEvents depend on events"
   );
 });
 

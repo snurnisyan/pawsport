@@ -49,6 +49,7 @@ import {
 import {
   deleteFile,
   petFilesQueryPrefix,
+  petsQueryKey,
   usePetsQuery,
   type TPetDetail,
 } from "@/lib/petsApi";
@@ -293,6 +294,7 @@ export default function CalendarPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: calendarQueryKey(calendarQuery) }),
         queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(data.petId) }),
+        queryClient.invalidateQueries({ queryKey: petsQueryKey }),
         data.files.length > 0
           ? queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(data.petId) })
           : Promise.resolve(),
@@ -342,6 +344,7 @@ export default function CalendarPage() {
         queryClient.invalidateQueries({ queryKey: calendarQueryKey(calendarQuery) }),
         queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(event.petId) }),
         queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) }),
+        queryClient.invalidateQueries({ queryKey: petsQueryKey }),
         filesChanged
           ? queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(event.petId) })
           : Promise.resolve(),
