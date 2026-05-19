@@ -44,6 +44,7 @@ COPY frontend/store ./store
 COPY frontend/styles ./styles
 COPY frontend/theme ./theme
 COPY frontend/types ./types
+COPY frontend/utils ./utils
 COPY --from=api-types /app/frontend/types/api.ts ./types/api.ts
 RUN yarn build
 
