@@ -7,12 +7,12 @@ import { ApiError } from "@/lib/api";
 import {
   createPetEvent,
   eventQueryKey,
-  petEventsQueryKey,
+  petEventsQueryPrefix,
   updateEvent,
   type TPetEvent,
   type TUpdateEventRequest,
 } from "@/lib/eventsApi";
-import { deleteFile, petFilesQueryKey } from "@/lib/petsApi";
+import { deleteFile, petFilesQueryPrefix } from "@/lib/petsApi";
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import {
   EventForm,
@@ -75,8 +75,8 @@ export function EventDialog({
 
   const invalidateEvents = async () => {
     if (targetPetId) {
-      await queryClient.invalidateQueries({ queryKey: petEventsQueryKey(targetPetId) });
-      await queryClient.invalidateQueries({ queryKey: petFilesQueryKey(targetPetId) });
+      await queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(targetPetId) });
+      await queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(targetPetId) });
     }
     if (event?.id) {
       await queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) });

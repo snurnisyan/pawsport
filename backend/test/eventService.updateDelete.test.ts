@@ -489,10 +489,7 @@ test("updateEvent rejects invalid eventId with 400", async () => {
   );
 });
 
-test("deleteEvent removes event, detaches files, and cascades pending reminders", async () => {
-  // Event-deletion file policy: files linked to the deleted event are DETACHED
-  // (the eventId field is unset) but the file metadata and S3 object remain
-  // under the pet. The user can still find them via GET /api/pets/:id/files.
+test("deleteEvent removes event-linked files and cascades pending reminders", async () => {
   const seen: string[] = [];
 
   await deleteEvent(ownerId, eventId, {
@@ -500,12 +497,13 @@ test("deleteEvent removes event, detaches files, and cascades pending reminders"
       assert.equal(id.toString(), eventId);
       assert.equal(owner.toString(), ownerId);
       seen.push("event");
-      return makeEventRecord();
+      return makeEventRecord({ fileIds: [new Types.ObjectId(fileId)] });
     },
-    detachFilesFromEvent: async (owner, id) => {
+    deleteFilesForEvent: async (owner, id, fileIds) => {
       assert.equal(id.toString(), eventId);
       assert.equal(owner.toString(), ownerId);
-      seen.push("detachFiles");
+      assert.deepEqual(fileIds.map((file) => file.toString()), [fileId]);
+      seen.push("files");
     },
     deleteRemindersForEvent: async (id, owner) => {
       assert.equal(id.toString(), eventId);
@@ -515,19 +513,19 @@ test("deleteEvent removes event, detaches files, and cascades pending reminders"
   });
 
   assert.equal(seen[0], "event");
-  assert.ok(seen.includes("detachFiles"));
+  assert.ok(seen.includes("files"));
   assert.ok(seen.includes("reminders"));
 });
 
 test("deleteEvent returns 404 when event missing and does not touch files or reminders", async () => {
   let cascadeCalled = false;
-  let detachCalled = false;
+  let filesDeleted = false;
   await assert.rejects(
     () =>
       deleteEvent(ownerId, eventId, {
         deleteEventRecord: async () => null,
-        detachFilesFromEvent: async () => {
-          detachCalled = true;
+        deleteFilesForEvent: async () => {
+          filesDeleted = true;
         },
         deleteRemindersForEvent: async () => {
           cascadeCalled = true;
@@ -542,7 +540,7 @@ test("deleteEvent returns 404 when event missing and does not touch files or rem
   );
 
   assert.equal(cascadeCalled, false);
-  assert.equal(detachCalled, false);
+  assert.equal(filesDeleted, false);
 });
 
 test("deleteEvent rejects invalid id with 400", async () => {

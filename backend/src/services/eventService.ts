@@ -20,7 +20,7 @@ import { PetModel, type IPet } from "../models/Pet";
 import { ReminderModel } from "../models/Reminder";
 import {
   attachFilesToEvent as defaultAttachFilesToEvent,
-  detachEventFromFiles as defaultDetachEventFromFiles,
+  deleteFilesForEvent as defaultDeleteFilesForEvent,
   validateFileIdsForPet as defaultValidateFileIdsForPet
 } from "./fileService";
 import {
@@ -174,9 +174,10 @@ export interface EventServiceDependencies {
     ownerId: Types.ObjectId,
     fileIds: Types.ObjectId[]
   ) => Promise<Pick<IStoredFile, "_id" | "originalName">[]>;
-  detachFilesFromEvent?: (
+  deleteFilesForEvent?: (
     ownerId: Types.ObjectId,
-    eventId: Types.ObjectId
+    eventId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
   ) => Promise<void>;
 }
 
@@ -196,7 +197,7 @@ const isEventServiceDependencies = (
     typeof candidate.validateFileIdsForPet === "function" ||
     typeof candidate.attachFilesToEvent === "function" ||
     typeof candidate.listFilesByIds === "function" ||
-    typeof candidate.detachFilesFromEvent === "function"
+    typeof candidate.deleteFilesForEvent === "function"
   );
 };
 
@@ -932,19 +933,17 @@ export const deleteEvent = async (
     deleteRemindersForEvent = async (id, owner) => {
       await ReminderModel.deleteMany({ eventId: id, ownerId: owner, status: "pending" }).exec();
     },
-    detachFilesFromEvent = (owner, id) => defaultDetachEventFromFiles(owner, id)
+    deleteFilesForEvent = (owner, id, fileIds) => defaultDeleteFilesForEvent(owner, id, fileIds)
   } = dependencies;
 
   const ownerObjectId = requireOwnerId(ownerId);
   const eventObjectId = requireEventId(eventId);
 
-  // Event-deletion file policy: detach event-linked files (unset eventId) and keep them
-  // under the pet so the user can still find them via GET /api/pets/:id/files.
   const deleted = await deleteEventRecord(eventObjectId, ownerObjectId);
   if (!deleted) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
 
-  await detachFilesFromEvent(ownerObjectId, eventObjectId);
+  await deleteFilesForEvent(ownerObjectId, eventObjectId, deleted.fileIds ?? []);
   await deleteRemindersForEvent(eventObjectId, ownerObjectId);
 };

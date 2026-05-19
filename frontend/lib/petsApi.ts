@@ -56,8 +56,12 @@ export type TUploadPetFileOptions = {
 
 export const petsQueryKey = ["pets"] as const;
 export const petQueryKey = (id: string) => ["pets", id] as const;
+export const petFilesQueryPrefix = (petId: string) =>
+  ["pets", petId, "files"] as const;
 export const petFilesQueryKey = (petId: string, filters?: TPetFilesQuery) =>
   ["pets", petId, "files", filters ?? {}] as const;
+export const petEventsQueryPrefix = (petId: string) =>
+  ["pets", petId, "events"] as const;
 export const petEventsQueryKey = (petId: string, filters?: TPetEventsQuery) =>
   ["pets", petId, "events", filters ?? {}] as const;
 export const remindersQueryKey = (filters?: TReminderListQuery) =>
