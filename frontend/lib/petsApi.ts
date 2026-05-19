@@ -42,10 +42,8 @@ export type TMarkRemindersReadRequest =
 export type TMarkRemindersReadResponse =
   components["schemas"]["MarkRemindersReadResponse"];
 export type TPetExport = components["schemas"]["Export"];
-export type TListedPetExport = components["schemas"]["ListedExport"];
 export type TCreatePetExportRequest = components["schemas"]["CreateExportRequest"];
 export type TPetExportResponse = components["schemas"]["ExportResponse"];
-export type TPetExportListResponse = components["schemas"]["ExportListResponse"];
 export type TPetFilesQuery = {
   from?: string;
   to?: string;
@@ -68,7 +66,6 @@ export const remindersQueryKey = (filters?: TReminderListQuery) =>
   ["reminders", filters ?? {}] as const;
 export const petExportMutationKey = (petId: string) => ["pets", petId, "export"] as const;
 export const exportQueryKey = (exportId: string) => ["exports", exportId] as const;
-export const exportsQueryKey = ["exports"] as const;
 
 export const listPets = (): Promise<TPetListResponse> =>
   unwrapApiResponse(apiClient.GET("/pets"));
@@ -200,9 +197,6 @@ export const getExport = (exportId: string): Promise<TPetExportResponse> =>
   unwrapApiResponse(
     apiClient.GET("/exports/{id}", { params: { path: { id: exportId } } })
   );
-
-export const listExports = (): Promise<TPetExportListResponse> =>
-  unwrapApiResponse(apiClient.GET("/exports"));
 
 export const downloadExport = async (
   downloadUrl: string

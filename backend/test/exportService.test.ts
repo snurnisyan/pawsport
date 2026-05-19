@@ -7,8 +7,7 @@ import { AppError } from "../src/middleware/errorHandler";
 import {
   createPetExport,
   deleteAllExportsForOwner,
-  getPetExport,
-  listOwnerExports
+  getPetExport
 } from "../src/services/exportService";
 import type { FileStorage } from "../src/storage/s3Storage";
 
@@ -584,83 +583,6 @@ test("getPetExport returns pending, failed, and ready owned exports with the sha
   }
 });
 
-test("listOwnerExports returns export filters, download links, and current data flags", async () => {
-  const currentRecord = makeExportRecord({
-    _id: oid(exportId),
-    ownerId: oid(ownerId),
-    petId: oid(petId),
-    period: { from: new Date("2026-05-01T00:00:00.000Z") },
-    sections: ["profile", "events"],
-    eventTypes: ["vaccine", "lab"],
-    artifactId: oid(artifactId),
-    dataHash,
-    status: "ready",
-    fileKey: artifactKey,
-    expiresAt
-  });
-  const staleRecord = makeExportRecord({
-    _id: oid("507f1f77bcf86cd799439066"),
-    ownerId: oid(ownerId),
-    petId: oid(petId),
-    sections: ["profile"],
-    dataHash: "b".repeat(64),
-    status: "ready",
-    fileKey: "users/o/p/exports/stale.pdf",
-    expiresAt
-  });
-  const expiredRecord = makeExportRecord({
-    _id: oid("507f1f77bcf86cd799439077"),
-    ownerId: oid(ownerId),
-    petId: oid(petId),
-    sections: ["files"],
-    dataHash,
-    status: "ready",
-    fileKey: "users/o/p/exports/expired.pdf",
-    expiresAt: new Date("2026-05-13T10:00:00.000Z")
-  });
-
-  const result = await listOwnerExports(ownerId, {
-    listExportsByOwner: async (owner) => {
-      assert.equal(owner.toString(), ownerId);
-      return [currentRecord, staleRecord, expiredRecord];
-    },
-    findPetByIdForOwner: async (pet, owner) => {
-      assert.equal(pet.toString(), petId);
-      assert.equal(owner.toString(), ownerId);
-      return makePet();
-    },
-    buildFingerprint: async (input) => {
-      if (input.sections[0] === "profile" && input.sections[1] === "events") {
-        assert.deepEqual(input.eventTypes, ["vaccine", "lab"]);
-      }
-      return makeFingerprint();
-    },
-    getPublicUrl: (key) => `https://download.example/${key}`,
-    now: () => now
-  });
-
-  assert.equal(result.exports.length, 3);
-  assert.deepEqual(result.exports[0], {
-    id: exportId,
-    ownerId,
-    petId,
-    period: { from: "2026-05-01" },
-    sections: ["profile", "events"],
-    eventTypes: ["vaccine", "lab"],
-    fileKey: artifactKey,
-    downloadUrl: `https://download.example/${artifactKey}`,
-    status: "ready",
-    expiresAt: expiresAt.toISOString(),
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-    isCurrent: true
-  });
-  assert.equal(result.exports[1].isCurrent, false);
-  assert.equal(result.exports[1].downloadUrl, "https://download.example/users/o/p/exports/stale.pdf");
-  assert.equal(result.exports[2].isCurrent, true);
-  assert.equal(result.exports[2].downloadUrl, undefined);
-});
-
 test("getPetExport returns 400 for malformed export id", async () => {
   await assert.rejects(
     () => getPetExport(ownerId, "not-an-id"),
@@ -709,7 +631,7 @@ test("deleteAllExportsForOwner deletes ready exports from storage and clears met
         deletedKeys.push(key);
       }
     }),
-    listOwnerExports: async (owner) => {
+    listOwnerExportRecords: async (owner) => {
       assert.equal(owner.toString(), ownerId);
       return [ready, pending];
     },
@@ -735,7 +657,7 @@ test("deleteAllExportsForOwner tolerates missing storage objects", async () => {
         throw missing;
       }
     }),
-    listOwnerExports: async () => [{ _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }],
+    listOwnerExportRecords: async () => [{ _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }],
     listOwnerArtifacts: async () => [],
     deleteOwnerExports: async () => {
       metadataDeleted = true;
@@ -758,7 +680,7 @@ test("deleteAllExportsForOwner throws on hard storage failure and keeps metadata
             throw new Error("network down");
           }
         }),
-        listOwnerExports: async () => [
+        listOwnerExportRecords: async () => [
           { _id: new Types.ObjectId(), fileKey: "users/o/exports/a.pdf" }
         ],
         listOwnerArtifacts: async () => [],
@@ -784,7 +706,7 @@ test("deleteAllExportsForOwner clears metadata when no exports exist", async () 
         storageCalled = true;
       }
     }),
-    listOwnerExports: async () => [],
+    listOwnerExportRecords: async () => [],
     listOwnerArtifacts: async () => [],
     deleteOwnerExports: async () => {
       metadataDeleted = true;

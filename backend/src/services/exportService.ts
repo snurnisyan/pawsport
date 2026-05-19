@@ -78,14 +78,6 @@ export interface SerializedExport {
   updatedAt: string;
 }
 
-export interface SerializedListedExport extends SerializedExport {
-  isCurrent: boolean;
-}
-
-export interface SerializedExportList {
-  exports: SerializedListedExport[];
-}
-
 type ExportRecord = Pick<
   IExport,
   | "_id"
@@ -171,29 +163,9 @@ export interface GetPetExportDependencies {
   retentionDays?: number;
 }
 
-export interface ListOwnerExportsDependencies {
-  listExportsByOwner?: (ownerId: Types.ObjectId) => Promise<ExportRecord[]>;
-  findPetByIdForOwner?: (
-    petId: Types.ObjectId,
-    ownerId: Types.ObjectId
-  ) => Promise<PetRecord | null>;
-  buildFingerprint?: (
-    input: {
-      ownerId: Types.ObjectId;
-      petId: Types.ObjectId;
-      pet: PetRecord;
-      period?: NormalizedExportPeriod;
-      sections: ExportSection[];
-      eventTypes?: EventType[];
-    }
-  ) => Promise<PetExportFingerprintResult>;
-  getPublicUrl?: (key: string) => string;
-  now?: () => Date;
-}
-
 export interface DeleteOwnerExportsDependencies {
   storage?: FileStorage;
-  listOwnerExports?: (ownerId: Types.ObjectId) => Promise<ExportStorageRecord[]>;
+  listOwnerExportRecords?: (ownerId: Types.ObjectId) => Promise<ExportStorageRecord[]>;
   listOwnerArtifacts?: (ownerId: Types.ObjectId) => Promise<ExportStorageRecord[]>;
   deleteOwnerExports?: (ownerId: Types.ObjectId) => Promise<void>;
   deleteOwnerArtifacts?: (ownerId: Types.ObjectId) => Promise<void>;
@@ -683,66 +655,6 @@ export const getPetExport = async (
   return serializeExport(petExport, getPublicUrl);
 };
 
-const isReadyExportDownloadable = (record: ExportRecord, now: Date): boolean =>
-  record.status === "ready" &&
-  Boolean(record.fileKey) &&
-  record.expiresAt !== undefined &&
-  record.expiresAt.getTime() > now.getTime();
-
-export const listOwnerExports = async (
-  ownerId: string,
-  dependencies: ListOwnerExportsDependencies = {}
-): Promise<SerializedExportList> => {
-  const {
-    listExportsByOwner = async (owner) =>
-      ExportModel.find({ ownerId: owner })
-        .sort({ updatedAt: -1, _id: -1 })
-        .exec() as unknown as ExportRecord[],
-    findPetByIdForOwner: findPet = findPetByIdForOwner,
-    buildFingerprint = (payload) => buildPetExportFingerprint(payload),
-    getPublicUrl = getObjectDownloadUrl,
-    now = () => new Date()
-  } = dependencies;
-
-  const ownerObjectId = requireOwnerId(ownerId);
-  const checkedAt = now();
-  const records = await listExportsByOwner(ownerObjectId);
-  const pets = new Map<string, PetRecord | null>();
-
-  const exports: SerializedListedExport[] = [];
-  for (const record of records) {
-    const petKey = record.petId.toString();
-    let pet = pets.get(petKey);
-    if (!pets.has(petKey)) {
-      pet = await findPet(record.petId, ownerObjectId);
-      pets.set(petKey, pet);
-    }
-
-    let isCurrent = false;
-    if (pet && record.dataHash) {
-      const fingerprint = await buildFingerprint({
-        ownerId: ownerObjectId,
-        petId: record.petId,
-        pet,
-        period: record.period,
-        sections: record.sections,
-        eventTypes: record.eventTypes
-      });
-      isCurrent = fingerprint.dataHash === record.dataHash;
-    }
-
-    const serialized = serializeExport(
-      isReadyExportDownloadable(record, checkedAt)
-        ? record
-        : { ...record, fileKey: undefined },
-      getPublicUrl
-    );
-    exports.push({ ...serialized, isCurrent });
-  }
-
-  return { exports };
-};
-
 const cleanupExportStorage = async (
   records: ExportStorageRecord[],
   storage: FileStorage
@@ -771,7 +683,7 @@ export const deleteAllExportsForOwner = async (
 ): Promise<void> => {
   const {
     storage = s3Storage,
-    listOwnerExports = async (owner) =>
+    listOwnerExportRecords = async (owner) =>
       ExportModel.find({ ownerId: owner })
         .select({ _id: 1, fileKey: 1 })
         .exec() as unknown as ExportStorageRecord[],
@@ -788,7 +700,7 @@ export const deleteAllExportsForOwner = async (
   } = dependencies;
 
   const [exports, artifacts] = await Promise.all([
-    listOwnerExports(ownerId),
+    listOwnerExportRecords(ownerId),
     listOwnerArtifacts(ownerId)
   ]);
   await cleanupExportStorage([...exports, ...artifacts], storage);

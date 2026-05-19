@@ -524,18 +524,6 @@ export const ExportResponseSchema = z
   })
   .openapi("ExportResponse");
 
-export const ListedExportSchema = ExportSchema.extend({
-  isCurrent: z.boolean().openapi({
-    description: "Whether this export's stored data hash matches the current data for its filters."
-  })
-}).openapi("ListedExport");
-
-export const ExportListResponseSchema = z
-  .object({
-    exports: z.array(ListedExportSchema)
-  })
-  .openapi("ExportListResponse");
-
 export const IdPathParamsSchema = z.object({
   id: ObjectIdSchema
 });
