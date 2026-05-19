@@ -2,6 +2,11 @@ import { asyncHandler } from "../utils/asyncHandler";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { AppError } from "../middleware/errorHandler";
 import * as authService from "../services/authService";
+import {
+  AUTH_COOKIE_NAME,
+  authCookieOptions,
+  clearAuthCookieOptions,
+} from "../utils/authCookie";
 
 const PASSWORD_RESET_ACCEPTED_MESSAGE =
   "If the email belongs to an account, a password reset link has been sent";
@@ -15,10 +20,18 @@ const requireUserId = (req: AuthenticatedRequest): string => {
   return req.user.id;
 };
 
+const toAuthResponseBody = (result: authService.AuthResult) => ({
+  user: result.user,
+  nextStep: result.nextStep,
+});
+
 export const register = asyncHandler(async (req, res) => {
   const result = await authService.registerUser(req.body);
 
-  res.status(201).json(result);
+  res
+    .cookie(AUTH_COOKIE_NAME, result.accessToken, authCookieOptions())
+    .status(201)
+    .json(toAuthResponseBody(result));
 });
 
 export interface ConfirmEmailHandlerDependencies {
@@ -31,7 +44,10 @@ export const confirmEmailHandler = (dependencies: ConfirmEmailHandlerDependencie
   return asyncHandler(async (req, res) => {
     const result = await confirmEmailFn(req.body ?? {});
 
-    res.status(200).json(result);
+    res
+      .cookie(AUTH_COOKIE_NAME, result.accessToken, authCookieOptions())
+      .status(200)
+      .json(toAuthResponseBody(result));
   });
 };
 
@@ -60,7 +76,14 @@ export const resendConfirmationEmail = resendConfirmationEmailHandler();
 export const login = asyncHandler(async (req, res) => {
   const result = await authService.loginUser(req.body);
 
-  res.status(200).json(result);
+  res
+    .cookie(AUTH_COOKIE_NAME, result.accessToken, authCookieOptions())
+    .status(200)
+    .json(toAuthResponseBody(result));
+});
+
+export const logout = asyncHandler(async (_req, res) => {
+  res.clearCookie(AUTH_COOKIE_NAME, clearAuthCookieOptions()).status(204).send();
 });
 
 export const requestPasswordReset = asyncHandler(async (req, res) => {

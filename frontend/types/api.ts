@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log out and clear the auth cookie */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/password-reset": {
         parameters: {
             query?: never;
@@ -434,7 +451,6 @@ export interface components {
             emailVerified: boolean;
         };
         AuthResponse: {
-            accessToken: string;
             user: components["schemas"]["AuthUser"];
             /** @enum {string|null} */
             nextStep: "onboarding" | null;
@@ -992,6 +1008,33 @@ export interface operations {
             };
             /** @description Invalid credentials */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logged out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Request validation failed */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

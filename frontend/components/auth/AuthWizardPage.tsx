@@ -61,7 +61,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
   const shouldRedirectPlainRegistration =
     redirectPlainRegistration && router.isReady && router.query.step !== "pet";
   const visibleStep: 1 | 2 | 3 =
-    router.query.step === "pet" && step === 1 && clientReady && session?.accessToken
+    router.query.step === "pet" && step === 1 && clientReady && session
       ? 2
       : step;
 
@@ -73,7 +73,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
       return;
     }
 
-    if (!clientReady || router.query.step !== "pet" || session?.accessToken) {
+    if (!clientReady || router.query.step !== "pet" || session) {
       return;
     }
 
@@ -83,7 +83,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
     router,
     router.isReady,
     router.query.step,
-    session?.accessToken,
+    session,
     shouldRedirectPlainRegistration,
   ]);
 
@@ -93,10 +93,9 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
         email: state.email.trim(),
         password: state.password,
         personalDataConsent: true,
-      }),
+    }),
     onSuccess: (response) => {
       persistAuthSession({
-        accessToken: response.accessToken,
         user: response.user,
       });
       setStep(2);

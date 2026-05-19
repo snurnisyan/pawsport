@@ -94,7 +94,6 @@ export const AuthUserSchema = z
 
 export const AuthResponseSchema = z
   .object({
-    accessToken: z.string(),
     user: AuthUserSchema,
     nextStep: z.literal("onboarding").nullable()
   })

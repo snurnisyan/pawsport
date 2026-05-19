@@ -25,6 +25,6 @@ export const useCalendarEventsQuery = (
   return useQuery({
     queryKey: calendarQueryKey(query),
     queryFn: () => listCalendarEvents(query),
-    enabled: enabled && Boolean(session?.accessToken),
+    enabled: enabled && Boolean(session),
   });
 };

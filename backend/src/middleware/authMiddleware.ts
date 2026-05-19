@@ -3,6 +3,7 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 
 import { env } from "../config/env";
 import { AppError } from "./errorHandler";
+import { getAuthCookie } from "../utils/authCookie";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -22,15 +23,17 @@ export const createAuthMiddleware = ({
 }: AuthMiddlewareDependencies = {}): RequestHandler => {
   return (req: AuthenticatedRequest, _res, next) => {
     const header = req.header("authorization") ?? req.header("Authorization");
+    const cookieToken = getAuthCookie(req);
 
-    if (!header) {
-      next(new AppError(401, "UNAUTHORIZED", "Authorization header is required"));
+    if (!header && !cookieToken) {
+      next(new AppError(401, "UNAUTHORIZED", "Authentication token is required"));
       return;
     }
 
-    const [scheme, token] = header.split(" ");
+    const [scheme, bearerToken] = header?.split(" ") ?? [];
+    const token = cookieToken ?? bearerToken;
 
-    if (scheme !== "Bearer" || !token) {
+    if (!cookieToken && (scheme !== "Bearer" || !token)) {
       next(new AppError(401, "UNAUTHORIZED", "Authorization header must use Bearer scheme"));
       return;
     }

@@ -36,7 +36,7 @@ export default function PetPage() {
   const petQuery = useQuery({
     queryKey: petQueryKey(id),
     queryFn: () => getPet(id),
-    enabled: router.isReady && Boolean(id) && Boolean(session?.accessToken),
+    enabled: router.isReady && Boolean(id) && Boolean(session),
   });
   const localPet = useMemo(() => pets.find((p) => p.id === id), [pets, id]);
   const pet = petQuery.data?.pet ? toPetViewModel(petQuery.data.pet) : localPet;
@@ -49,7 +49,7 @@ export default function PetPage() {
     );
   }
 
-  if (session?.accessToken && petQuery.isLoading) {
+  if (session && petQuery.isLoading) {
     return (
       <AppWrapper>
         <Text color="fg.muted">Загружаем карточку питомца...</Text>
@@ -57,7 +57,7 @@ export default function PetPage() {
     );
   }
 
-  if (session?.accessToken && petQuery.isError) {
+  if (session && petQuery.isError) {
     const error = petQuery.error;
     const isNotFound =
       error instanceof ApiError &&
@@ -129,7 +129,7 @@ export default function PetPage() {
             <ExportTab
               petId={petQuery.data?.pet.id}
               petName={pet.name}
-              usesBackend={Boolean(session?.accessToken && petQuery.data?.pet.id)}
+              usesBackend={Boolean(session && petQuery.data?.pet.id)}
             />
           )}
         </Stack>

@@ -74,6 +74,24 @@ test("authMiddleware attaches user from valid token", async () => {
   assert.equal(req.user?.email, "user@example.com");
 });
 
+test("authMiddleware attaches user from auth cookie", async () => {
+  const userId = "507f1f77bcf86cd799439011";
+
+  const { req, error } = await callMiddleware(
+    { headers: { cookie: "pawsport.access_token=cookie-token" } },
+    createAuthMiddleware({
+      verifyJwt: (token) => {
+        assert.equal(token, "cookie-token");
+        return { sub: userId, email: "user@example.com" };
+      }
+    })
+  );
+
+  assert.equal(error, undefined);
+  assert.equal(req.user?.id, userId);
+  assert.equal(req.user?.email, "user@example.com");
+});
+
 test("authMiddleware rejects payload without sub", async () => {
   const { error } = await callMiddleware(
     { headers: { authorization: "Bearer x" } },

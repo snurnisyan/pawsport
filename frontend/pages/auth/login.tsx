@@ -37,7 +37,6 @@ export default function LoginPage() {
     mutationFn: () => loginUser({ email: email.trim(), password }),
     onSuccess: (response) => {
       persistAuthSession({
-        accessToken: response.accessToken,
         user: response.user,
       });
       router.replace(response.nextStep === "onboarding" ? "/auth?step=pet" : "/pets");

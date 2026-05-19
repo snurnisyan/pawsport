@@ -4,6 +4,7 @@ import {
   confirmEmail,
   confirmPasswordReset,
   login,
+  logout,
   register,
   requestPasswordReset,
   resendConfirmationEmail,
@@ -61,6 +62,13 @@ auth.route("post", "/login", {
     401: jsonResponse("Invalid credentials", ErrorResponseSchema)
   },
   handlers: [login]
+});
+
+auth.route("post", "/logout", {
+  operationId: "logout",
+  summary: "Log out and clear the auth cookie",
+  responses: { 204: { description: "Logged out" } },
+  handlers: [logout]
 });
 
 auth.route("post", "/password-reset", {

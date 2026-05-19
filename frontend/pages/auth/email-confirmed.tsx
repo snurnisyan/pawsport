@@ -28,7 +28,6 @@ export default function EmailConfirmedPage() {
     mutationFn: (token: string) => confirmEmail(token),
     onSuccess: (response) => {
       persistAuthSession({
-        accessToken: response.accessToken,
         user: response.user,
       });
       router.replace("/auth/email-confirmed", undefined, { shallow: true });

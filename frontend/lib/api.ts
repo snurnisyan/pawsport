@@ -1,6 +1,5 @@
-import createClient, { type Middleware } from "openapi-fetch";
+import createClient from "openapi-fetch";
 import type { components, paths } from "@/types/api";
-import { getAccessToken } from "@/lib/session";
 
 export type TApiErrorCode = string;
 
@@ -28,39 +27,35 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE_URL =
+const CONFIGURED_API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "http://localhost:4000/api";
 
-const apiBase = new URL(API_BASE_URL);
-const apiPathPrefix = apiBase.pathname.endsWith("/")
-  ? apiBase.pathname
-  : `${apiBase.pathname}/`;
+const resolveApiBaseUrl = (): string => {
+  if (
+    typeof window === "undefined" ||
+    !["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ) {
+    return CONFIGURED_API_BASE_URL;
+  }
 
-const shouldAttachAuth = (requestUrl: string): boolean => {
-  const url = new URL(requestUrl);
-  return (
-    url.origin === apiBase.origin &&
-    (url.pathname === apiBase.pathname || url.pathname.startsWith(apiPathPrefix))
-  );
+  try {
+    const url = new URL(CONFIGURED_API_BASE_URL);
+    if (url.hostname !== window.location.hostname) {
+      url.hostname = window.location.hostname;
+    }
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return CONFIGURED_API_BASE_URL;
+  }
 };
 
-const authMiddleware: Middleware = {
-  onRequest({ request }) {
-    const token = getAccessToken();
-    if (!token || !shouldAttachAuth(request.url)) return request;
-
-    const headers = new Headers(request.headers);
-    headers.set("Authorization", `Bearer ${token}`);
-    return new Request(request, { headers });
-  },
-};
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export const apiClient = createClient<paths>({
   baseUrl: API_BASE_URL,
-  credentials: "omit",
+  credentials: "include",
+  fetch: (request) => fetch(request, { credentials: "include" }),
 });
-
-apiClient.use(authMiddleware);
 
 type TBackendError = components["schemas"]["ErrorResponse"];
 
@@ -115,14 +110,12 @@ export const buildApiUrl = (
 };
 
 export const authenticatedFetch = (path: string, init?: RequestInit): Promise<Response> => {
-  const request = new Request(buildApiUrl(path), init);
-  const token = getAccessToken();
+  const request = new Request(buildApiUrl(path), {
+    ...init,
+    credentials: "include",
+  });
 
-  if (!token || !shouldAttachAuth(request.url)) return fetch(request);
-
-  const headers = new Headers(request.headers);
-  headers.set("Authorization", `Bearer ${token}`);
-  return fetch(new Request(request, { headers }));
+  return fetch(request);
 };
 
 export const unwrapApiResponse = async <T>(

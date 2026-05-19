@@ -6,7 +6,7 @@ import { PrimaryButton } from "@/components/ui/Buttons";
 import { Pressable } from "@/components/ui/Pressable";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api";
-import { resendEmailConfirmation } from "@/lib/authApi";
+import { logoutUser, resendEmailConfirmation } from "@/lib/authApi";
 import { clearAuthSession, useAuthSession } from "@/lib/session";
 import { POPOVER_CONTENT_PROPS } from "./popoverStyles";
 
@@ -38,10 +38,15 @@ export function useResendEmail() {
 
 export function useLogout() {
   const router = useRouter();
-  return () => {
-    clearAuthSession();
-    router.push("/auth/login");
-  };
+  const mutation = useMutation({
+    mutationFn: logoutUser,
+    onSettled: () => {
+      clearAuthSession();
+      router.push("/auth/login");
+    },
+  });
+
+  return () => mutation.mutate();
 }
 
 type TEmailNotVerifiedBlockProps = {

@@ -22,6 +22,7 @@ import {
 import { env } from "../src/config/env";
 import { authMiddleware } from "../src/middleware/authMiddleware";
 import { AppError, errorHandler } from "../src/middleware/errorHandler";
+import { AUTH_COOKIE_NAME } from "../src/utils/authCookie";
 import {
   hashToken,
   resendConfirmationEmail as resendConfirmationEmailService,
@@ -34,6 +35,7 @@ const authHeader = (): HeadersInit => ({ Authorization: `Bearer ${token}` });
 
 type AuthControllerTestDependencies = ConfirmEmailHandlerDependencies &
   ResendConfirmationEmailHandlerDependencies;
+type AuthResponseBody = Omit<EmailConfirmationResult, "accessToken">;
 
 const buildApp = (overrides: AuthControllerTestDependencies = {}): express.Express => {
   const app = express();
@@ -85,8 +87,11 @@ test("POST /auth/confirm forwards the token and returns 200 with the auth payloa
       });
 
       assert.equal(res.status, 200);
-      const body = (await res.json()) as EmailConfirmationResult;
-      assert.equal(body.accessToken, "fake-jwt-token");
+      assert.ok(
+        res.headers.get("set-cookie")?.includes(`${AUTH_COOKIE_NAME}=fake-jwt-token`)
+      );
+      const body = (await res.json()) as AuthResponseBody;
+      assert.equal("accessToken" in body, false);
       assert.equal(body.user.id, USER_ID);
       assert.equal(body.user.email, "user@example.com");
       assert.equal(body.user.emailVerified, true);
