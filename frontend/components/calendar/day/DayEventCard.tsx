@@ -22,9 +22,11 @@ type TDayEventCardProps = {
   expanded: boolean;
   initialData?: Partial<TEventFormData>;
   isPending?: boolean;
+  isDeleting?: boolean;
   onToggle?: () => void;
   onSave: (data: TEventFormData, keptExistingFileIds: string[]) => boolean | Promise<boolean>;
   onCancel?: () => void;
+  onDelete?: (event: TDayEvent) => void;
 };
 
 export function DayEventCard({
@@ -33,9 +35,11 @@ export function DayEventCard({
   expanded,
   initialData,
   isPending = false,
+  isDeleting = false,
   onToggle,
   onSave,
   onCancel,
+  onDelete,
 }: TDayEventCardProps) {
   const isCreate = !event;
   const [editMode, setEditMode] = useState(isCreate);
@@ -201,7 +205,12 @@ export function DayEventCard({
               isPending={isPending}
             />
           ) : event ? (
-            <ReadView event={event} onEdit={startEdit} />
+            <ReadView
+              event={event}
+              onEdit={startEdit}
+              onDelete={onDelete ? () => onDelete(event) : undefined}
+              isDeleting={isDeleting}
+            />
           ) : null}
         </Box>
       </Box>

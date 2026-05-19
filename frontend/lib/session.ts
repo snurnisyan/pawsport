@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { useRouter } from "next/router";
 import { ApiError } from "@/lib/api";
 import { getCurrentUser, logoutUser } from "@/lib/authApi";
 import { useAuthStore, type TAuthUser } from "@/store/auth";
@@ -42,6 +43,24 @@ export const useAuthStatus = () => useAuthStore((state) => state.status);
 export const useClientReady = () => {
   const status = useAuthStatus();
   return status !== "loading";
+};
+
+/**
+ * Redirects authenticated users away from a page (e.g. login/register).
+ * Returns `true` while the redirect is in flight so the caller can skip rendering.
+ */
+export const useRedirectIfAuthenticated = (target = "/pets"): boolean => {
+  const router = useRouter();
+  const session = useAuthSession();
+  const clientReady = useClientReady();
+  const shouldRedirect = clientReady && Boolean(session);
+
+  useEffect(() => {
+    if (!shouldRedirect) return;
+    router.replace(target);
+  }, [router, shouldRedirect, target]);
+
+  return shouldRedirect;
 };
 
 export const isInvalidAuthSessionError = (error: unknown): boolean =>

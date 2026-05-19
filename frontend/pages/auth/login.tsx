@@ -12,7 +12,7 @@ import { TextField } from "@/components/ui/TextField";
 import PawIcon from "@/icons/paw.svg";
 import { ApiError } from "@/lib/api";
 import { loginUser } from "@/lib/authApi";
-import { persistAuthSession } from "@/lib/session";
+import { persistAuthSession, useRedirectIfAuthenticated } from "@/lib/session";
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_EMAIL: "Введите корректный email.",
@@ -29,6 +29,7 @@ const errorMessage = (error: unknown): string => {
 
 export default function LoginPage() {
   const router = useRouter();
+  const isRedirecting = useRedirectIfAuthenticated();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -49,6 +50,8 @@ export default function LoginPage() {
     event.preventDefault();
     if (canSubmit) loginMutation.mutate();
   };
+
+  if (isRedirecting) return null;
 
   return (
     <>
