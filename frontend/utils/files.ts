@@ -1,3 +1,32 @@
+import { toaster } from "@/components/ui/toaster";
+
+export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+export const MAX_UPLOAD_LABEL = "20 MB";
+
+const isWithinUploadLimit = (file: File): boolean =>
+  file.size <= MAX_UPLOAD_BYTES;
+
+export const acceptFilesWithSizeGuard = (files: File[]): File[] => {
+  const accepted: File[] = [];
+  const rejected: File[] = [];
+  for (const file of files) {
+    if (isWithinUploadLimit(file)) accepted.push(file);
+    else rejected.push(file);
+  }
+
+  if (rejected.length > 0) {
+    toaster.error({
+      title:
+        rejected.length === 1
+          ? `Файл больше ${MAX_UPLOAD_LABEL}`
+          : `Несколько файлов больше ${MAX_UPLOAD_LABEL}`,
+      description: rejected.map((file) => file.name).join(", "),
+    });
+  }
+
+  return accepted;
+};
+
 export const saveBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

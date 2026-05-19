@@ -4,7 +4,11 @@ import { LuFile, LuX } from "react-icons/lu";
 import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { FileDropZone } from "@/components/ui/FileDropZone";
-import { formatSize } from "@/utils/files";
+import {
+  MAX_UPLOAD_LABEL,
+  acceptFilesWithSizeGuard,
+  formatSize,
+} from "@/utils/files";
 
 type TFileUploadDialogProps = {
   open: boolean;
@@ -69,9 +73,13 @@ export function FileUploadDialog({
           multiple
           accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg"
           onFiles={(picked) => {
-            if (!isPending) setFiles((prev) => [...prev, ...picked]);
+            if (isPending) return;
+            const accepted = acceptFilesWithSizeGuard(picked);
+            if (accepted.length > 0) {
+              setFiles((prev) => [...prev, ...accepted]);
+            }
           }}
-          subtitle="PDF, PNG, JPG (макс. 20MB)"
+          subtitle={`PDF, PNG, JPG (макс. ${MAX_UPLOAD_LABEL})`}
           height="180px"
         />
 

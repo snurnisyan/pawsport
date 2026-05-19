@@ -45,10 +45,6 @@ export const useClientReady = () => {
   return status !== "loading";
 };
 
-/**
- * Redirects authenticated users away from a page (e.g. login/register).
- * Returns `true` while the redirect is in flight so the caller can skip rendering.
- */
 export const useRedirectIfAuthenticated = (target = "/pets"): boolean => {
   const router = useRouter();
   const session = useAuthSession();

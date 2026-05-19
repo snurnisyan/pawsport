@@ -12,6 +12,7 @@ import { LuImage, LuX } from "react-icons/lu";
 import { DialogActions } from "@/components/ui/DialogActions";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { FileDropZone } from "@/components/ui/FileDropZone";
+import { MAX_UPLOAD_LABEL, acceptFilesWithSizeGuard } from "@/utils/files";
 
 type TPhotoUploadDialogProps = {
   open: boolean;
@@ -122,11 +123,13 @@ export function PhotoUploadDialog({
       ) : (
         <FileDropZone
           accept="image/png,image/jpeg"
-          onFiles={(files) => {
-            if (!isPending) setFile(files[0]);
+          onFiles={(picked) => {
+            if (isPending) return;
+            const accepted = acceptFilesWithSizeGuard(picked);
+            if (accepted.length > 0) setFile(accepted[0]);
           }}
           title="Нажмите, чтобы выбрать фото"
-          subtitle="PNG, JPG"
+          subtitle={`PNG, JPG (макс. ${MAX_UPLOAD_LABEL})`}
           height="240px"
         />
       )}
