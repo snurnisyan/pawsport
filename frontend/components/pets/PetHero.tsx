@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AspectRatio,
   Box,
@@ -13,17 +14,75 @@ import { FaMars, FaVenus } from "react-icons/fa6";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { PhotoUploadDialog } from "@/components/pets/PhotoUploadDialog";
+import { toaster } from "@/components/ui/toaster";
+import { ApiError } from "@/lib/api";
+import {
+  petQueryKey,
+  petsQueryKey,
+  uploadPetPhoto,
+  type TPetListResponse,
+  type TPetResponse,
+} from "@/lib/petsApi";
+import { useAuthSession } from "@/lib/session";
 import type { TPet } from "@/store/pets";
-import {EVENT_TYPE_META} from "@/lib/eventTypes";
+import { EVENT_TYPE_META } from "@/lib/eventTypes";
 
 type TPetHeroProps = {
   pet: TPet;
 };
 
+const apiErrorMessage = (error: unknown): string => {
+  if (error instanceof ApiError) return error.message;
+  return "Не удалось загрузить фото. Проверьте формат и попробуйте еще раз.";
+};
+
 export function PetHero({ pet }: TPetHeroProps) {
+  const session = useAuthSession();
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
-  const photoUrl = photoOverrides[pet.id] ?? pet.imageUrl;
+  const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
+  const photoUrl = localPhotoUrl ?? pet.imageUrl;
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => uploadPetPhoto(pet.id, file),
+    onSuccess: async (response) => {
+      queryClient.setQueryData<TPetResponse>(petQueryKey(response.pet.id), {
+        pet: response.pet,
+      });
+      queryClient.setQueryData<TPetListResponse>(petsQueryKey, (previous) =>
+        previous
+          ? {
+              ...previous,
+              items: previous.items.map((item) =>
+                item.id === response.pet.id ? response.pet : item
+              ),
+            }
+          : previous
+      );
+      setLocalPhotoUrl(null);
+      await queryClient.invalidateQueries({ queryKey: petsQueryKey });
+      toaster.success({ title: "Фото обновлено" });
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось загрузить фото",
+        description: apiErrorMessage(error),
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!localPhotoUrl) return;
+    return () => URL.revokeObjectURL(localPhotoUrl);
+  }, [localPhotoUrl]);
+
+  const handlePhotoSave = async (file: File) => {
+    if (!session) {
+      setLocalPhotoUrl(URL.createObjectURL(file));
+      return;
+    }
+    await uploadMutation.mutateAsync(file);
+  };
+
   const sexMeta =
     pet.sex === "male"
       ? { icon: <FaMars />, label: "Мальчик" }
@@ -113,12 +172,8 @@ export function PetHero({ pet }: TPetHeroProps) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         petName={pet.name}
-        onSave={(file) =>
-          setPhotoOverrides((current) => ({
-            ...current,
-            [pet.id]: URL.createObjectURL(file),
-          }))
-        }
+        onSave={handlePhotoSave}
+        isPending={uploadMutation.isPending}
       />
     </>
   );
