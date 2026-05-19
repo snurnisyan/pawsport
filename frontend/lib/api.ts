@@ -27,26 +27,15 @@ export class ApiError extends Error {
   }
 }
 
-const CONFIGURED_API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "http://localhost:4000/api";
+const API_PATH = "/api";
+const CONFIGURED_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
 
 const resolveApiBaseUrl = (): string => {
-  if (
-    typeof window === "undefined" ||
-    !["localhost", "127.0.0.1"].includes(window.location.hostname)
-  ) {
+  if (CONFIGURED_API_BASE_URL) {
     return CONFIGURED_API_BASE_URL;
   }
 
-  try {
-    const url = new URL(CONFIGURED_API_BASE_URL);
-    if (url.hostname !== window.location.hostname) {
-      url.hostname = window.location.hostname;
-    }
-    return url.toString().replace(/\/+$/, "");
-  } catch {
-    return CONFIGURED_API_BASE_URL;
-  }
+  return API_PATH;
 };
 
 export const API_BASE_URL = resolveApiBaseUrl();
@@ -100,7 +89,22 @@ export const buildApiUrl = (
   query?: Record<string, string | undefined>
 ): string => {
   const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL : `${API_BASE_URL}/`;
-  const url = new URL(path.replace(/^\/+/, ""), baseUrl);
+  const isRelativeBaseUrl = baseUrl.startsWith("/");
+  const apiPath = path.replace(/^\/+/, "");
+
+  if (isRelativeBaseUrl) {
+    const [pathWithoutSearch, search = ""] = apiPath.split("?", 2);
+    const searchParams = new URLSearchParams(search);
+
+    Object.entries(query ?? {}).forEach(([key, value]) => {
+      if (value) searchParams.set(key, value);
+    });
+
+    const queryString = searchParams.toString();
+    return `${baseUrl}${pathWithoutSearch}${queryString ? `?${queryString}` : ""}`;
+  }
+
+  const url = new URL(apiPath, baseUrl);
 
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
