@@ -4,18 +4,13 @@ import { LuFile, LuX } from "react-icons/lu";
 import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { FileDropZone } from "@/components/ui/FileDropZone";
+import { formatSize } from "@/utils/files";
 
 type TFileUploadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit?: (files: File[]) => void | Promise<void>;
   isPending?: boolean;
-};
-
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 export function FileUploadDialog({

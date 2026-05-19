@@ -1,227 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
-import {
-  LuBell,
-  LuCalendar,
-  LuChevronDown,
-  LuClock,
-  LuFile,
-  LuFileText,
-  LuMapPin,
-  LuPawPrint,
-  LuPenLine,
-  LuTag,
-} from "react-icons/lu";
+import { LuChevronDown, LuPenLine } from "react-icons/lu";
 import { Pressable } from "@/components/ui/Pressable";
-import { GhostButton, PrimaryButton, SecondaryButton } from "@/components/ui/Buttons";
 import {
-  EventForm,
   INITIAL_EVENT,
-  REMINDER_OPTIONS,
-  TYPE_OPTIONS,
   type TEventFormData,
   type TExistingEventFile,
   type TPetOption,
-  type TReminderValue,
 } from "@/components/pets/events/EventForm";
-import { fromEvent } from "@/components/pets/events/eventFormMapping";
-import {
-  EVENT_SUBTYPE_LABEL,
-  EVENT_TYPE_META,
-  isEventSubtypeSupported,
-} from "@/lib/eventTypes";
-import type { TPetEvent } from "@/lib/eventsApi";
-import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
+import { fromEvent } from "@/components/pets/events/eventTransforms";
+import { EVENT_TYPE_META } from "@/lib/eventTypes";
+import { EditView } from "./eventCard/EditView";
+import { ReadView } from "./eventCard/ReadView";
+import type { TDayEvent } from "./eventCard/types";
 
-export type TDayEventType = TPetEventType;
-
-export type TDayEvent = {
-  id: string;
-  type: TDayEventType;
-  subtype?: TPetEventSubtype;
-  time: string;
-  title: string;
-  petId: string;
-  petName: string;
-  petDescription?: string;
-  place?: string;
-  comment?: string;
-  nextDate?: string;
-  reminder?: TReminderValue;
-  files?: TExistingEventFile[];
-  source: TPetEvent;
-};
-
-const lookupLabel = (options: { value: string; label: string }[], v?: string) =>
-  options.find((o) => o.value === v)?.label;
-
-type TFieldRowProps = {
-  icon: ReactNode;
-  label: string;
-  children: ReactNode;
-};
-
-function FieldRow({ icon, label, children }: TFieldRowProps) {
-  return (
-    <HStack gap="12px" align="flex-start">
-      <Icon color="fg.muted" mt="2px">
-        {icon}
-      </Icon>
-      <Stack gap="4px" flex={1} minW={0}>
-        <Text
-          fontSize="11px"
-          fontWeight={700}
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="0.08em"
-        >
-          {label}
-        </Text>
-        {typeof children === "string" ? (
-          <Text fontSize="14px" color="fg.default">
-            {children}
-          </Text>
-        ) : (
-          children
-        )}
-      </Stack>
-    </HStack>
-  );
-}
-
-type TFilesListProps = {
-  files: TExistingEventFile[];
-};
-
-function FilesList({ files }: TFilesListProps) {
-  return (
-    <Stack gap="6px">
-      {files.map((f, i) => (
-        <HStack
-          key={`${f.fileId}-${i}`}
-          gap="8px"
-          bg="secondary.700"
-          rounded="md"
-          px="10px"
-          py="6px"
-        >
-          <Icon color="primary.400" boxSize="14px">
-            <LuFile />
-          </Icon>
-          <Text fontSize="13px" truncate>
-            {f.originalName}
-          </Text>
-        </HStack>
-      ))}
-    </Stack>
-  );
-}
-
-type TReadViewProps = {
-  event: TDayEvent;
-  onEdit: () => void;
-};
-
-function ReadView({ event, onEdit }: TReadViewProps) {
-  return (
-    <Stack gap="14px" px="16px" pb="16px" pt="4px">
-      <FieldRow icon={<LuCalendar />} label="Название">
-        {event.title}
-      </FieldRow>
-      <FieldRow icon={<LuTag />} label="Тип">
-        {[
-          lookupLabel(TYPE_OPTIONS, event.type) ?? event.type,
-          event.subtype ? EVENT_SUBTYPE_LABEL[event.subtype] : undefined,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </FieldRow>
-      {event.petDescription && (
-        <FieldRow icon={<LuPawPrint />} label="Питомец">
-          {event.petDescription}
-        </FieldRow>
-      )}
-      {event.nextDate && (
-        <FieldRow icon={<LuClock />} label="Следующая дата">
-          {event.nextDate}
-        </FieldRow>
-      )}
-      {event.reminder && (
-        <FieldRow icon={<LuBell />} label="Напоминание">
-          {lookupLabel(REMINDER_OPTIONS, event.reminder) ?? event.reminder}
-        </FieldRow>
-      )}
-      {event.place && (
-        <FieldRow icon={<LuMapPin />} label="Место">
-          {event.place}
-        </FieldRow>
-      )}
-      {event.comment && (
-        <FieldRow icon={<LuFileText />} label="Заметки">
-          {event.comment}
-        </FieldRow>
-      )}
-      {event.files && event.files.length > 0 && (
-        <FieldRow icon={<LuFile />} label="Файлы">
-          <FilesList files={event.files} />
-        </FieldRow>
-      )}
-      <SecondaryButton h="40px" onClick={onEdit}>
-        <HStack gap="8px">
-          <LuPenLine />
-          <Text fontSize="14px">Редактировать</Text>
-        </HStack>
-      </SecondaryButton>
-    </Stack>
-  );
-}
-
-type TEditViewProps = {
-  data: TEventFormData;
-  onChange: (patch: Partial<TEventFormData>) => void;
-  onCancel: () => void;
-  onSave: () => void;
-  pets: TPetOption[];
-  saveLabel: string;
-  existingFiles?: TExistingEventFile[];
-  onRemoveExistingFile?: (fileId: string) => void;
-  isPending?: boolean;
-};
-
-function EditView({
-  data,
-  onChange,
-  onCancel,
-  onSave,
-  pets,
-  saveLabel,
-  existingFiles,
-  onRemoveExistingFile,
-  isPending,
-}: TEditViewProps) {
-  const subtypeMissing = isEventSubtypeSupported(data.type) && !data.subtype;
-  const disabled =
-    Boolean(isPending) || !data.title.trim() || !data.type || !data.petId || subtypeMissing;
-  return (
-    <Stack gap="20px" px="16px" pb="16px" pt="8px">
-      <EventForm
-        data={data}
-        onChange={onChange}
-        pets={pets.length > 0 ? pets : undefined}
-        existingFiles={existingFiles}
-        onRemoveExistingFile={onRemoveExistingFile}
-      />
-      <HStack gap="12px" pt="4px">
-        <GhostButton flex={1} onClick={onCancel} disabled={isPending}>
-          Отменить
-        </GhostButton>
-        <PrimaryButton flex={1} onClick={onSave} disabled={disabled}>
-          {saveLabel}
-        </PrimaryButton>
-      </HStack>
-    </Stack>
-  );
-}
+export type { TDayEvent, TDayEventType } from "./eventCard/types";
 
 type TDayEventCardProps = {
   event?: TDayEvent;
@@ -234,14 +27,16 @@ type TDayEventCardProps = {
   onCancel?: () => void;
 };
 
-export function DayEventCard({ event,
-                                pets,
-                                expanded,
-                                initialData,
-                                isPending = false,
-                                onToggle,
-                                onSave,
-                                onCancel }: TDayEventCardProps) {
+export function DayEventCard({
+  event,
+  pets,
+  expanded,
+  initialData,
+  isPending = false,
+  onToggle,
+  onSave,
+  onCancel,
+}: TDayEventCardProps) {
   const isCreate = !event;
   const [editMode, setEditMode] = useState(isCreate);
   const [form, setForm] = useState<TEventFormData>(() =>

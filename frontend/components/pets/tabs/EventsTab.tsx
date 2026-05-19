@@ -26,13 +26,11 @@ import {
   petsQueryKey,
   type TPetFileListResponse,
 } from "@/lib/petsApi";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 
 type TEventsTabProps = {
   petId?: string;
 };
-
-const apiErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof ApiError ? error.message : fallback;
 
 const EMPTY_EVENTS: TPetEvent[] = [];
 

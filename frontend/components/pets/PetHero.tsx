@@ -15,7 +15,6 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PetImage } from "@/components/pets/PetImage";
 import { PhotoUploadDialog } from "@/components/pets/PhotoUploadDialog";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import {
   petQueryKey,
   petsQueryKey,
@@ -26,15 +25,13 @@ import {
 import { useAuthSession } from "@/lib/session";
 import type { TPet } from "@/store/pets";
 import { EVENT_TYPE_META } from "@/lib/eventTypes";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 
 type TPetHeroProps = {
   pet: TPet;
 };
 
-const apiErrorMessage = (error: unknown): string => {
-  if (error instanceof ApiError) return error.message;
-  return "Не удалось загрузить фото. Проверьте формат и попробуйте еще раз.";
-};
+const PHOTO_UPLOAD_FAILED = "Не удалось загрузить фото. Проверьте формат и попробуйте еще раз.";
 
 export function PetHero({ pet }: TPetHeroProps) {
   const session = useAuthSession();
@@ -65,7 +62,7 @@ export function PetHero({ pet }: TPetHeroProps) {
     onError: (error) => {
       toaster.error({
         title: "Не удалось загрузить фото",
-        description: apiErrorMessage(error),
+        description: apiErrorMessage(error, PHOTO_UPLOAD_FAILED),
       });
     },
   });

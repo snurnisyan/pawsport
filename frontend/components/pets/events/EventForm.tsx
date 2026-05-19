@@ -16,7 +16,6 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { TimeInput } from "@/components/ui/TimeInput";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import { downloadFile } from "@/lib/petsApi";
 import {
   EVENT_TYPE_OPTIONS,
@@ -25,6 +24,8 @@ import {
   isEventSubtypeValidForType,
 } from "@/lib/eventTypes";
 import type { TPetEventSubtype, TPetEventType } from "@/store/pets";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { formatSize, saveBlob } from "@/utils/files";
 
 export type TReminderValue = "none" | "day" | "week" | "month";
 
@@ -85,23 +86,6 @@ type TEventFormProps = {
 
 const FILE_ACCEPT = "application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg";
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const saveBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
-
 export function EventForm({
   data,
   onChange,
@@ -116,8 +100,7 @@ export function EventForm({
     } catch (error) {
       toaster.error({
         title: "Не удалось скачать файл",
-        description:
-          error instanceof ApiError ? error.message : "Попробуйте еще раз.",
+        description: apiErrorMessage(error, "Попробуйте еще раз."),
       });
     }
   };

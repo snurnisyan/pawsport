@@ -17,7 +17,6 @@ import { DateInput } from "@/components/ui/DateInput";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import { toPetViewModel } from "@/lib/petViewModel";
 import {
   petQueryKey,
@@ -26,6 +25,7 @@ import {
   type TPetResponse,
 } from "@/lib/petsApi";
 import type { TPet } from "@/store/pets";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { FormActions } from "./FormActions";
 import { SectionCardHeader } from "./SectionCardHeader";
 
@@ -74,11 +74,6 @@ const normalizeWeight = (value: string, unit: TWeightUnit): number | null => {
   return unit === "g" ? parsed / 1000 : parsed;
 };
 
-const apiErrorMessage = (error: unknown): string => {
-  if (error instanceof ApiError) return error.message;
-  return SAVE_ERROR;
-};
-
 export function OverviewSection({ pet, backendPetId }: TOverviewSectionProps) {
   const [editing, setEditing] = useState(false);
   const queryClient = useQueryClient();
@@ -122,7 +117,7 @@ export function OverviewSection({ pet, backendPetId }: TOverviewSectionProps) {
     onError: (error) => {
       toaster.error({
         title: "Не удалось сохранить обзор",
-        description: apiErrorMessage(error),
+        description: apiErrorMessage(error, SAVE_ERROR),
       });
     },
   });

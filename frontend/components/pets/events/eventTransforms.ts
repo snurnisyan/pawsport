@@ -1,27 +1,8 @@
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
 import type { TCreateEventRequest, TPetEvent } from "@/lib/eventsApi";
 import type { TPetEventType } from "@/store/pets";
+import { splitDateTime, toIsoDateTime } from "@/utils/dates";
 import type { TEventFormData, TReminderValue } from "./EventForm";
-
-export const splitDateTime = (iso: string): { date: string; time: string } => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return { date, time };
-};
-
-export const toIsoDateTime = (date: string, time?: string): string => {
-  const hhmm = time && time.length > 0 ? time : "00:00";
-  return new Date(`${date}T${hhmm}:00`).toISOString();
-};
-
-export const todayIsoDate = (): string => {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 
 export type TEventPayloadBase = Omit<TCreateEventRequest, "fileIds">;
 

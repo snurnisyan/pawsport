@@ -6,7 +6,6 @@ import { LuMail, LuPhone, LuStethoscope } from "react-icons/lu";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/TextField";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import {
   petQueryKey,
   petsQueryKey,
@@ -14,6 +13,7 @@ import {
   type TPetResponse,
 } from "@/lib/petsApi";
 import type { TPet } from "@/store/pets";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { FormActions } from "./FormActions";
 import { SectionCardHeader } from "./SectionCardHeader";
 
@@ -38,11 +38,6 @@ const buildForm = (vet?: TVetFormSource): TVetForm => ({
   phone: vet?.phone ?? "",
   email: vet?.email ?? "",
 });
-
-const apiErrorMessage = (error: unknown): string => {
-  if (error instanceof ApiError) return error.message;
-  return SAVE_ERROR;
-};
 
 export function VetSection({ vet, backendPetId }: TVetSectionProps) {
   const [editing, setEditing] = useState(false);
@@ -96,7 +91,7 @@ export function VetSection({ vet, backendPetId }: TVetSectionProps) {
     onError: (error) => {
       toaster.error({
         title: "Не удалось сохранить ветеринара",
-        description: apiErrorMessage(error),
+        description: apiErrorMessage(error, SAVE_ERROR),
       });
     },
   });
