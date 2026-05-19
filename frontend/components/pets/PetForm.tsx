@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Box, Icon, Image, SimpleGrid, Stack, Text } from "@chakra-ui/react";
-import { LuCamera, LuEllipsis, LuSearch } from "react-icons/lu";
+import { LuCamera, LuEllipsis } from "react-icons/lu";
 import { FaMars, FaVenus } from "react-icons/fa6";
 import { ChoiceCard } from "@/components/ui/ChoiceCard";
 import { Pressable } from "@/components/ui/Pressable";
@@ -26,17 +26,15 @@ type TPetFormProps = {
 
 export function PetForm({ data, onChange }: TPetFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewUrl = useMemo(
+    () => (data.photo ? URL.createObjectURL(data.photo) : null),
+    [data.photo],
+  );
 
   useEffect(() => {
-    if (!data.photo) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(data.photo);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [data.photo]);
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;

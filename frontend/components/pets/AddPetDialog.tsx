@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DialogActions } from "@/components/ui/DialogActions";
 import { DialogShell } from "@/components/ui/DialogShell";
@@ -24,9 +24,10 @@ export function AddPetDialog({ open, onOpenChange }: TAddPetDialogProps) {
   const [data, setData] = useState<TPetFormData>(INITIAL);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!open) setData(INITIAL);
-  }, [open]);
+  const closeDialog = () => {
+    setData(INITIAL);
+    onOpenChange(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -41,7 +42,7 @@ export function AddPetDialog({ open, onOpenChange }: TAddPetDialogProps) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: petsQueryKey });
       toaster.success({ title: "Питомец добавлен" });
-      onOpenChange(false);
+      closeDialog();
     },
     onError: (error) => {
       toaster.error({
@@ -56,13 +57,18 @@ export function AddPetDialog({ open, onOpenChange }: TAddPetDialogProps) {
     <DialogShell
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!createMutation.isPending) onOpenChange(nextOpen);
+        if (createMutation.isPending) return;
+        if (!nextOpen) {
+          closeDialog();
+          return;
+        }
+        onOpenChange(true);
       }}
       title="Новый питомец"
       subtitle="Коротко расскажи о своем питомце"
       footer={
         <DialogActions
-          onCancel={() => onOpenChange(false)}
+          onCancel={closeDialog}
           onSave={() => createMutation.mutate()}
           saveLabel="Добавить"
           saveDisabled={

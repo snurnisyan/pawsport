@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   HStack,
@@ -20,41 +20,48 @@ type TPhotoUploadDialogProps = {
   petName: string;
 };
 
-export function PhotoUploadDialog({ open,
-                                    onOpenChange,
-                                    onSave,
-                                    petName }: TPhotoUploadDialogProps) {
+export function PhotoUploadDialog({
+  open,
+  onOpenChange,
+  onSave,
+  petName,
+}: TPhotoUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewUrl = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file],
+  );
 
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
-  useEffect(() => {
-    if (!open) setFile(null);
-  }, [open]);
+  const closeDialog = () => {
+    setFile(null);
+    onOpenChange(false);
+  };
 
   const handleSave = () => {
     if (!file) return;
     onSave(file);
-    onOpenChange(false);
+    closeDialog();
   };
 
   return (
     <DialogShell
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          closeDialog();
+          return;
+        }
+        onOpenChange(true);
+      }}
       title={`Загрузить фото — ${petName}`}
       footer={
         <DialogActions
-          onCancel={() => onOpenChange(false)}
+          onCancel={closeDialog}
           onSave={handleSave}
           saveDisabled={!file}
         />
@@ -94,7 +101,9 @@ export function PhotoUploadDialog({ open,
             </IconButton>
           </Box>
           <HStack gap="8px" color="fg.muted" fontSize="14px">
-            <Icon><LuImage /></Icon>
+            <Icon>
+              <LuImage />
+            </Icon>
             <Text truncate>{file?.name}</Text>
           </HStack>
         </Stack>
