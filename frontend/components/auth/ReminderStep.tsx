@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Box, Flex,
   Icon,
@@ -9,7 +9,6 @@ import {
 } from "@chakra-ui/react";
 import {
   LuBug,
-  LuCalendar, LuChevronDown,
   LuShieldCheck,
   LuSyringe,
   LuWorm
@@ -17,7 +16,9 @@ import {
 import { Card } from "@/components/ui/Card";
 import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { StepProgress } from "@/components/ui/StepProgress";
-import { TextField } from "@/components/ui/TextField";
+import { DateInput } from "@/components/ui/DateInput";
+
+type TReminderKind = "vaccine" | "treatment";
 
 type TReminderConfig = {
   id: string;
@@ -26,7 +27,7 @@ type TReminderConfig = {
   iconColor: string;
   enabled: boolean;
   lastDate: string;
-  frequency: string;
+  kind: TReminderKind;
 };
 
 const DEFAULT_REMINDERS: TReminderConfig[] = [
@@ -36,8 +37,8 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuSyringe />,
     iconColor: "#A855F7",
     enabled: true,
-    lastDate: "12.10.2025",
-    frequency: "Ежегодно",
+    lastDate: "2025-10-12",
+    kind: "vaccine",
   },
   {
     id: "rabies",
@@ -45,8 +46,8 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuShieldCheck />,
     iconColor: "#A855F7",
     enabled: true,
-    lastDate: "12.10.2025",
-    frequency: "Каждые 3 года",
+    lastDate: "2025-10-12",
+    kind: "vaccine",
   },
   {
     id: "external",
@@ -54,8 +55,8 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuBug />,
     iconColor: "#10B981",
     enabled: true,
-    lastDate: "05.04.2026",
-    frequency: "Ежемесячно",
+    lastDate: "2026-04-05",
+    kind: "treatment",
   },
   {
     id: "internal",
@@ -63,10 +64,31 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuWorm />,
     iconColor: "#10B981",
     enabled: true,
-    lastDate: "05.04.2026",
-    frequency: "Ежемесячно",
+    lastDate: "2026-04-05",
+    kind: "treatment",
   },
 ];
+
+function computeNextDate(lastDate: string, kind: TReminderKind): string {
+  if (!lastDate) return "";
+  const [year, month, day] = lastDate.split("-").map(Number);
+  const next = new Date(year, month - 1, day);
+  if (kind === "vaccine") {
+    next.setFullYear(next.getFullYear() + 1);
+  } else {
+    next.setMonth(next.getMonth() + 1);
+  }
+  const yyyy = next.getFullYear();
+  const mm = String(next.getMonth() + 1).padStart(2, "0");
+  const dd = String(next.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+type TReminderState = {
+  enabled: boolean;
+  lastDate: string;
+  nextDate: string;
+};
 
 type TReminderStepProps = {
   onSave: () => void;
@@ -74,6 +96,44 @@ type TReminderStepProps = {
 };
 
 export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
+  const [state, setState] = useState<Record<string, TReminderState>>(() =>
+    Object.fromEntries(
+      DEFAULT_REMINDERS.map((r) => [
+        r.id,
+        {
+          enabled: r.enabled,
+          lastDate: r.lastDate,
+          nextDate: computeNextDate(r.lastDate, r.kind),
+        },
+      ]),
+    ),
+  );
+
+  const updateLastDate = (r: TReminderConfig, value: string) => {
+    setState((prev) => ({
+      ...prev,
+      [r.id]: {
+        ...prev[r.id],
+        lastDate: value,
+        nextDate: computeNextDate(value, r.kind),
+      },
+    }));
+  };
+
+  const updateNextDate = (id: string, value: string) => {
+    setState((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], nextDate: value },
+    }));
+  };
+
+  const toggleEnabled = (id: string, value: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], enabled: value },
+    }));
+  };
+
   return (
     <VStack gap="24px" align="stretch" w="full" maxW="640px" mx="auto">
       <VStack gap="8px" align="center">
@@ -87,48 +147,55 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
       </VStack>
 
       <Stack gap="16px">
-        {DEFAULT_REMINDERS.map((r) => (
-          <Card key={r.id} p="20px">
-            <Stack gap="16px">
-              <Flex justifyContent="space-between">
-                <Flex gap="12px" alignItems="center">
-                  <Box
-                    w={["28px", "28px", "36px"]}
-                    h={["28px", "28px", "36px"]}
-                    rounded="full"
-                    bg="secondary.700"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    color={r.iconColor}
-                    flexShrink={0}
+        {DEFAULT_REMINDERS.map((r) => {
+          const s = state[r.id];
+          return (
+            <Card key={r.id} p="20px">
+              <Stack gap="16px">
+                <Flex justifyContent="space-between">
+                  <Flex gap="12px" alignItems="center">
+                    <Box
+                      w={["28px", "28px", "36px"]}
+                      h={["28px", "28px", "36px"]}
+                      rounded="full"
+                      bg="secondary.700"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      color={r.iconColor}
+                      flexShrink={0}
+                    >
+                      <Icon boxSize="16px">{r.icon}</Icon>
+                    </Box>
+                    <Text fontWeight={600}>{r.label}</Text>
+                  </Flex>
+                  <Switch.Root
+                    checked={s.enabled}
+                    onCheckedChange={(e) => toggleEnabled(r.id, e.checked)}
+                    colorPalette="blue"
                   >
-                    <Icon boxSize="16px">{r.icon}</Icon>
-                  </Box>
-                  <Text fontWeight={600}>{r.label}</Text>
+                    <Switch.HiddenInput />
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Root>
                 </Flex>
-                <Switch.Root defaultChecked={r.enabled} colorPalette="blue">
-                  <Switch.HiddenInput />
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                </Switch.Root>
-              </Flex>
-              <Flex flexDir={["column", "column", "row"]} gap="12px">
-                <TextField
-                  label="Последняя обработка"
-                  placeholder={r.lastDate}
-                  endElement={<LuCalendar />}
-                />
-                <TextField
-                  label="Частота"
-                  placeholder={r.frequency}
-                  endElement={<LuChevronDown />}
-                />
-              </Flex>
-            </Stack>
-          </Card>
-        ))}
+                <Flex flexDir={["column", "column", "row"]} gap="12px">
+                  <DateInput
+                    label="Последняя обработка"
+                    value={s.lastDate}
+                    onChange={(iso) => updateLastDate(r, iso)}
+                  />
+                  <DateInput
+                    label="Следующая обработка"
+                    value={s.nextDate}
+                    onChange={(iso) => updateNextDate(r.id, iso)}
+                  />
+                </Flex>
+              </Stack>
+            </Card>
+          );
+        })}
       </Stack>
 
       <Stack gap="8px">
