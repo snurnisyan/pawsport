@@ -26,22 +26,28 @@ type TDayDialogProps = {
   events: TDayEvent[];
   pets: TPetOption[];
   isPending?: boolean;
+  deletingId?: string | null;
   onCreate?: (data: TEventFormData) => boolean | Promise<boolean>;
   onUpdate?: (
     event: TDayEvent,
     data: TEventFormData,
     keptExistingFileIds: string[]
   ) => boolean | Promise<boolean>;
+  onDelete?: (event: TDayEvent) => void;
 };
 
-export function DayDialog({ open,
-                            onOpenChange,
-                            date,
-                            events,
-                            pets,
-                            isPending = false,
-                            onCreate,
-                            onUpdate }: TDayDialogProps) {
+export function DayDialog({
+  open,
+  onOpenChange,
+  date,
+  events,
+  pets,
+  isPending = false,
+  deletingId,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: TDayDialogProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -127,9 +133,11 @@ export function DayDialog({ open,
                 setExpandedId((cur) => (cur === event.id ? null : event.id))
               }
               isPending={isPending}
+              isDeleting={deletingId === event.id}
               onSave={(data, keptExistingFileIds) =>
                 onUpdate?.(event, data, keptExistingFileIds) ?? false
               }
+              onDelete={onDelete}
             />
           ))}
         </Stack>

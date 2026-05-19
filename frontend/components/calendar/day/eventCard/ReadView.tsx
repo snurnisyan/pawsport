@@ -9,8 +9,9 @@ import {
   LuPawPrint,
   LuPenLine,
   LuTag,
+  LuTrash,
 } from "react-icons/lu";
-import { SecondaryButton } from "@/components/ui/Buttons";
+import { GhostButton, SecondaryButton } from "@/components/ui/Buttons";
 import {
   REMINDER_OPTIONS,
   TYPE_OPTIONS,
@@ -26,9 +27,11 @@ const lookupLabel = (options: { value: string; label: string }[], v?: string) =>
 type TReadViewProps = {
   event: TDayEvent;
   onEdit: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 };
 
-export function ReadView({ event, onEdit }: TReadViewProps) {
+export function ReadView({ event, onEdit, onDelete, isDeleting }: TReadViewProps) {
   return (
     <Stack gap="14px" px="16px" pb="16px" pt="4px">
       <FieldRow icon={<LuCalendar />} label="Название">
@@ -72,12 +75,29 @@ export function ReadView({ event, onEdit }: TReadViewProps) {
           <FilesList files={event.files} />
         </FieldRow>
       )}
-      <SecondaryButton h="40px" onClick={onEdit}>
-        <HStack gap="8px">
-          <LuPenLine />
-          <Text fontSize="14px">Редактировать</Text>
-        </HStack>
-      </SecondaryButton>
+      <HStack gap="12px">
+        {onDelete && (
+          <GhostButton
+            flex={1}
+            h="40px"
+            onClick={onDelete}
+            disabled={isDeleting}
+            color="red.300"
+            _hover={{ bg: "rgba(248, 113, 113, 0.12)", color: "red.200" }}
+          >
+            <HStack gap="8px">
+              <LuTrash />
+              <Text fontSize="14px">Удалить</Text>
+            </HStack>
+          </GhostButton>
+        )}
+        <SecondaryButton flex={1} h="40px" onClick={onEdit} disabled={isDeleting}>
+          <HStack gap="8px">
+            <LuPenLine />
+            <Text fontSize="14px">Редактировать</Text>
+          </HStack>
+        </SecondaryButton>
+      </HStack>
     </Stack>
   );
 }

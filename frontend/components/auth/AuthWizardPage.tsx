@@ -9,7 +9,11 @@ import { ReminderStep } from "@/components/auth/ReminderStep";
 import { ApiError } from "@/lib/api";
 import { registerUser } from "@/lib/authApi";
 import { createPet, petsQueryKey } from "@/lib/petsApi";
-import { persistAuthSession, useAuthSession, useClientReady } from "@/lib/session";
+import {
+  persistAuthSession,
+  useAuthSession,
+  useClientReady,
+} from "@/lib/session";
 
 type TWizardState = {
   email: string;
@@ -60,10 +64,13 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
   const [state, setState] = useState<TWizardState>(INITIAL);
   const shouldRedirectPlainRegistration =
     redirectPlainRegistration && router.isReady && router.query.step !== "pet";
+  const isOnPetStep = router.query.step === "pet";
+  // Authenticated users that land on the plain registration form get sent away.
+  // The pet-onboarding step (?step=pet) requires an active session, so we keep it.
+  const shouldRedirectAuthenticated =
+    clientReady && Boolean(session) && router.isReady && !isOnPetStep && step === 1;
   const visibleStep: 1 | 2 | 3 =
-    router.query.step === "pet" && step === 1 && clientReady && session
-      ? 2
-      : step;
+    isOnPetStep && step === 1 && clientReady && session ? 2 : step;
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -73,17 +80,23 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
       return;
     }
 
-    if (!clientReady || router.query.step !== "pet" || session) {
+    if (shouldRedirectAuthenticated) {
+      router.replace("/pets");
+      return;
+    }
+
+    if (!clientReady || !isOnPetStep || session) {
       return;
     }
 
     router.replace(REGISTRATION_PATH, undefined, { shallow: true });
   }, [
     clientReady,
+    isOnPetStep,
     router,
     router.isReady,
-    router.query.step,
     session,
+    shouldRedirectAuthenticated,
     shouldRedirectPlainRegistration,
   ]);
 
@@ -121,7 +134,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
 
   const finish = () => router.push("/pets");
 
-  if (shouldRedirectPlainRegistration) {
+  if (shouldRedirectPlainRegistration || shouldRedirectAuthenticated) {
     return null;
   }
 

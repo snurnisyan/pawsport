@@ -9,6 +9,7 @@ import {
 } from "@/lib/calendarApi";
 import {
   createPetEvent,
+  deleteEvent,
   eventQueryKey,
   petEventsQueryPrefix,
   updateEvent,
@@ -17,6 +18,7 @@ import {
   deleteFile,
   petFilesQueryPrefix,
   petsQueryKey,
+  type TPetFileListResponse,
 } from "@/lib/petsApi";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
 
@@ -98,5 +100,38 @@ export function useCalendarMutations(calendarQuery: TCalendarQuery) {
     },
   });
 
-  return { createMutation, updateMutation };
+  const deleteMutation = useMutation({
+    mutationFn: (event: TDayEvent) => deleteEvent(event.id).then(() => event),
+    onSuccess: async (event) => {
+      const deletedFileIds = new Set((event.source.files ?? []).map((file) => file.fileId));
+      if (deletedFileIds.size > 0) {
+        queryClient.setQueriesData<TPetFileListResponse>(
+          { queryKey: petFilesQueryPrefix(event.petId) },
+          (previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.filter((file) => !deletedFileIds.has(file.id)),
+                }
+              : previous
+        );
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: calendarQueryKey(calendarQuery) }),
+        queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(event.petId) }),
+        queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(event.petId) }),
+        queryClient.invalidateQueries({ queryKey: eventQueryKey(event.id) }),
+        queryClient.invalidateQueries({ queryKey: petsQueryKey }),
+      ]);
+      toaster.create({ type: "success", title: "Событие удалено" });
+    },
+    onError: (error) => {
+      toaster.error({
+        title: "Не удалось удалить событие",
+        description: apiErrorMessage(error, "Попробуйте еще раз."),
+      });
+    },
+  });
+
+  return { createMutation, updateMutation, deleteMutation };
 }

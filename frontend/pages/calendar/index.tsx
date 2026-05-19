@@ -31,7 +31,9 @@ import {
 } from "@/components/calendar/eventGrouping";
 import { useCalendarFilters } from "@/components/calendar/hooks/useCalendarFilters";
 import { useCalendarMutations } from "@/components/calendar/hooks/useCalendarMutations";
+import type { TDayEvent } from "@/components/calendar/day/DayEventCard";
 import { AppWrapper } from "@/components/layout/AppWrapper";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ApiError } from "@/lib/api";
 import {
   useCalendarEventsQuery,
@@ -48,6 +50,7 @@ const EMPTY_EVENTS: TPetEvent[] = [];
 export default function CalendarPage() {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [selectedDay, setSelectedDay] = useState<TSelectedDay | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<TDayEvent | null>(null);
   const drawer = useDisclosure();
 
   const petsQuery = usePetsQuery();
@@ -117,8 +120,11 @@ export default function CalendarPage() {
     ? new Date(selectedDay.year, selectedDay.month, selectedDay.day)
     : new Date();
 
-  const { createMutation, updateMutation } = useCalendarMutations(calendarQuery);
-  const mutationPending = createMutation.isPending || updateMutation.isPending;
+  const { createMutation, updateMutation, deleteMutation } =
+    useCalendarMutations(calendarQuery);
+  const mutationPending =
+    createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const deletingId = deleteMutation.variables?.id ?? null;
 
   const petsError =
     petsQuery.error instanceof ApiError
@@ -311,6 +317,7 @@ export default function CalendarPage() {
           events={dayEvents}
           pets={petOptions}
           isPending={mutationPending}
+          deletingId={deletingId}
           onCreate={async (data) => {
             try {
               await createMutation.mutateAsync(data);
@@ -326,6 +333,23 @@ export default function CalendarPage() {
             } catch {
               return false;
             }
+          }}
+          onDelete={(event) => setEventToDelete(event)}
+        />
+
+        <ConfirmDialog
+          open={Boolean(eventToDelete)}
+          onOpenChange={(open) => {
+            if (!open) setEventToDelete(null);
+          }}
+          title="Удалить событие?"
+          description="Событие будет удалено из карточки питомца."
+          isPending={deleteMutation.isPending}
+          onConfirm={() => {
+            if (!eventToDelete) return;
+            deleteMutation.mutate(eventToDelete, {
+              onSuccess: () => setEventToDelete(null),
+            });
           }}
         />
       </AppWrapper>
