@@ -23,6 +23,7 @@ import {
 } from "@/lib/eventsApi";
 import {
   petFilesQueryPrefix,
+  petsQueryKey,
   type TPetFileListResponse,
 } from "@/lib/petsApi";
 
@@ -94,6 +95,7 @@ export function EventsTab({ petId }: TEventsTabProps) {
           queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(targetPetId) }),
         ]);
       }
+      await queryClient.invalidateQueries({ queryKey: petsQueryKey });
       toaster.create({ type: "success", title: "Событие удалено" });
       setEventToDelete(null);
     },

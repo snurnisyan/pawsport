@@ -154,6 +154,7 @@ export function PetCard({ pet }: TPetCardProps) {
         <EventDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
+          petId={pet.id}
           initialData={{
             petId: pet.id,
             type: expiredEvent.type,
