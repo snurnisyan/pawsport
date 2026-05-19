@@ -1,99 +1,12 @@
 import { Box, Popover, Portal, Stack, Text } from "@chakra-ui/react";
-import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "next/router";
-import { LuChevronDown, LuLogOut } from "react-icons/lu";
-import { PrimaryButton } from "@/components/ui/Buttons";
+import { LuChevronDown } from "react-icons/lu";
 import { Pressable } from "@/components/ui/Pressable";
-import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
-import { logoutUser, resendEmailConfirmation } from "@/lib/authApi";
-import { clearAuthSession, useAuthSession } from "@/lib/session";
+import { useAuthSession } from "@/lib/session";
+import { useLogout } from "./hooks/useLogout";
+import { useResendEmail } from "./hooks/useResendEmail";
 import { POPOVER_CONTENT_PROPS } from "./popoverStyles";
-
-export function useResendEmail() {
-  const mutation = useMutation({
-    mutationFn: resendEmailConfirmation,
-    onSuccess: () => {
-      toaster.create({
-        type: "success",
-        title: "Письмо отправлено",
-        description: "Проверьте почту, чтобы подтвердить email.",
-      });
-    },
-    onError: (error) => {
-      toaster.error({
-        title: "Не удалось отправить письмо",
-        description:
-          error instanceof ApiError
-            ? error.message
-            : "Попробуйте еще раз позже.",
-      });
-    },
-  });
-  return {
-    resend: () => mutation.mutate(),
-    isPending: mutation.isPending,
-  };
-}
-
-export function useLogout() {
-  const router = useRouter();
-  const mutation = useMutation({
-    mutationFn: logoutUser,
-    onSettled: () => {
-      clearAuthSession();
-      router.push("/auth/login");
-    },
-  });
-
-  return () => mutation.mutate();
-}
-
-type TEmailNotVerifiedBlockProps = {
-  onResend: () => void;
-  isPending: boolean;
-};
-
-export function EmailNotVerifiedBlock({ onResend, isPending }: TEmailNotVerifiedBlockProps) {
-  return (
-    <Stack gap="8px" px="4px" py="4px">
-      <Text fontSize="13px" color="fg.muted" textAlign="center">
-        Ваш email не подтвержден
-      </Text>
-      <PrimaryButton h="36px" onClick={onResend} loading={isPending}>
-        Подтвердить
-      </PrimaryButton>
-    </Stack>
-  );
-}
-
-type TLogoutRowProps = {
-  onClick: () => void;
-};
-
-export function LogoutRow({ onClick }: TLogoutRowProps) {
-  return (
-    <Pressable
-      type="button"
-      onClick={onClick}
-      display="flex"
-      alignItems="center"
-      gap="10px"
-      w="full"
-      px="12px"
-      py="10px"
-      rounded="md"
-      color="fg.default"
-      cursor="pointer"
-      _hover={{ bg: "secondary.700" }}
-    >
-      <Box color="fg.muted" fontSize="16px">
-        <LuLogOut />
-      </Box>
-      <Text fontSize="14px">Выйти</Text>
-    </Pressable>
-  );
-}
+import { EmailNotVerifiedBlock } from "./user/EmailNotVerifiedBlock";
+import { LogoutRow } from "./user/LogoutRow";
 
 type TUserPopoverProps = {
   fallbackEmail: string;

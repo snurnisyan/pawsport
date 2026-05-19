@@ -2,7 +2,6 @@ import { Stack, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
 import { AppWrapper } from "@/components/layout/AppWrapper";
 import { PetHero } from "@/components/pets/PetHero";
 import { EventsTab } from "@/components/pets/tabs/EventsTab";
@@ -15,7 +14,6 @@ import { getPet, petQueryKey } from "@/lib/petsApi";
 import { toPetViewModel } from "@/lib/petViewModel";
 import { useAuthSession, useClientReady } from "@/lib/session";
 import { usePetNavigationStore, type TPetPageTab } from "@/store/petNavigation";
-import { usePetsStore } from "@/store/pets";
 
 const TABS: { value: TPetPageTab; label: string }[] = [
   { value: "overview", label: "Общая информация" },
@@ -32,14 +30,12 @@ export default function PetPage() {
     router.isReady && typeof router.query.id === "string" ? router.query.id : "";
   const tab = usePetNavigationStore((s) => s.petTabs[id] ?? "overview");
   const setPetTab = usePetNavigationStore((s) => s.setPetTab);
-  const pets = usePetsStore((s) => s.pets);
   const petQuery = useQuery({
     queryKey: petQueryKey(id),
     queryFn: () => getPet(id),
     enabled: router.isReady && Boolean(id) && Boolean(session),
   });
-  const localPet = useMemo(() => pets.find((p) => p.id === id), [pets, id]);
-  const pet = petQuery.data?.pet ? toPetViewModel(petQuery.data.pet) : localPet;
+  const pet = petQuery.data?.pet ? toPetViewModel(petQuery.data.pet) : undefined;
 
   if (!router.isReady || !clientReady) {
     return (

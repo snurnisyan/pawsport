@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DialogActions } from "@/components/ui/DialogActions";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import {
   createPetEvent,
   eventQueryKey,
@@ -14,18 +13,19 @@ import {
 } from "@/lib/eventsApi";
 import { deleteFile, petFilesQueryPrefix, petsQueryKey } from "@/lib/petsApi";
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import {
   EventForm,
   INITIAL_EVENT,
   type TEventFormData,
   type TExistingEventFile,
 } from "./EventForm";
+import { todayIsoDate } from "@/utils/dates";
 import {
   buildPayload,
   fromEvent,
-  todayIsoDate,
   type TEventPayloadBase,
-} from "./eventFormMapping";
+} from "./eventTransforms";
 
 type TEventDialogProps = {
   open: boolean;
@@ -35,9 +35,6 @@ type TEventDialogProps = {
   initialData?: Partial<TEventFormData>;
   onSubmit?: (data: TEventFormData) => void;
 };
-
-const apiErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof ApiError ? error.message : fallback;
 
 export function EventDialog({
   open,

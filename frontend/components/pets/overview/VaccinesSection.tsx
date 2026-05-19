@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { LuBriefcaseMedical } from "react-icons/lu";
 import { Card } from "@/components/ui/Card";
-import { ApiError } from "@/lib/api";
 import { EVENT_TYPE_META } from "@/lib/eventTypes";
 import {
   listPetEvents,
   petEventsQueryKey,
   type TPetEvent,
 } from "@/lib/petsApi";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { formatFullDateLong } from "@/utils/dates";
 import { SectionCardHeader } from "./SectionCardHeader";
 
 type TVaccinesSectionProps = {
@@ -24,29 +25,7 @@ type TUpcomingItem = {
   eventDate?: Date;
 };
 
-const DEMO_ITEMS: TUpcomingItem[] = [
-  {
-    id: "demo-vaccine",
-    title: "Бешенство (Nobivac)",
-    type: "vaccine",
-    nextDate: new Date("2026-06-01T00:00:00.000Z"),
-  },
-  {
-    id: "demo-treatment",
-    title: "Внешние паразиты",
-    type: "treatment",
-    nextDate: new Date("2026-05-01T00:00:00.000Z"),
-  },
-];
-
 const OVERVIEW_EVENT_TYPES: TUpcomingItem["type"][] = ["vaccine", "treatment"];
-
-const formatDate = (date: Date): string =>
-  new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
 
 const parseDate = (value?: string): Date | undefined => {
   if (!value) return undefined;
@@ -119,7 +98,7 @@ function EventRow({ item }: { item: TUpcomingItem }) {
           </Text>
           <Text fontSize="12px" color="fg.muted">
             {meta.label}
-            {item.eventDate ? ` · Последнее событие: ${formatDate(item.eventDate)}` : ""}
+            {item.eventDate ? ` · Последнее событие: ${formatFullDateLong(item.eventDate)}` : ""}
           </Text>
         </Stack>
       </HStack>
@@ -129,7 +108,7 @@ function EventRow({ item }: { item: TUpcomingItem }) {
         textAlign={["left", "right"]}
         flexShrink={0}
       >
-        Следующая дата: {formatDate(item.nextDate)}
+        Следующая дата: {formatFullDateLong(item.nextDate)}
       </Text>
     </HStack>
   );
@@ -168,7 +147,7 @@ export function VaccinesSection({ backendPetId }: TVaccinesSectionProps) {
   const eventsQuery = useQuery({
     queryKey: backendPetId
       ? petEventsQueryKey(backendPetId, { nextDateFrom, eventTypes: OVERVIEW_EVENT_TYPES })
-      : petEventsQueryKey("demo"),
+      : (["pets", "missing", "vaccines"] as const),
     queryFn: () =>
       listPetEvents(backendPetId!, {
         nextDateFrom,
@@ -178,15 +157,15 @@ export function VaccinesSection({ backendPetId }: TVaccinesSectionProps) {
     staleTime: 30_000,
   });
 
-  const items = useMemo(() => {
-    if (!backendPetId) return DEMO_ITEMS;
-    return toUpcomingItems(eventsQuery.data?.items ?? [], nowMs);
-  }, [backendPetId, eventsQuery.data?.items, nowMs]);
+  const items = useMemo(
+    () => toUpcomingItems(eventsQuery.data?.items ?? [], nowMs),
+    [eventsQuery.data?.items, nowMs]
+  );
 
-  const errorDetail =
-    eventsQuery.error instanceof ApiError
-      ? eventsQuery.error.message
-      : "Попробуйте обновить страницу.";
+  const errorDetail = apiErrorMessage(
+    eventsQuery.error,
+    "Попробуйте обновить страницу."
+  );
 
   return (
     <Card>

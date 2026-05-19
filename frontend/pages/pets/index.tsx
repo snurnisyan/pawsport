@@ -6,13 +6,11 @@ import { PetCard } from "@/components/pets/PetCard";
 import { toPetViewModel } from "@/lib/petViewModel";
 import { usePetsQuery } from "@/lib/petsApi";
 import { useAuthSession } from "@/lib/session";
-import { usePetsStore } from "@/store/pets";
 
 export default function PetsPage() {
   const session = useAuthSession();
-  const localPets = usePetsStore((s) => s.pets);
   const petsQuery = usePetsQuery();
-  const pets = petsQuery.data?.items.map(toPetViewModel) ?? localPets;
+  const pets = petsQuery.data?.items.map(toPetViewModel) ?? [];
 
   return (
     <>

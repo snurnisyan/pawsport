@@ -5,13 +5,13 @@ import { HStack, IconButton, Input, Stack, Text } from "@chakra-ui/react";
 import { LuFileText, LuPlus, LuX } from "react-icons/lu";
 import { Card } from "@/components/ui/Card";
 import { toaster } from "@/components/ui/toaster";
-import { ApiError } from "@/lib/api";
 import {
   petQueryKey,
   petsQueryKey,
   updatePet,
   type TPetResponse,
 } from "@/lib/petsApi";
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { FormActions } from "./FormActions";
 import { SectionCardHeader } from "./SectionCardHeader";
 
@@ -31,11 +31,6 @@ const buildForm = (notes: string[]): TNotesForm => ({
   notes: notes.map((value) => ({ value })),
   draft: "",
 });
-
-const apiErrorMessage = (error: unknown): string => {
-  if (error instanceof ApiError) return error.message;
-  return SAVE_ERROR;
-};
 
 export function NotesSection({ notes: initialNotes, backendPetId }: TNotesSectionProps) {
   const [editing, setEditing] = useState(false);
@@ -72,7 +67,7 @@ export function NotesSection({ notes: initialNotes, backendPetId }: TNotesSectio
     onError: (error) => {
       toaster.error({
         title: "Не удалось сохранить заметки",
-        description: apiErrorMessage(error),
+        description: apiErrorMessage(error, SAVE_ERROR),
       });
     },
   });

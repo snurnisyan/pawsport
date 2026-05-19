@@ -2,18 +2,14 @@ import { useState } from "react";
 import { Box, IconButton, Popover, Portal, Stack, Text } from "@chakra-ui/react";
 import { LuMenu } from "react-icons/lu";
 import { useAuthSession } from "@/lib/session";
+import { useLogout } from "./hooks/useLogout";
+import { useOpenReminderPet } from "./hooks/useOpenReminderPet";
+import { useReminders } from "./hooks/useReminders";
+import { useResendEmail } from "./hooks/useResendEmail";
 import { POPOVER_CONTENT_PROPS } from "./popoverStyles";
-import {
-  RemindersContent,
-  useOpenReminderPet,
-  useReminders,
-} from "./RemindersPopover";
-import {
-  EmailNotVerifiedBlock,
-  LogoutRow,
-  useLogout,
-  useResendEmail,
-} from "./UserPopover";
+import { RemindersContent } from "./reminders/RemindersContent";
+import { EmailNotVerifiedBlock } from "./user/EmailNotVerifiedBlock";
+import { LogoutRow } from "./user/LogoutRow";
 
 export function MobileMenuPopover() {
   const [open, setOpen] = useState(false);
