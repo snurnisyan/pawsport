@@ -19,6 +19,6 @@ echo "build: backend -> ${BACKEND_IMAGE}"
 docker build --platform "${PLATFORM}" -t "${BACKEND_IMAGE}" "${ROOT_DIR}/backend"
 
 echo "build: frontend -> ${FRONTEND_IMAGE}"
-docker build --platform "${PLATFORM}" -t "${FRONTEND_IMAGE}" "${ROOT_DIR}/frontend"
+docker build --platform "${PLATFORM}" -t "${FRONTEND_IMAGE}" -f "${ROOT_DIR}/frontend/Dockerfile" "${ROOT_DIR}"
 
 echo "build: done"
