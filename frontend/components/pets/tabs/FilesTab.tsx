@@ -30,7 +30,8 @@ import {
   deleteFile,
   downloadFile,
   listPetFiles,
-  petEventsQueryKey,
+  petEventsQueryPrefix,
+  petFilesQueryPrefix,
   petFilesQueryKey,
   uploadPetFile,
   type TPetFile,
@@ -160,7 +161,9 @@ export function FilesTab({ petId }: TFilesTabProps) {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["pets", petId, "files"] });
+      if (petId) {
+        await queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(petId) });
+      }
       setDialogOpen(false);
     },
     onError: (error) => {
@@ -197,15 +200,17 @@ export function FilesTab({ petId }: TFilesTabProps) {
     mutationFn: (file: TPetFile) => deleteFile(file.id).then(() => file),
     onSuccess: async (file) => {
       queryClient.setQueriesData<TPetFileListResponse>(
-        { queryKey: ["pets", petId, "files"] },
+        { queryKey: petId ? petFilesQueryPrefix(petId) : ["pets", "files", "missing"] },
         (previous) =>
           previous
             ? { ...previous, items: previous.items.filter((item) => item.id !== file.id) }
             : previous
       );
-      await queryClient.invalidateQueries({ queryKey: ["pets", petId, "files"] });
+      if (petId) {
+        await queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(petId) });
+      }
       if (petId && file.eventId) {
-        await queryClient.invalidateQueries({ queryKey: petEventsQueryKey(petId) });
+        await queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(petId) });
       }
       setFileToDelete(null);
     },

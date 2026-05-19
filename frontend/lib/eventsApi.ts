@@ -6,6 +6,7 @@ import {
 } from "@/lib/api";
 import {
   deleteFile,
+  petEventsQueryPrefix,
   petEventsQueryKey,
   listPetEvents,
   uploadPetFile,
@@ -17,7 +18,7 @@ import { useAuthSession } from "@/lib/session";
 import type { components } from "@/types/api";
 
 export type { TPetEvent, TPetEventListResponse, TPetEventsQuery };
-export { petEventsQueryKey, listPetEvents };
+export { petEventsQueryPrefix, petEventsQueryKey, listPetEvents };
 
 export type TPetEventResponse = components["schemas"]["EventResponse"];
 export type TCreateEventRequest = components["schemas"]["CreateEventRequest"];

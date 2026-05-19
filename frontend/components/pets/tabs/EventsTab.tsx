@@ -16,11 +16,15 @@ import {
 import { ApiError } from "@/lib/api";
 import {
   deleteEvent,
-  petEventsQueryKey,
+  petEventsQueryPrefix,
   usePetEventsQuery,
   type TPetEvent,
   type TPetEventsQuery,
 } from "@/lib/eventsApi";
+import {
+  petFilesQueryPrefix,
+  type TPetFileListResponse,
+} from "@/lib/petsApi";
 
 type TEventsTabProps = {
   petId?: string;
@@ -28,6 +32,8 @@ type TEventsTabProps = {
 
 const apiErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof ApiError ? error.message : fallback;
+
+const EMPTY_EVENTS: TPetEvent[] = [];
 
 const hasActiveFilters = (filters: TEventsFilters): boolean =>
   Boolean(
@@ -58,7 +64,7 @@ export function EventsTab({ petId }: TEventsTabProps) {
 
   const eventsQuery = usePetEventsQuery(petId, backendQuery);
 
-  const backendEvents = eventsQuery.data?.items ?? [];
+  const backendEvents = eventsQuery.data?.items ?? EMPTY_EVENTS;
   const filtered = useMemo(
     () => filterEvents(backendEvents, filters),
     [backendEvents, filters]
@@ -67,11 +73,26 @@ export function EventsTab({ petId }: TEventsTabProps) {
 
   const deleteMutation = useMutation({
     mutationFn: (event: TPetEvent) => deleteEvent(event.id).then(() => event),
-    onSuccess: async () => {
-      if (petId) {
-        await queryClient.invalidateQueries({
-          queryKey: petEventsQueryKey(petId),
-        });
+    onSuccess: async (event) => {
+      const targetPetId = petId ?? event.petId;
+      if (targetPetId) {
+        const deletedFileIds = new Set((event.files ?? []).map((file) => file.fileId));
+        if (deletedFileIds.size > 0) {
+          queryClient.setQueriesData<TPetFileListResponse>(
+            { queryKey: petFilesQueryPrefix(targetPetId) },
+            (previous) =>
+              previous
+                ? {
+                    ...previous,
+                    items: previous.items.filter((file) => !deletedFileIds.has(file.id)),
+                  }
+                : previous
+          );
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: petEventsQueryPrefix(targetPetId) }),
+          queryClient.invalidateQueries({ queryKey: petFilesQueryPrefix(targetPetId) }),
+        ]);
       }
       toaster.create({ type: "success", title: "Событие удалено" });
       setEventToDelete(null);

@@ -8,6 +8,7 @@ import {
   deleteAllFilesForOwner,
   deleteAllFilesForPet,
   deleteFile,
+  deleteFilesForEvent,
   detachEventFromFiles,
   downloadFile,
   cleanupExpiredTemporaryFile,
@@ -766,6 +767,70 @@ test("detachEventFromFiles unsets eventId on matching files for the owner", asyn
   });
 
   assert.deepEqual(observed, { owner: ownerId, event: eventId });
+});
+
+test("deleteFilesForEvent removes event files from storage and metadata", async () => {
+  const ownerObjectId = new Types.ObjectId(ownerId);
+  const eventObjectId = new Types.ObjectId(eventId);
+  const fileA = { _id: new Types.ObjectId(fileId), storageKey: "users/o/pets/p/files/a/a.pdf" };
+  const fileB = { _id: new Types.ObjectId(), storageKey: "users/o/pets/p/files/b/b.pdf" };
+  const deletedKeys: string[] = [];
+  let metadataDeletedFor:
+    | {
+        owner: string;
+        event: string;
+        fileIds: string[];
+      }
+    | undefined;
+
+  await deleteFilesForEvent(ownerObjectId, eventObjectId, [fileA._id, fileA._id], {
+    storage: makeStorage({
+      deleteObject: async ({ key }) => {
+        deletedKeys.push(key);
+      }
+    }),
+    listEventFiles: async (owner, event, fileIds) => {
+      assert.equal(owner.toString(), ownerId);
+      assert.equal(event.toString(), eventId);
+      assert.deepEqual(fileIds.map((id) => id.toString()), [fileId, fileId]);
+      return [fileA, fileB];
+    },
+    deleteEventFileRecords: async (owner, event, fileIds) => {
+      metadataDeletedFor = {
+        owner: owner.toString(),
+        event: event.toString(),
+        fileIds: fileIds.map((id) => id.toString())
+      };
+    }
+  });
+
+  assert.deepEqual(deletedKeys, [fileA.storageKey, fileB.storageKey]);
+  assert.deepEqual(metadataDeletedFor, {
+    owner: ownerId,
+    event: eventId,
+    fileIds: [fileId, fileId]
+  });
+});
+
+test("deleteFilesForEvent tolerates already-missing storage objects", async () => {
+  const missing = Object.assign(new Error("missing"), { name: "NoSuchKey" });
+  let metadataDeleted = false;
+
+  await deleteFilesForEvent(new Types.ObjectId(ownerId), new Types.ObjectId(eventId), [], {
+    storage: makeStorage({
+      deleteObject: async () => {
+        throw missing;
+      }
+    }),
+    listEventFiles: async () => [
+      { _id: new Types.ObjectId(fileId), storageKey: "users/o/p/f/a.pdf" }
+    ],
+    deleteEventFileRecords: async () => {
+      metadataDeleted = true;
+    }
+  });
+
+  assert.equal(metadataDeleted, true);
 });
 
 test("attachFilesToEvent sets eventId and clears temporary expiry", async () => {

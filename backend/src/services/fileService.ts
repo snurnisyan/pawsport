@@ -828,6 +828,70 @@ export const detachEventFromFiles = async (
   await detachEventFromFileRecords(ownerId, eventId);
 };
 
+type EventFileRecord = Pick<IStoredFile, "_id" | "storageKey">;
+
+export interface DeleteEventFilesDependencies {
+  storage?: FileStorage;
+  listEventFiles?: (
+    ownerId: Types.ObjectId,
+    eventId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<EventFileRecord[]>;
+  deleteEventFileRecords?: (
+    ownerId: Types.ObjectId,
+    eventId: Types.ObjectId,
+    fileIds: Types.ObjectId[]
+  ) => Promise<void>;
+}
+
+const buildEventFilesFilter = (
+  ownerId: Types.ObjectId,
+  eventId: Types.ObjectId,
+  fileIds: Types.ObjectId[]
+): Record<string, unknown> => {
+  const uniqueFileIds = Array.from(new Map(fileIds.map((id) => [id.toString(), id])).values());
+  if (uniqueFileIds.length === 0) {
+    return { ownerId, eventId };
+  }
+
+  return {
+    ownerId,
+    $or: [{ eventId }, { _id: { $in: uniqueFileIds } }]
+  };
+};
+
+export const deleteFilesForEvent = async (
+  ownerId: Types.ObjectId,
+  eventId: Types.ObjectId,
+  fileIds: Types.ObjectId[] = [],
+  dependencies: DeleteEventFilesDependencies = {}
+): Promise<void> => {
+  const {
+    storage = s3Storage,
+    listEventFiles = async (owner, event, ids) =>
+      FileModel.find(buildEventFilesFilter(owner, event, ids))
+        .select({ _id: 1, storageKey: 1 })
+        .exec() as unknown as EventFileRecord[],
+    deleteEventFileRecords = async (owner, event, ids) => {
+      await FileModel.deleteMany(buildEventFilesFilter(owner, event, ids)).exec();
+    }
+  } = dependencies;
+
+  const files = await listEventFiles(ownerId, eventId, fileIds);
+
+  for (const file of files) {
+    try {
+      await storage.deleteObject({ key: file.storageKey });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        throw toStorageError(error, "FILE_STORAGE_DELETE_FAILED", "Could not delete file from storage");
+      }
+    }
+  }
+
+  await deleteEventFileRecords(ownerId, eventId, fileIds);
+};
+
 type OwnerFileRecord = Pick<IStoredFile, "_id" | "storageKey">;
 
 export interface DeleteOwnerFilesDependencies {
