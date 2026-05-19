@@ -33,7 +33,6 @@ export interface PdfProfile {
   sex: string;
   weight?: number;
   microchipNumber?: string;
-  tags: string[];
   notes: string[];
   vetContact?: PdfVetContact;
 }
@@ -102,7 +101,6 @@ export type PetRecord = Pick<
   | "weight"
   | "photoFileId"
   | "microchipNumber"
-  | "tags"
   | "notes"
   | "vetContact"
   | "createdAt"
@@ -323,7 +321,6 @@ const serializeProfileForPdf = async (
     name: pet.name,
     species: pet.species,
     sex: pet.sex,
-    tags: pet.tags ?? [],
     notes: pet.notes ?? []
   };
 
@@ -406,6 +403,14 @@ const isCurrentPetPhotoFile = (
   photoFileId?: Types.ObjectId
 ): boolean => Boolean(photoFileId && file._id.equals(photoFileId));
 
+const isUnlinkedFile = (file: FileMetadataRecord): boolean => !optionalId(file.eventId);
+
+const isFileUploadedInRange = (file: FileMetadataRecord, range: DateRange): boolean => {
+  if (range.from && file.uploadedAt < range.from) return false;
+  if (range.toExclusive && file.uploadedAt >= range.toExclusive) return false;
+  return true;
+};
+
 const serializeReminderForPdf = (reminder: ReminderRecord): PdfReminder => ({
   id: reminder._id.toString(),
   eventId: reminder.eventId.toString(),
@@ -457,9 +462,19 @@ export const buildPetExportReport = async (
       return serialized;
     });
   }
-  if (input.sections.includes("files")) {
+  const shouldIncludeFileSection = input.sections.includes("files");
+  const linkedEventFileIds = new Set((report.events ?? []).flatMap((event) => event.fileIds));
+  const shouldIncludeUnlinkedFiles = input.sections.includes("events");
+  if (shouldIncludeFileSection || linkedEventFileIds.size > 0 || shouldIncludeUnlinkedFiles) {
     report.files = (await listFileMetadataForPet(input.ownerId, input.petId, range))
       .filter((file) => !isCurrentPetPhotoFile(file, input.pet.photoFileId))
+      .filter((file) => isFileUploadedInRange(file, range))
+      .filter(
+        (file) =>
+          shouldIncludeFileSection ||
+          linkedEventFileIds.has(file._id.toString()) ||
+          (shouldIncludeUnlinkedFiles && isUnlinkedFile(file))
+      )
       .map((file) => {
         const serialized = serializeFileForPdf(file, getFileDownloadUrl);
         if (serialized.eventId) {

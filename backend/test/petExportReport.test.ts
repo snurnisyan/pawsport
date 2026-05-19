@@ -19,7 +19,6 @@ const makePet = () => ({
   species: "cat",
   photoFileId,
   sex: "female" as const,
-  tags: [],
   notes: [],
   createdAt: now,
   updatedAt: now
@@ -149,6 +148,149 @@ test("buildPetExportReport adds clickable download URLs to file metadata", async
   assert.equal(report.files?.[0]?.eventTitle, "Rabies booster");
 });
 
+test("buildPetExportReport includes linked event file metadata when exporting events only", async () => {
+  const fileId = new Types.ObjectId("507f1f77bcf86cd799439055");
+  const eventId = new Types.ObjectId("507f1f77bcf86cd799439066");
+
+  const report = await buildPetExportReport(
+    {
+      exportId,
+      ownerId,
+      petId,
+      pet: makePet(),
+      sections: ["events"],
+      generatedAt: now
+    },
+    {
+      listEventsForPet: async () => [
+        {
+          _id: eventId,
+          ownerId,
+          petId,
+          type: "vaccine",
+          title: "Rabies booster",
+          eventDate: new Date("2026-01-10T00:00:00.000Z"),
+          fileIds: [fileId],
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      listFileMetadataForPet: async () => [
+        {
+          _id: fileId,
+          ownerId,
+          petId,
+          eventId,
+          originalName: "rabies-certificate.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 840_000,
+          storageKey: "users/o/p/files/rabies-certificate.pdf",
+          uploadedAt: new Date("2026-01-11T00:00:00.000Z"),
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      getFileDownloadUrl: (key) => `https://download.example/${key}`
+    }
+  );
+
+  assert.deepEqual(report.events?.[0]?.fileIds, [fileId.toString()]);
+  assert.equal(report.files?.[0]?.originalName, "rabies-certificate.pdf");
+  assert.equal(report.files?.[0]?.eventTitle, "Rabies booster");
+});
+
+test("buildPetExportReport includes unlinked files for events exports within the upload date range", async () => {
+  const includedFileId = new Types.ObjectId("507f1f77bcf86cd799439077");
+  const beforeRangeFileId = new Types.ObjectId("507f1f77bcf86cd799439088");
+  const afterRangeFileId = new Types.ObjectId("507f1f77bcf86cd799439099");
+  const linkedToOtherEventFileId = new Types.ObjectId("507f1f77bcf86cd7994390aa");
+  const otherEventId = new Types.ObjectId("507f1f77bcf86cd7994390bb");
+  let observedRange: unknown;
+
+  const report = await buildPetExportReport(
+    {
+      exportId,
+      ownerId,
+      petId,
+      pet: makePet(),
+      period: {
+        from: new Date("2026-05-01T00:00:00.000Z"),
+        to: new Date("2026-05-31T00:00:00.000Z")
+      },
+      sections: ["events"],
+      generatedAt: now
+    },
+    {
+      listEventsForPet: async () => [],
+      listFileMetadataForPet: async (_owner, _pet, range) => {
+        observedRange = range;
+        return [
+          {
+            _id: beforeRangeFileId,
+            ownerId,
+            petId,
+            originalName: "before-range.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 100,
+            storageKey: "users/o/p/files/before-range.pdf",
+            uploadedAt: new Date("2026-04-30T23:59:59.000Z"),
+            createdAt: now,
+            updatedAt: now
+          },
+          {
+            _id: includedFileId,
+            ownerId,
+            petId,
+            originalName: "unlinked-in-range.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 200,
+            storageKey: "users/o/p/files/unlinked-in-range.pdf",
+            uploadedAt: new Date("2026-05-15T12:00:00.000Z"),
+            createdAt: now,
+            updatedAt: now
+          },
+          {
+            _id: afterRangeFileId,
+            ownerId,
+            petId,
+            originalName: "after-range.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 300,
+            storageKey: "users/o/p/files/after-range.pdf",
+            uploadedAt: new Date("2026-06-01T00:00:00.000Z"),
+            createdAt: now,
+            updatedAt: now
+          },
+          {
+            _id: linkedToOtherEventFileId,
+            ownerId,
+            petId,
+            eventId: otherEventId,
+            originalName: "other-event.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 400,
+            storageKey: "users/o/p/files/other-event.pdf",
+            uploadedAt: new Date("2026-05-20T12:00:00.000Z"),
+            createdAt: now,
+            updatedAt: now
+          }
+        ];
+      },
+      getFileDownloadUrl: (key) => `https://download.example/${key}`
+    }
+  );
+
+  assert.deepEqual(observedRange, {
+    from: new Date("2026-05-01T00:00:00.000Z"),
+    toExclusive: new Date("2026-06-01T00:00:00.000Z")
+  });
+  assert.deepEqual(
+    report.files?.map((file) => file.originalName),
+    ["unlinked-in-range.pdf"]
+  );
+  assert.equal(report.files?.[0]?.downloadUrl, "https://download.example/users/o/p/files/unlinked-in-range.pdf");
+});
+
 test("buildPetExportReport excludes the current pet photo from file metadata", async () => {
   const documentFileId = new Types.ObjectId("507f1f77bcf86cd799439077");
 
@@ -215,7 +357,8 @@ test("buildPetExportReport passes selected event types to event listing", async 
       listEventsForPet: async (_owner, _pet, _range, eventTypes) => {
         observedEventTypes = eventTypes;
         return [];
-      }
+      },
+      listFileMetadataForPet: async () => []
     }
   );
 

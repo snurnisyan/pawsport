@@ -3,7 +3,7 @@ import path from "node:path";
 import Handlebars from "handlebars";
 
 import type { GotenbergAsset } from "./gotenbergClient";
-import type { PdfEvent, PdfFileMetadata, PdfReminder, PetExportPdfReport } from "./petExportReport";
+import type { PdfEvent, PdfFileMetadata, PetExportPdfReport } from "./petExportReport";
 
 export interface RenderPetExportTemplateResult {
   html: string;
@@ -23,10 +23,6 @@ interface TemplateFile extends PdfFileMetadata {
   uploadedLabel: string;
 }
 
-interface TemplateReminder extends PdfReminder {
-  sendAtLabel: string;
-}
-
 interface TemplateEvent extends PdfEvent {
   dateLabel: string;
   typeLabel: string;
@@ -35,7 +31,6 @@ interface TemplateEvent extends PdfEvent {
   stateClass: "past" | "future";
   contextParts: string[];
   files: TemplateFile[];
-  reminders: TemplateReminder[];
 }
 
 interface TemplateProfile extends NonNullable<PetExportPdfReport["profile"]> {
@@ -52,20 +47,22 @@ interface TemplateView {
   profile?: TemplateProfile;
   events?: TemplateEvent[];
   files?: TemplateFile[];
-  reminders?: TemplateReminder[];
+  documentFiles?: TemplateFile[];
   counts: {
     pastEvents: number;
     futureEvents: number;
     files: number;
+    documentFiles: number;
     reminders: number;
   };
+  renderFilesSection: boolean;
 }
 
 const formatDate = (value?: string): string => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -76,13 +73,13 @@ const formatDate = (value?: string): string => {
 const formatDateWithWeekday = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const datePart = new Intl.DateTimeFormat("en", {
+  const datePart = new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
-  const weekday = new Intl.DateTimeFormat("en", {
+  const weekday = new Intl.DateTimeFormat("ru-RU", {
     weekday: "short",
     timeZone: "UTC"
   }).format(date);
@@ -91,8 +88,8 @@ const formatDateWithWeekday = (value: string): string => {
 
 const formatBytes = (value: number): string => {
   if (!Number.isFinite(value) || value < 0) return "";
-  if (value < 1024) return `${value} B`;
-  const units = ["KB", "MB", "GB"];
+  if (value < 1024) return `${value} Б`;
+  const units = ["КБ", "МБ", "ГБ"];
   let size = value / 1024;
   for (const unit of units) {
     if (size < 1024 || unit === units[units.length - 1]) {
@@ -100,7 +97,7 @@ const formatBytes = (value: number): string => {
     }
     size /= 1024;
   }
-  return `${value} B`;
+  return `${value} Б`;
 };
 
 const titleize = (value: string): string =>
@@ -156,20 +153,68 @@ const eventTypeMeta = (type: string): { className: string; iconSvg: string } => 
   return EVENT_TYPE_META[type] ?? EVENT_TYPE_META.other;
 };
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  vaccine: "Вакцинация",
+  treatment: "Обработка",
+  visit: "Визит",
+  operation: "Операция",
+  lab: "Анализы и обследования",
+  other: "Другое"
+};
+
+const PET_SEX_LABELS: Record<string, string> = {
+  male: "Мальчик",
+  female: "Девочка",
+  unknown: "Пол не указан"
+};
+
+const SPECIES_LABELS: Record<string, string> = {
+  cat: "Кошка",
+  dog: "Собака"
+};
+
+const pluralRu = (value: number, one: string, few: string, many: string): string => {
+  const mod10 = Math.abs(value) % 10;
+  const mod100 = Math.abs(value) % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+};
+
+const recurrenceUnitLabel = (
+  frequency: string
+): { one: string; few: string; many: string; every: string } | undefined => {
+  const labels: Record<string, { one: string; few: string; many: string; every: string }> = {
+    daily: { one: "день", few: "дня", many: "дней", every: "каждый день" },
+    weekly: { one: "неделю", few: "недели", many: "недель", every: "каждую неделю" },
+    monthly: { one: "месяц", few: "месяца", many: "месяцев", every: "каждый месяц" },
+    yearly: { one: "год", few: "года", many: "лет", every: "каждый год" }
+  };
+  return labels[frequency];
+};
+
 const recurrenceLabel = (recurrence: PdfEvent["recurrence"]): string | undefined => {
   if (!recurrence) return undefined;
-  const frequency = titleize(recurrence.frequency).toLowerCase();
+  if (recurrence.frequency === "none") return undefined;
+  if (recurrence.frequency === "custom") return "повторяется по индивидуальному графику";
+  const frequency = recurrenceUnitLabel(recurrence.frequency);
+  if (!frequency) return `повторяется: ${titleize(recurrence.frequency).toLowerCase()}`;
   if (!recurrence.interval || recurrence.interval === 1) {
-    return `recurs ${frequency}`;
+    return `повторяется ${frequency.every}`;
   }
-  return `recurs every ${recurrence.interval} ${frequency}`;
+  return `повторяется каждые ${recurrence.interval} ${pluralRu(
+    recurrence.interval,
+    frequency.one,
+    frequency.few,
+    frequency.many
+  )}`;
 };
 
 const periodLabel = (period: PetExportPdfReport["period"]): string => {
-  if (!period?.from && !period?.to) return "all time";
+  if (!period?.from && !period?.to) return "за все время";
   if (period.from && period.to) return `${formatDate(period.from)} - ${formatDate(period.to)}`;
-  if (period.from) return `from ${formatDate(period.from)}`;
-  return `until ${formatDate(period.to)}`;
+  if (period.from) return `с ${formatDate(period.from)}`;
+  return `до ${formatDate(period.to)}`;
 };
 
 const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
@@ -179,11 +224,6 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
     sizeLabel: formatBytes(file.sizeBytes),
     uploadedLabel: formatDate(file.uploadedAt)
   }));
-  const reminders: TemplateReminder[] = (report.reminders ?? []).map((reminder) => ({
-    ...reminder,
-    sendAtLabel: formatDate(reminder.sendAt)
-  }));
-
   const filesById = new Map(files.map((file) => [file.id, file]));
   const filesByEventId = new Map<string, TemplateFile[]>();
   for (const file of files) {
@@ -191,13 +231,6 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
     const eventFiles = filesByEventId.get(file.eventId) ?? [];
     eventFiles.push(file);
     filesByEventId.set(file.eventId, eventFiles);
-  }
-
-  const remindersByEventId = new Map<string, TemplateReminder[]>();
-  for (const reminder of reminders) {
-    const eventReminders = remindersByEventId.get(reminder.eventId) ?? [];
-    eventReminders.push(reminder);
-    remindersByEventId.set(reminder.eventId, eventReminders);
   }
 
   const events: TemplateEvent[] = (report.events ?? []).map((event) => {
@@ -211,18 +244,16 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
       linkedFiles.set(file.id, file);
     }
 
-    const contextParts = [
-      event.clinicName,
-      recurrenceLabel(event.recurrence),
-      event.reminderOffset ? `reminder ${event.reminderOffset} before` : undefined
-    ].filter((part): part is string => Boolean(part));
+    const contextParts = [event.clinicName, recurrenceLabel(event.recurrence)].filter((part): part is string =>
+      Boolean(part)
+    );
 
     const typeMeta = eventTypeMeta(event.type);
 
     return {
       ...event,
       dateLabel: formatDateWithWeekday(event.eventDate),
-      typeLabel: titleize(event.type),
+      typeLabel: EVENT_TYPE_LABELS[event.type] ?? titleize(event.type),
       typeClass: typeMeta.className,
       typeIconSvg: typeMeta.iconSvg,
       stateClass:
@@ -230,8 +261,7 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
           ? "future"
           : "past",
       contextParts,
-      files: [...linkedFiles.values()],
-      reminders: remindersByEventId.get(event.id) ?? []
+      files: [...linkedFiles.values()]
     };
   });
 
@@ -239,18 +269,21 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
     ? {
         ...report.profile,
         initial: report.profile.name.trim().charAt(0).toUpperCase() || "P",
-        speciesLabel: [report.profile.breed, titleize(report.profile.species)].filter(Boolean).join(" - "),
+        speciesLabel: [report.profile.breed, SPECIES_LABELS[report.profile.species] ?? titleize(report.profile.species)]
+          .filter(Boolean)
+          .join(" - "),
         summaryParts: [
-          titleize(report.profile.sex),
-          report.profile.birthDate ? `Born ${formatDate(report.profile.birthDate)}` : undefined,
-          report.profile.microchipNumber ? `Microchip ${report.profile.microchipNumber}` : undefined,
-          report.profile.weight !== undefined ? `Weight ${report.profile.weight} kg` : undefined
+          PET_SEX_LABELS[report.profile.sex] ?? titleize(report.profile.sex),
+          report.profile.birthDate ? `Дата рождения: ${formatDate(report.profile.birthDate)}` : undefined,
+          report.profile.microchipNumber ? `Микрочип: ${report.profile.microchipNumber}` : undefined,
+          report.profile.weight !== undefined ? `Вес: ${report.profile.weight} кг` : undefined
         ].filter((part): part is string => Boolean(part))
       }
     : undefined;
 
   const pastEvents = events.filter((event) => event.stateClass === "past").length;
   const futureEvents = events.length - pastEvents;
+  const documentFiles = report.sections.includes("files") ? files : files.filter((file) => !file.eventId);
 
   return {
     report: {
@@ -261,13 +294,15 @@ const buildTemplateView = (report: PetExportPdfReport): TemplateView => {
     profile,
     events,
     files,
-    reminders,
+    documentFiles,
     counts: {
       pastEvents,
       futureEvents,
       files: files.length,
-      reminders: reminders.length
-    }
+      documentFiles: documentFiles.length,
+      reminders: report.reminders?.length ?? 0
+    },
+    renderFilesSection: report.sections.includes("files") || documentFiles.length > 0
   };
 };
 

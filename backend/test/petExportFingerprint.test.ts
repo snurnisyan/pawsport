@@ -24,7 +24,6 @@ const makePet = (overrides: Partial<PetRecord> = {}): PetRecord => ({
   sex: "female",
   weight: 4.2,
   microchipNumber: "123456789012345",
-  tags: ["indoor"],
   notes: ["likes travel"],
   vetContact: { name: "Dr. Smith", email: "vet@example.com" },
   createdAt: now,
@@ -36,6 +35,7 @@ const makeDependencies = (
   overrides: {
     eventTitle?: string;
     fileName?: string;
+    includeUnlinkedFile?: boolean;
     reminderStatus?: "pending" | "sent" | "failed" | "cancelled";
     reverseOrder?: boolean;
   } = {}
@@ -78,6 +78,14 @@ const makeDependencies = (
     storageKey: "users/o/p/files/visit-notes.pdf",
     uploadedAt: new Date("2026-02-11T00:00:00.000Z")
   };
+  const unlinkedFile = {
+    ...file,
+    _id: new Types.ObjectId("507f1f77bcf86cd799439088"),
+    eventId: undefined,
+    originalName: "insurance-policy.pdf",
+    storageKey: "users/o/p/files/insurance-policy.pdf",
+    uploadedAt: new Date("2026-03-11T00:00:00.000Z")
+  };
   const reminder = {
     _id: reminderId,
     ownerId,
@@ -94,7 +102,10 @@ const makeDependencies = (
 
   return {
     listEventsForPet: async () => (overrides.reverseOrder ? [laterEvent, event] : [event, laterEvent]),
-    listFileMetadataForPet: async () => (overrides.reverseOrder ? [laterFile, file] : [file, laterFile]),
+    listFileMetadataForPet: async () => {
+      const files = overrides.reverseOrder ? [laterFile, file] : [file, laterFile];
+      return overrides.includeUnlinkedFile ? [...files, unlinkedFile] : files;
+    },
     listRemindersForPet: async () => [reminder]
   };
 };
@@ -161,4 +172,17 @@ test("pet export fingerprint changes with PDF-relevant data and filters", async 
   assert.notEqual(changedReminder.dataHash, base.dataHash);
   assert.notEqual(changedSections.dataHash, base.dataHash);
   assert.notEqual(changedEventTypes.dataHash, base.dataHash);
+});
+
+test("pet export fingerprint changes when an unlinked in-range file is added to an events export", async () => {
+  const first = await hashFor({
+    sections: ["profile", "events"]
+  });
+  const withUnlinkedFile = await hashFor({
+    sections: ["profile", "events"],
+    dependencies: makeDependencies({ includeUnlinkedFile: true })
+  });
+
+  assert.notEqual(withUnlinkedFile.dataHash, first.dataHash);
+  assert.match(JSON.stringify(withUnlinkedFile.canonicalData), /insurance-policy\.pdf/);
 });

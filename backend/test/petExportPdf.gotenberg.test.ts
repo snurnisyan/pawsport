@@ -68,7 +68,6 @@ test(
         sex: "male",
         weight: 28.5,
         microchipNumber: "123456789012345",
-        tags: ["active", "traveler"],
         notes: ["Owner note kept intentionally short for the integration fixture."]
       },
       events,

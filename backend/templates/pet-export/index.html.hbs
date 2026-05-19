@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <title>Pawsport pet report</title>
+    <title>Медицинский отчет питомца Pawsport</title>
     <style>
       @page {
         size: A4;
@@ -187,22 +187,6 @@
         padding: 2px 8px;
       }
 
-      .tag-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        margin-top: 9px;
-      }
-
-      .tag {
-        background: #f4f3fa;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: var(--ink);
-        font-size: 10.5px;
-        padding: 2px 8px;
-      }
-
       .notes-card {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -370,8 +354,7 @@
         margin-top: 7px;
       }
 
-      .file-chip,
-      .reminder-chip {
+      .file-chip {
         align-items: center;
         background: #f6f7fb;
         border: 1px solid var(--line);
@@ -387,9 +370,7 @@
       }
 
       .file-chip[href] { color: #2454b8; }
-      .file-chip svg,
-      .reminder-chip svg { flex: 0 0 auto; height: 11px; width: 11px; }
-      .reminder-chip { background: #fff8e0; border-color: #f1dda1; color: #674b09; }
+      .file-chip svg { flex: 0 0 auto; height: 11px; width: 11px; }
 
       .file-table {
         border-collapse: collapse;
@@ -434,11 +415,11 @@
       <header class="doc-head">
         <div class="brand">
           <span class="brand-mark">P</span>
-          <span class="brand-name">Pawsport <span>Pet report</span></span>
+          <span class="brand-name">Pawsport <span>Медицинский отчет</span></span>
         </div>
         <div class="doc-meta">
-          <span><b>Period</b> {{report.periodLabel}}</span>
-          <span><b>Generated</b> {{report.generatedLabel}}</span>
+          <span><b>Период</b> {{report.periodLabel}}</span>
+          <span><b>Создан</b> {{report.generatedLabel}}</span>
         </div>
       </header>
 
@@ -461,16 +442,11 @@
                   <span class="summary-item summary-chip">{{this}}</span>
                 {{/each}}
               </div>
-              {{#if profile.tags}}
-                <div class="tag-list">
-                  {{#each profile.tags}}<span class="tag">{{this}}</span>{{/each}}
-                </div>
-              {{/if}}
             </div>
           </div>
           {{#if profile.notes}}
             <div class="notes-card">
-              <p class="subhead">Owner notes</p>
+              <p class="subhead">Заметки владельца</p>
               <ul class="notes-list">
                 {{#each profile.notes}}<li>{{this}}</li>{{/each}}
               </ul>
@@ -482,11 +458,11 @@
       {{#if events}}
         <section>
           <div class="section-head">
-            <h2 class="section-title">History of care</h2>
+            <h2 class="section-title">История ухода</h2>
             <div class="section-sub">
-              <b>{{counts.pastEvents}}</b> past events &middot;
-              <b>{{counts.futureEvents}}</b> upcoming &middot;
-              <b>{{counts.files}}</b> documents
+              Прошло: <b>{{counts.pastEvents}}</b> &middot;
+              Запланировано: <b>{{counts.futureEvents}}</b> &middot;
+              Документы: <b>{{counts.files}}</b>
             </div>
           </div>
 
@@ -521,16 +497,6 @@
                       {{/each}}
                     </div>
                   {{/if}}
-                  {{#if reminders}}
-                    <div class="tl-extras">
-                      {{#each reminders}}
-                        <span class="reminder-chip">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-                          <span>{{channel}} reminder &middot; {{sendAtLabel}}</span>
-                        </span>
-                      {{/each}}
-                    </div>
-                  {{/if}}
                 </div>
               </article>
             {{/each}}
@@ -538,23 +504,23 @@
         </section>
       {{/if}}
 
-      {{#if files}}
+      {{#if renderFilesSection}}
         <section>
           <div class="section-head">
-            <h2 class="section-title">Documents</h2>
-            <div class="section-sub"><b>{{counts.files}}</b> files</div>
+            <h2 class="section-title">Документы</h2>
+            <div class="section-sub">Файлы: <b>{{counts.documentFiles}}</b></div>
           </div>
           <table class="file-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Uploaded</th>
-                <th>Size</th>
-                <th>Event</th>
+                <th>Название</th>
+                <th>Загружен</th>
+                <th>Размер</th>
+                <th>Событие</th>
               </tr>
             </thead>
             <tbody>
-              {{#each files}}
+              {{#each documentFiles}}
                 <tr>
                   <td><a href="{{downloadUrl}}">{{originalName}}</a></td>
                   <td>{{uploadedLabel}}</td>
@@ -568,8 +534,8 @@
       {{/if}}
 
       <footer class="doc-foot">
-        <span>Pawsport pet health report</span>
-        <span>Report ID {{report.exportId}}</span>
+        <span>Pawsport: медицинский отчет питомца</span>
+        <span>ID отчета {{report.exportId}}</span>
       </footer>
     </main>
   </body>
