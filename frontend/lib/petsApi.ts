@@ -27,6 +27,7 @@ export type TPetResponse = components["schemas"]["PetResponse"];
 export type TPetFile = components["schemas"]["File"];
 export type TPetFileListResponse = components["schemas"]["FileListResponse"];
 export type TPetFileResponse = components["schemas"]["FileResponse"];
+export type TPetPhotoResponse = components["schemas"]["PetPhotoResponse"];
 export type TPetEvent = components["schemas"]["Event"];
 export type TPetEventListResponse = components["schemas"]["EventListResponse"];
 export type TPetEventsQuery = NonNullable<
@@ -156,6 +157,27 @@ export const uploadPetFile = async (
   }
 
   return payload as TPetFileResponse;
+};
+
+export const uploadPetPhoto = async (
+  petId: string,
+  file: File
+): Promise<TPetPhotoResponse> => {
+  const body = new FormData();
+  body.append("file", file);
+
+  const response = await authenticatedFetch(`/pets/${petId}/photo`, {
+    method: "POST",
+    body,
+  });
+
+  const payload = (await response.json().catch(() => undefined)) as unknown;
+
+  if (!response.ok) {
+    throw normalizeApiError(payload, response);
+  }
+
+  return payload as TPetPhotoResponse;
 };
 
 export const downloadFile = async (

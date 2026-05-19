@@ -16,8 +16,9 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 type TPhotoUploadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (file: File) => void;
+  onSave: (file: File) => void | Promise<void>;
   petName: string;
+  isPending?: boolean;
 };
 
 export function PhotoUploadDialog({
@@ -25,6 +26,7 @@ export function PhotoUploadDialog({
   onOpenChange,
   onSave,
   petName,
+  isPending = false,
 }: TPhotoUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const previewUrl = useMemo(
@@ -38,20 +40,27 @@ export function PhotoUploadDialog({
   }, [previewUrl]);
 
   const closeDialog = () => {
+    if (isPending) return;
     setFile(null);
     onOpenChange(false);
   };
 
-  const handleSave = () => {
-    if (!file) return;
-    onSave(file);
-    closeDialog();
+  const handleSave = async () => {
+    if (!file || isPending) return;
+    try {
+      await onSave(file);
+      setFile(null);
+      onOpenChange(false);
+    } catch {
+      // The parent mutation owns the visible error state and keeps the dialog open.
+    }
   };
 
   return (
     <DialogShell
       open={open}
       onOpenChange={(nextOpen) => {
+        if (isPending) return;
         if (!nextOpen) {
           closeDialog();
           return;
@@ -63,7 +72,9 @@ export function PhotoUploadDialog({
         <DialogActions
           onCancel={closeDialog}
           onSave={handleSave}
-          saveDisabled={!file}
+          cancelDisabled={isPending}
+          saveDisabled={!file || isPending}
+          saveLabel={isPending ? "Сохраняем..." : "Сохранить"}
         />
       }
     >
@@ -95,6 +106,7 @@ export function PhotoUploadDialog({
               color="fg.default"
               backdropFilter="blur(8px)"
               onClick={() => setFile(null)}
+              disabled={isPending}
               _hover={{ bg: "bg.canvas" }}
             >
               <LuX />
@@ -110,7 +122,9 @@ export function PhotoUploadDialog({
       ) : (
         <FileDropZone
           accept="image/png,image/jpeg"
-          onFiles={(files) => setFile(files[0])}
+          onFiles={(files) => {
+            if (!isPending) setFile(files[0]);
+          }}
           title="Нажмите, чтобы выбрать фото"
           subtitle="PNG, JPG"
           height="240px"
