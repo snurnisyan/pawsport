@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { ApiError } from "@/lib/api";
-import { getCurrentUser } from "@/lib/authApi";
+import { getCurrentUser, logoutUser } from "@/lib/authApi";
 import { useAuthStore, type TAuthUser } from "@/store/auth";
 
 export type { TAuthUser };
@@ -44,6 +44,20 @@ export const useClientReady = () => {
   return status !== "loading";
 };
 
+export const isInvalidAuthSessionError = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  (error.status === 401 || error.code === "UNAUTHORIZED" || error.code === "USER_NOT_FOUND");
+
+const clearServerAuthCookie = async (): Promise<void> => {
+  try {
+    await logoutUser();
+  } catch (error) {
+    if (!isInvalidAuthSessionError(error)) {
+      console.error("Failed to clear auth cookie", error);
+    }
+  }
+};
+
 let bootstrapStarted = false;
 
 export function AuthSessionBootstrap() {
@@ -55,8 +69,10 @@ export function AuthSessionBootstrap() {
       .then(({ user }) => {
         useAuthStore.getState().setUser(toAuthUser(user));
       })
-      .catch((error) => {
-        if (error instanceof ApiError && error.status !== 401) {
+      .catch(async (error) => {
+        if (isInvalidAuthSessionError(error)) {
+          await clearServerAuthCookie();
+        } else {
           console.error("Failed to restore auth session", error);
         }
         useAuthStore.getState().setAnonymous();
