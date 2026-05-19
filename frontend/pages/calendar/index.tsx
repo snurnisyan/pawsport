@@ -228,10 +228,16 @@ export default function CalendarPage() {
     [pets]
   );
 
+  const effectiveSelectedPetIds = useMemo(
+    () => (petFilterTouched ? selectedPetIds : petIds),
+    [petFilterTouched, petIds, selectedPetIds]
+  );
+
   useEffect(() => {
+    if (!petFilterTouched) return;
+
     const timer = window.setTimeout(() => {
       setSelectedPetIds((current) => {
-        if (!petFilterTouched) return sameValues(current, petIds) ? current : petIds;
         const valid = current.filter((id) => petIds.includes(id));
         return sameValues(current, valid) ? current : valid;
       });
@@ -242,20 +248,20 @@ export default function CalendarPage() {
 
   const calendarQuery = useMemo<TCalendarQuery>(() => {
     const allPetsSelected =
-      pets.length > 0 && selectedPetIds.length === pets.length;
+      pets.length > 0 && effectiveSelectedPetIds.length === pets.length;
     const allTypesSelected = selectedEventTypes.length === ALL_EVENT_TYPES.length;
 
     return {
       from: dateParam(year, 1, 1),
       to: dateParam(year, 12, 31),
-      petIds: allPetsSelected ? undefined : selectedPetIds,
+      petIds: allPetsSelected ? undefined : effectiveSelectedPetIds,
       eventTypes: allTypesSelected ? undefined : selectedEventTypes,
     };
-  }, [pets.length, selectedEventTypes, selectedPetIds, year]);
+  }, [effectiveSelectedPetIds, pets.length, selectedEventTypes, year]);
 
   const calendarEnabled =
     !petsQuery.isLoading &&
-    selectedPetIds.length > 0 &&
+    effectiveSelectedPetIds.length > 0 &&
     selectedEventTypes.length > 0;
   const calendarQueryResult = useCalendarEventsQuery(
     calendarQuery,
@@ -373,7 +379,9 @@ export default function CalendarPage() {
         ? "Попробуйте обновить страницу."
         : undefined;
 
-  const emptyFiltered = selectedEventTypes.length === 0 || selectedPetIds.length === 0;
+  const emptyFiltered =
+    !petsQuery.isLoading &&
+    (selectedEventTypes.length === 0 || effectiveSelectedPetIds.length === 0);
   const emptyEvents =
     calendarEnabled &&
     !calendarQueryResult.isLoading &&
@@ -383,7 +391,7 @@ export default function CalendarPage() {
   const filters = (
     <CalendarFilters
       selectedEventTypes={selectedEventTypes}
-      selectedPetIds={selectedPetIds}
+      selectedPetIds={effectiveSelectedPetIds}
       pets={petOptions}
       petsLoading={petsQuery.isLoading}
       petsError={petsError}

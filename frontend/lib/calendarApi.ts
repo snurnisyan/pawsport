@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiClient, unwrapApiResponse } from "@/lib/api";
 import { useAuthSession } from "@/lib/session";
 import type { components, paths } from "@/types/api";
@@ -26,5 +26,6 @@ export const useCalendarEventsQuery = (
     queryKey: calendarQueryKey(query),
     queryFn: () => listCalendarEvents(query),
     enabled: enabled && Boolean(session),
+    placeholderData: keepPreviousData,
   });
 };
