@@ -36,6 +36,7 @@ services:
           listen 443 ssl;
           http2 on;
           server_name pawsport.ru;
+          client_max_body_size 25m;
 
           ssl_certificate /etc/nginx/certs/fullchain.pem;
           ssl_certificate_key /etc/nginx/certs/privkey.pem;
@@ -91,6 +92,7 @@ services:
       - /etc/pawsport/backend.env
     environment:
       GOTENBERG_URL: "http://gotenberg:3000"
+      BACKGROUND_JOB_RUNNER_ENABLED: "true"
     depends_on:
       - gotenberg
 
