@@ -6,6 +6,7 @@ import { buildPetExportFingerprint } from "../src/services/petExportFingerprint"
 import type { BuildPetExportReportDependencies, PetRecord } from "../src/services/petExportReport";
 import type { ExportSection } from "../src/models/Export";
 import type { EventType } from "../src/models/Event";
+import { PetModel } from "../src/models/Pet";
 
 const ownerId = new Types.ObjectId("507f1f77bcf86cd799439011");
 const petId = new Types.ObjectId("507f1f77bcf86cd799439022");
@@ -185,4 +186,24 @@ test("pet export fingerprint changes when an unlinked in-range file is added to 
 
   assert.notEqual(withUnlinkedFile.dataHash, first.dataHash);
   assert.match(JSON.stringify(withUnlinkedFile.canonicalData), /insurance-policy\.pdf/);
+});
+
+test("pet export fingerprint handles hydrated pet profile subdocuments", async () => {
+  const hydratedPet = PetModel.hydrate(makePet({
+    vetContact: { name: "Dr. Smith", phone: "555-0100", email: "vet@example.com" }
+  })) as unknown as PetRecord;
+
+  const result = await hashFor({
+    pet: hydratedPet,
+    sections: ["profile"],
+    dependencies: {
+      listFileMetadataForPet: async () => []
+    }
+  });
+
+  assert.equal(result.dataHash.length, 64);
+  assert.deepEqual(
+    (result.canonicalData as { renderData: { profile: { vetContact: unknown } } }).renderData.profile.vetContact,
+    { email: "vet@example.com", name: "Dr. Smith", phone: "555-0100" }
+  );
 });

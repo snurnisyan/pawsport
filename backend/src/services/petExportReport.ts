@@ -244,7 +244,7 @@ export const findPetByIdForOwner = async (
   petId: Types.ObjectId,
   ownerId: Types.ObjectId
 ): Promise<PetRecord | null> =>
-  PetModel.findOne({ _id: petId, ownerId }).exec() as unknown as PetRecord | null;
+  PetModel.findOne({ _id: petId, ownerId }).lean().exec() as unknown as PetRecord | null;
 
 const defaultListEvents: NonNullable<BuildPetExportReportDependencies["listEventsForPet"]> = async (
   ownerId,
@@ -309,6 +309,18 @@ const streamToBuffer = async (body: NodeJS.ReadableStream): Promise<Buffer> => {
 
 const optionalId = (id?: Types.ObjectId): string | undefined => id?.toString();
 
+const serializeVetContact = (vetContact: PetRecord["vetContact"]): PdfVetContact | undefined => {
+  if (!vetContact) {
+    return undefined;
+  }
+
+  const result: PdfVetContact = {};
+  if (vetContact.name) result.name = vetContact.name;
+  if (vetContact.phone) result.phone = vetContact.phone;
+  if (vetContact.email) result.email = vetContact.email;
+  return Object.keys(result).length > 0 ? result : undefined;
+};
+
 const serializeProfileForPdf = async (
   pet: PetRecord,
   ownerId: Types.ObjectId,
@@ -321,14 +333,15 @@ const serializeProfileForPdf = async (
     name: pet.name,
     species: pet.species,
     sex: pet.sex,
-    notes: pet.notes ?? []
+    notes: [...(pet.notes ?? [])]
   };
 
   if (pet.breed) result.breed = pet.breed;
   if (pet.birthDate) result.birthDate = toDateOnly(pet.birthDate);
   if (pet.weight !== undefined && pet.weight !== null) result.weight = pet.weight;
   if (pet.microchipNumber) result.microchipNumber = pet.microchipNumber;
-  if (pet.vetContact) result.vetContact = pet.vetContact;
+  const vetContact = serializeVetContact(pet.vetContact);
+  if (vetContact) result.vetContact = vetContact;
 
   if (pet.photoFileId) {
     const photoFile = await findPhotoFileForPet(pet.photoFileId, ownerId, petId);
