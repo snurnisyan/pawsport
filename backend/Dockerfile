@@ -25,5 +25,6 @@ RUN yarn install --production --frozen-lockfile && yarn cache clean
 RUN mkdir -p /root/.mongodb
 COPY --from=yc-mongodb-ca /root/.mongodb/root.crt /root/.mongodb/root.crt
 COPY --from=build /app/dist ./dist
+COPY templates ./templates
 EXPOSE 4000
 CMD ["node", "dist/server.js"]
