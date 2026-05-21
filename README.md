@@ -102,7 +102,7 @@ API также умеет принимать токен из заголовка 
 
 - `helmet` для базовых HTTP security headers.
 - `cors` с разрешенными origin из `CORS_ORIGIN`.
-- `express-rate-limit`: 100 запросов за 15 минут.
+- `express-rate-limit`: 1000 успешных запросов за 15 минут.
 - Ограничение JSON body до 1 MB.
 - Файлы принимаются только через multipart и только типов `application/pdf`, `image/png`, `image/jpeg`.
 - Максимальный размер файла - 20 MB.
