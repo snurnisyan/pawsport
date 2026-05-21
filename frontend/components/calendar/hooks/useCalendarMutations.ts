@@ -1,7 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TDayEvent } from "@/components/calendar/day/DayEventCard";
 import type { TEventFormData } from "@/components/pets/events/EventForm";
-import { buildPayload } from "@/components/pets/events/eventTransforms";
+import {
+  buildCreatePayload,
+  buildUpdatePayload,
+} from "@/components/pets/events/eventTransforms";
 import { toaster } from "@/components/ui/toaster";
 import {
   calendarQueryKey,
@@ -28,7 +31,7 @@ export function useCalendarMutations(calendarQuery: TCalendarQuery) {
   const createMutation = useMutation({
     mutationFn: async (data: TEventFormData) => {
       if (!data.petId) throw new Error("Выберите питомца для события.");
-      const payload = buildPayload(data);
+      const payload = buildCreatePayload(data);
       return createPetEvent(data.petId, { ...payload, fileIds: [] }, data.files);
     },
     onSuccess: async (response, data) => {
@@ -62,7 +65,7 @@ export function useCalendarMutations(calendarQuery: TCalendarQuery) {
     }) => {
       const originalIds = (event.source.files ?? []).map((file) => file.fileId);
       const removedIds = originalIds.filter((id) => !keptExistingFileIds.includes(id));
-      const payload = buildPayload(data);
+      const payload = buildUpdatePayload(data);
       const result = await updateEvent(event.id, payload, {
         petId: event.petId,
         files: data.files,

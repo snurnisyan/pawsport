@@ -1,5 +1,9 @@
 import { isEventSubtypeSupported } from "@/lib/eventTypes";
-import type { TCreateEventRequest, TPetEvent } from "@/lib/eventsApi";
+import type {
+  TCreateEventRequest,
+  TPetEvent,
+  TUpdateEventRequest,
+} from "@/lib/eventsApi";
 import type { TPetEventType } from "@/store/pets";
 import { splitDateTime, toIsoDateTime } from "@/utils/dates";
 import type { TEventFormData, TReminderValue } from "./EventForm";
@@ -23,7 +27,7 @@ export const fromEvent = (event: TPetEvent): TEventFormData => {
   };
 };
 
-export const buildPayload = (data: TEventFormData): TEventPayloadBase => ({
+export const buildCreatePayload = (data: TEventFormData): TEventPayloadBase => ({
   type: data.type as TPetEventType,
   subtype: isEventSubtypeSupported(data.type) ? data.subtype || undefined : undefined,
   title: data.title.trim(),
@@ -32,4 +36,17 @@ export const buildPayload = (data: TEventFormData): TEventPayloadBase => ({
   clinicName: data.clinic.trim() || undefined,
   comment: data.comment.trim() || undefined,
   reminderOffset: data.reminder === "none" ? undefined : data.reminder,
+});
+
+export const buildUpdatePayload = (data: TEventFormData): TUpdateEventRequest => ({
+  type: data.type as TPetEventType,
+  subtype: isEventSubtypeSupported(data.type) ? data.subtype || undefined : undefined,
+  title: data.title.trim(),
+  eventDate: toIsoDateTime(data.date, data.time),
+  nextDate: data.nextDate ? toIsoDateTime(data.nextDate) : "",
+  clinicName: data.clinic.trim(),
+  comment: data.comment.trim(),
+  reminderOffset: (data.reminder === "none"
+    ? ""
+    : data.reminder) as TUpdateEventRequest["reminderOffset"],
 });

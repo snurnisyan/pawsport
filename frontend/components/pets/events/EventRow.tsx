@@ -64,11 +64,6 @@ export function EventRow({ event, onEdit, onDelete }: TEventRowProps) {
               </HStack>
             )}
           </HStack>
-          {event.comment && (
-            <Text fontSize="14px" color="fg.subtle">
-              {event.comment}
-            </Text>
-          )}
           <HStack gap="4px" flexShrink={0}>
             <IconButton
               aria-label="Редактировать"
@@ -92,6 +87,11 @@ export function EventRow({ event, onEdit, onDelete }: TEventRowProps) {
             </IconButton>
           </HStack>
         </Flex>
+        {event.comment && (
+          <Text fontSize="14px" color="fg.subtle" w="full">
+            {event.comment}
+          </Text>
+        )}
       </Stack>
     </HStack>
   );

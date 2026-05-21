@@ -22,7 +22,8 @@ import {
 } from "./EventForm";
 import { todayIsoDate } from "@/utils/dates";
 import {
-  buildPayload,
+  buildCreatePayload,
+  buildUpdatePayload,
   fromEvent,
   type TEventPayloadBase,
 } from "./eventTransforms";
@@ -148,11 +149,10 @@ export function EventDialog({
       onOpenChange(false);
       return;
     }
-    const payload = buildPayload(data);
     if (isEdit) {
-      updateMutation.mutate(payload);
+      updateMutation.mutate(buildUpdatePayload(data));
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate(buildCreatePayload(data));
     }
   };
 
