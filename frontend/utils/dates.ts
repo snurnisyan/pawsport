@@ -27,6 +27,12 @@ export const subtractMonths = (date: Date, months: number): Date => {
   return result;
 };
 
+export const subtractDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+};
+
 export const formatFullDateLong = (date: string | Date): string => {
   const d = date instanceof Date ? date : new Date(date);
   return new Intl.DateTimeFormat("ru-RU", {

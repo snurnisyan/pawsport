@@ -17,16 +17,26 @@ import { Card } from "@/components/ui/Card";
 import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { StepProgress } from "@/components/ui/StepProgress";
 import { DateInput } from "@/components/ui/DateInput";
+import { subtractDays, subtractMonths, toDateOnly } from "@/utils/dates";
 
 type TReminderKind = "vaccine" | "treatment";
 
+type TReminderSubtype = "complex" | "rabies" | "internal" | "external";
+
+export type TReminderDraft = {
+  type: TReminderKind;
+  subtype: TReminderSubtype;
+  title: string;
+  lastDate: string;
+  nextDate: string;
+};
+
 type TReminderConfig = {
-  id: string;
+  id: TReminderSubtype;
   label: string;
   icon: ReactNode;
   iconColor: string;
   enabled: boolean;
-  lastDate: string;
   kind: TReminderKind;
 };
 
@@ -37,7 +47,6 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuSyringe />,
     iconColor: "#A855F7",
     enabled: true,
-    lastDate: "2025-10-12",
     kind: "vaccine",
   },
   {
@@ -46,7 +55,6 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuShieldCheck />,
     iconColor: "#A855F7",
     enabled: true,
-    lastDate: "2025-10-12",
     kind: "vaccine",
   },
   {
@@ -55,7 +63,6 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuBug />,
     iconColor: "#10B981",
     enabled: true,
-    lastDate: "2026-04-05",
     kind: "treatment",
   },
   {
@@ -64,10 +71,14 @@ const DEFAULT_REMINDERS: TReminderConfig[] = [
     icon: <LuWorm />,
     iconColor: "#10B981",
     enabled: true,
-    lastDate: "2026-04-05",
     kind: "treatment",
   },
 ];
+
+const defaultLastDate = (kind: TReminderKind): string =>
+  kind === "vaccine"
+    ? toDateOnly(subtractMonths(new Date(), 2))
+    : toDateOnly(subtractDays(new Date(), 14));
 
 function computeNextDate(lastDate: string, kind: TReminderKind): string {
   if (!lastDate) return "";
@@ -91,21 +102,31 @@ type TReminderState = {
 };
 
 type TReminderStepProps = {
-  onSave: () => void;
+  onSave: (reminders: TReminderDraft[]) => void;
   onSkip: () => void;
+  isSubmitting?: boolean;
+  errorText?: string;
 };
 
-export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
+export function ReminderStep({
+  onSave,
+  onSkip,
+  isSubmitting = false,
+  errorText,
+}: TReminderStepProps) {
   const [state, setState] = useState<Record<string, TReminderState>>(() =>
     Object.fromEntries(
-      DEFAULT_REMINDERS.map((r) => [
-        r.id,
-        {
-          enabled: r.enabled,
-          lastDate: r.lastDate,
-          nextDate: computeNextDate(r.lastDate, r.kind),
-        },
-      ]),
+      DEFAULT_REMINDERS.map((r) => {
+        const lastDate = defaultLastDate(r.kind);
+        return [
+          r.id,
+          {
+            enabled: r.enabled,
+            lastDate,
+            nextDate: computeNextDate(lastDate, r.kind),
+          },
+        ];
+      }),
     ),
   );
 
@@ -132,6 +153,20 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
       ...prev,
       [id]: { ...prev[id], enabled: value },
     }));
+  };
+
+  const handleSave = () => {
+    onSave(
+      DEFAULT_REMINDERS.filter(
+        (r) => state[r.id].enabled && state[r.id].lastDate,
+      ).map((r) => ({
+        type: r.kind,
+        subtype: r.id,
+        title: r.label,
+        lastDate: state[r.id].lastDate,
+        nextDate: state[r.id].nextDate,
+      })),
+    );
   };
 
   return (
@@ -199,8 +234,17 @@ export function ReminderStep({ onSave, onSkip }: TReminderStepProps) {
       </Stack>
 
       <Stack gap="8px">
-        <PrimaryButton onClick={onSave}>Сохранить</PrimaryButton>
-        <GhostButton onClick={onSkip}>Пропустить</GhostButton>
+        {errorText && (
+          <Text color="red.400" fontSize="sm" textAlign="center">
+            {errorText}
+          </Text>
+        )}
+        <PrimaryButton onClick={handleSave} loading={isSubmitting}>
+          Сохранить
+        </PrimaryButton>
+        <GhostButton onClick={onSkip} disabled={isSubmitting}>
+          Пропустить
+        </GhostButton>
       </Stack>
     </VStack>
   );
