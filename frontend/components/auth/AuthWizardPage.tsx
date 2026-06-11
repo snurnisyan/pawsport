@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { PetStep, type TPetData } from "@/components/auth/PetStep";
 import { RegisterStep } from "@/components/auth/RegisterStep";
-import { ReminderStep } from "@/components/auth/ReminderStep";
+import { ReminderStep, type TReminderDraft } from "@/components/auth/ReminderStep";
 import { ApiError } from "@/lib/api";
 import { registerUser } from "@/lib/authApi";
-import { createPet, petsQueryKey } from "@/lib/petsApi";
+import { createPetEvent } from "@/lib/eventsApi";
+import { createPet, petEventsQueryPrefix, petsQueryKey } from "@/lib/petsApi";
+import { toIsoDateTime } from "@/utils/dates";
 import {
   persistAuthSession,
   useAuthSession,
@@ -62,6 +64,7 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
   const clientReady = useClientReady();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [state, setState] = useState<TWizardState>(INITIAL);
+  const [petId, setPetId] = useState<string | null>(null);
   const shouldRedirectPlainRegistration =
     redirectPlainRegistration && router.isReady && router.query.step !== "pet";
   const isOnPetStep = router.query.step === "pet";
@@ -124,13 +127,50 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
         tags: [],
         notes: [],
       }),
-    onSuccess: async () => {
+    onSuccess: async (response) => {
+      setPetId(response.pet.id);
       await queryClient.invalidateQueries({ queryKey: petsQueryKey });
       setStep(3);
     },
   });
 
   const finish = () => router.push("/pets");
+
+  const saveRemindersMutation = useMutation({
+    mutationFn: async (reminders: TReminderDraft[]) => {
+      if (!petId) return;
+      for (const reminder of reminders) {
+        await createPetEvent(petId, {
+          type: reminder.type,
+          subtype: reminder.subtype,
+          title: reminder.title,
+          eventDate: toIsoDateTime(reminder.lastDate),
+          nextDate: reminder.nextDate
+            ? toIsoDateTime(reminder.nextDate)
+            : undefined,
+          fileIds: [],
+        });
+        if (reminder.nextDate) {
+          await createPetEvent(petId, {
+            type: reminder.type,
+            subtype: reminder.subtype,
+            title: reminder.title,
+            eventDate: toIsoDateTime(reminder.nextDate),
+            reminderOffset: "day",
+            fileIds: [],
+          });
+        }
+      }
+    },
+    onSuccess: async () => {
+      if (petId) {
+        await queryClient.invalidateQueries({
+          queryKey: petEventsQueryPrefix(petId),
+        });
+      }
+      finish();
+    },
+  });
 
   if (shouldRedirectPlainRegistration || shouldRedirectAuthenticated) {
     return null;
@@ -178,7 +218,24 @@ export function AuthWizardPage({ redirectPlainRegistration = false }: TAuthWizar
             onNext={() => createPetMutation.mutate()}
           />
         )}
-        {visibleStep === 3 && <ReminderStep onSave={finish} onSkip={finish} />}
+        {visibleStep === 3 && (
+          <ReminderStep
+            isSubmitting={saveRemindersMutation.isPending}
+            errorText={
+              saveRemindersMutation.isError
+                ? errorMessage(saveRemindersMutation.error)
+                : undefined
+            }
+            onSave={(reminders) => {
+              if (!petId || reminders.length === 0) {
+                finish();
+                return;
+              }
+              saveRemindersMutation.mutate(reminders);
+            }}
+            onSkip={finish}
+          />
+        )}
       </AuthLayout>
     </>
   );
